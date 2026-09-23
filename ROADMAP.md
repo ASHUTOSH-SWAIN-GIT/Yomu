@@ -82,13 +82,13 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 ### Scraping pipeline (Rust command `scrape_url`)
 
-- [ ] Normalize URL: strip tracking params, resolve redirects, use as cache key
-- [ ] Shortcuts first: `llms.txt`, markdown versions of docs pages, Medium RSS feed
-- [ ] Plain HTTP fetch with a real User-Agent
-- [ ] Fallback: if extracted text is under ~200 words, retry in a hidden webview
-- [ ] Extractor selection: site rule if matched, else Readability
-- [ ] Convert cleaned HTML into block JSON
-- [ ] Auto detect code language when missing
+- [x] Normalize URL: strip tracking params, use as cache key (redirect resolution happens at fetch time via the final response URL)
+- [ ] Shortcuts first: `llms.txt`, markdown versions of docs pages, Medium RSS feed — deferred, plain fetch only for now
+- [x] Plain HTTP fetch with a real User-Agent
+- [ ] Fallback: if extracted text is under ~200 words, retry in a hidden webview — deferred, needs the hidden webview from M4/M5 era tooling
+- [x] Extractor selection: Mozilla-style Readability (via the `readability` crate)
+- [x] Convert cleaned HTML into block JSON
+- [x] Auto detect code language when missing (hand written regex signatures, not a full highlight.js-style classifier)
 
 ### Block format
 
@@ -104,11 +104,11 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 }
 ```
 
-- [ ] Define block types in TypeScript and Rust (shared schema, one source of truth)
+- [x] Define block types in TypeScript and Rust (`src-tauri/src/scraper/blocks.rs` / `src/types/article.ts`, kept in sync by hand)
 
 ### Site rules
 
-- [ ] Kubernetes / Hugo docs (tabs, callouts)
+- [ ] Kubernetes / Hugo docs (tabs, callouts) — generic Readability extraction only so far
 - [ ] Docusaurus
 - [ ] MkDocs
 - [ ] dev.to, Hashnode
@@ -116,15 +116,16 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 ### Reader components
 
-- [ ] Heading
-- [ ] Paragraph (inline code, links, emphasis)
-- [ ] Code block with Shiki
-- [ ] Image (lazy load, alt text)
-- [ ] Math with KaTeX
+- [x] Heading
+- [x] Paragraph (inline code, links, emphasis — rendered from structured spans, not raw HTML)
+- [x] Code block with Shiki (fine grained bundle, JS regex engine, light/dark themes)
+- [x] Image (lazy load, alt text)
+- [x] Math with KaTeX
 
 ### Tests
 
-- [ ] Fixture HTML snapshots per target site -> expected block JSON
+- [x] Unit tests for HTML → block conversion, language detection, and URL normalization (`cargo test`, 16 passing)
+- [ ] Fixture HTML snapshots pulled from real target sites — deferred until site rules land
 
 **Exit criteria**: a Kubernetes doc page, a dev.to post, and a free Medium article all render cleanly.
 

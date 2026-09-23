@@ -91,3 +91,15 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+/* Shiki dual theme output (see src/lib/highlighter.ts, defaultColor: false) */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg) !important;
+}
+:root.dark .shiki,
+:root.dark .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg) !important;
+}
