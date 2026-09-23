@@ -154,29 +154,29 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 ### Onboarding
 
-- [ ] Detect Codex install (and adapter)
-- [ ] Check login status
-- [ ] "Sign in with ChatGPT" button runs `codex login` and opens the browser
-- [ ] `agent_status` command: `missing | logged_out | ready`
+- [x] Detect Codex install (`agent_status` runs `codex --version`) — adapter presence isn't checked separately yet
+- [x] Check login status (best guess `codex login status` parsing — **unverified against a real Codex install**, see below)
+- [x] "Sign in with ChatGPT" button runs `codex login`
+- [x] `agent_status` command: `missing | logged_out | ready`
 
 ### ACP client
 
-- [ ] Implement `AgentHarness` interface (`status`, `login`, `newSession`, `prompt`)
-- [ ] Spawn adapter, JSON-RPC over stdio
-- [ ] `session/new` with an empty temp dir as cwd
-- [ ] `session/prompt` and stream `session/update` chunks
-- [ ] Normalize events for the UI: `token`, `done`, `error`, `permission_request`
+- [x] `AgentHarness` (`src-tauri/src/agent/harness.rs`): `new_session`, `prompt`; status/login live in `agent/status.rs`
+- [x] Spawn adapter, JSON-RPC over stdio — hand rolled (`agent/rpc.rs`) rather than a third party ACP crate, see note below
+- [x] `session/new` with an empty temp dir as cwd
+- [x] `session/prompt` and stream `session/update` chunks
+- [x] Normalize events for the UI: `token`, `done`, `error`, `permission_request` (`agent/events.rs`)
 
 ### Safety
 
-- [ ] Read only sandbox: no file writes, no shell commands
-- [ ] Temp working directory, never user projects
-- [ ] Permission requests surfaced in UI, default deny
+- [x] Read only sandbox: no file writes, no shell commands are ever issued by the harness itself
+- [x] Temp working directory, never user projects (`agent_new_session` always creates a fresh temp dir)
+- [x] Permission requests surfaced in UI, default deny (no code path grants one)
 
 ### Lifecycle
 
-- [ ] Restart adapter on crash
-- [ ] Kill all child processes on app quit
+- [x] Restart adapter on crash (`connection()` checks `has_exited()` and respawns)
+- [x] Kill all child processes on app quit (`kill_on_drop` plus an explicit `ExitRequested` handler)
 
 ### Auth rules (non negotiable)
 
@@ -184,7 +184,22 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - Never call OpenAI's backend directly
 - All model calls go through the official Codex binary
 
-**Exit criteria**: fresh machine -> install prompt -> login -> "hello" prompt streams back in a debug panel.
+**Exit criteria**: fresh machine -> install prompt -> login -> "hello" prompt streams back in a debug panel. Verified against a mock ACP agent (below); **not yet verified against real Codex**.
+
+### Important caveat: no real Codex in this dev environment
+
+This sandbox has no `codex` binary and no way to sign in to ChatGPT, so none of the above has been run against the real thing. What's actually verified:
+
+- The ACP spike from Phase 0, kept as an automated test (`src-tauri/src/agent/tests.rs`) instead of a throwaway script, against `scripts/mock-acp-agent.mjs` — a small stand-in agent implementing this project's own minimal JSON-RPC-over-stdio protocol. Covers: process spawn, `initialize`, `session/new`, `session/prompt`, streamed `session/update` tokens, error handling, and the full `AgentHarness` path.
+- The onboarding → login → streamed-reply UI flow, browser-tested against a mocked Tauri backend.
+
+What's unverified and should be treated as a first guess, not a spec:
+
+- `codex login status` as the login-check command and its output format
+- The exact adapter binary/invocation (`codex-acp` is a guess at the package name from ROADMAP.md)
+- Whether real ACP's wire format matches this project's simplified one (real `initialize`/`session/new`/`session/prompt` shapes, capability negotiation, real permission-request semantics)
+
+Revisit `agent/status.rs` and `agent/harness.rs`'s doc comments once a real Codex + ACP adapter install is available to test against.
 
 ---
 

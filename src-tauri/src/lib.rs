@@ -1,7 +1,14 @@
+mod agent;
 mod db;
 mod scraper;
 
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use agent::{AgentHarness, AgentStatus};
 use scraper::ScrapedArticle;
+use tauri::Emitter;
+use tokio::sync::mpsc;
 
 #[tauri::command]
 async fn scrape_url(url: String) -> Result<ScrapedArticle, String> {
@@ -15,8 +22,51 @@ fn canonicalize_url(url: String) -> Result<String, String> {
     scraper::canonical_url(&url).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn agent_status() -> AgentStatus {
+    agent::detect().await
+}
+
+#[tauri::command]
+async fn agent_login() -> Result<(), String> {
+    agent::login().await
+}
+
+/// Opens a fresh ACP session rooted in a new, empty temp directory —
+/// never a user project — per ROADMAP.md M4 safety settings.
+#[tauri::command]
+async fn agent_new_session(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<String, String> {
+    let dir_name = format!(
+        "yomu-explain-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    let cwd = std::env::temp_dir().join(dir_name);
+    tokio::fs::create_dir_all(&cwd)
+        .await
+        .map_err(|e| format!("could not create a temp working directory: {e}"))?;
+
+    harness.new_session(&cwd).await
+}
+
+#[tauri::command]
+async fn agent_prompt(
+    session_id: String,
+    text: String,
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<(), String> {
+    harness.prompt(&session_id, &text).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let (event_tx, mut event_rx) = mpsc::unbounded_channel::<agent::AgentEvent>();
+    let harness = Arc::new(AgentHarness::new(event_tx));
+    let harness_for_exit = Arc::clone(&harness);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(
@@ -24,7 +74,34 @@ pub fn run() {
                 .add_migrations(db::DB_URL, db::migrations())
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![scrape_url, canonicalize_url])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .manage(harness)
+        .setup(move |app| {
+            // Forwards normalized agent events (see agent/events.rs) to
+            // the frontend as they arrive. The chat panel listens for
+            // "agent-event" and filters by sessionId.
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(event) = event_rx.recv().await {
+                    let _ = app_handle.emit("agent-event", event);
+                }
+            });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            scrape_url,
+            canonicalize_url,
+            agent_status,
+            agent_login,
+            agent_new_session,
+            agent_prompt
+        ])
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(move |_app_handle, event| {
+            // Explicit kill on quit (ROADMAP.md M4 lifecycle), on top of
+            // `kill_on_drop` in agent/rpc.rs as a fallback.
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                tauri::async_runtime::block_on(harness_for_exit.shutdown());
+            }
+        });
 }
