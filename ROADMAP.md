@@ -2,7 +2,7 @@
 
 A desktop reader for technical blogs and docs. Highlight any passage and your own local Codex agent explains it, billed to your ChatGPT subscription.
 
-Source: *Agent Native Technical Reader: Project Plan* (Sep 23, 2026).
+Source: _Agent Native Technical Reader: Project Plan_ (Sep 23, 2026).
 
 ---
 
@@ -25,20 +25,20 @@ Paste URL -> Scrape and parse -> Render in reader -> Select text -> Explain -> C
 
 ## Tech stack
 
-| Layer | Choice |
-| --- | --- |
-| Desktop shell | Tauri 2 (Rust core, native webview) |
-| UI | React + TypeScript |
-| Styling | Tailwind CSS |
-| UI primitives | shadcn/ui (Radix) |
-| State | Zustand |
-| Code highlighting | Shiki |
-| Math | KaTeX |
-| Extraction | `@mozilla/readability` + site specific rules |
-| JS heavy pages | Hidden Tauri webview |
-| Storage | SQLite via `tauri-plugin-sql` |
-| Agent protocol | ACP (`@agentclientprotocol/sdk` or Rust ACP crate) |
-| Agent | Codex CLI + Codex ACP adapter |
+| Layer             | Choice                                             |
+| ----------------- | -------------------------------------------------- |
+| Desktop shell     | Tauri 2 (Rust core, native webview)                |
+| UI                | React + TypeScript                                 |
+| Styling           | Tailwind CSS                                       |
+| UI primitives     | shadcn/ui (Radix)                                  |
+| State             | Zustand                                            |
+| Code highlighting | Shiki                                              |
+| Math              | KaTeX                                              |
+| Extraction        | `@mozilla/readability` + site specific rules       |
+| JS heavy pages    | Hidden Tauri webview                               |
+| Storage           | SQLite via `tauri-plugin-sql`                      |
+| Agent protocol    | ACP (`@agentclientprotocol/sdk` or Rust ACP crate) |
+| Agent             | Codex CLI + Codex ACP adapter                      |
 
 ---
 
@@ -46,13 +46,10 @@ Paste URL -> Scrape and parse -> Render in reader -> Select text -> Explain -> C
 
 Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
-- [ ] **ACP client location**: Node sidecar with the TS SDK, or Rust ACP crate in the core
-  - Leaning: Rust crate (one less runtime to ship, Rust already owns subprocesses). Validate crate maturity with a spike.
-- [ ] **Codex distribution**: bundle the Codex binary, or require the user to install it
-  - Start with "detect and guide install"; revisit bundling after licensing review.
-- [ ] **Protocol**: Codex ACP adapter vs Codex's own app server protocol
-  - Default to ACP for multi agent support; keep a note on adapter lag risk.
-- [ ] **ACP spike**: throwaway script that spawns the adapter, opens a session, sends a prompt, prints streamed updates. Proves the whole idea before UI work.
+- [x] **ACP client location**: Rust ACP crate in the core (decided, not yet validated with a spike)
+- [x] **Codex distribution**: detect and guide install for v1, revisit bundling later
+- [x] **Protocol**: ACP, for multi agent support
+- [ ] **ACP spike**: throwaway script that spawns the adapter, opens a session, sends a prompt, prints streamed updates. Do this before M4.
 
 **Exit criteria**: all four items decided and written down; spike streams a response from Codex.
 
@@ -62,18 +59,18 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 **Goal**: a running, styled app shell with no features.
 
-- [ ] Scaffold Tauri 2 + React + TypeScript + Tailwind
-- [ ] Add shadcn/ui, Zustand, ESLint, Prettier, `cargo fmt`, `clippy`
-- [ ] CI: lint, typecheck, Rust build, unit tests on push
-- [ ] Design tokens
-  - [ ] Type scale tuned for long form reading
-  - [ ] Color tokens, light and dark
-  - [ ] Spacing scale
-- [ ] App shell layout
-  - [ ] Left sidebar: library
-  - [ ] Main area: reader
-  - [ ] Right panel: chat, collapsible
-- [ ] Theme toggle (system / light / dark)
+- [x] Scaffold Tauri 2 + React + TypeScript + Tailwind
+- [x] Add shadcn/ui, Zustand, ESLint, Prettier, `cargo fmt`, `clippy`
+- [x] CI: lint, typecheck, Rust build, unit tests on push
+- [x] Design tokens
+  - [x] Type scale tuned for long form reading
+  - [x] Color tokens, light and dark
+  - [x] Spacing scale
+- [x] App shell layout
+  - [x] Left sidebar: library
+  - [x] Main area: reader
+  - [x] Right panel: chat, collapsible
+- [x] Theme toggle (system / light / dark)
 
 **Exit criteria**: `tauri dev` opens the three pane shell in both themes; CI green.
 
@@ -84,6 +81,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 **Goal**: paste a URL, read it cleanly.
 
 ### Scraping pipeline (Rust command `scrape_url`)
+
 - [ ] Normalize URL: strip tracking params, resolve redirects, use as cache key
 - [ ] Shortcuts first: `llms.txt`, markdown versions of docs pages, Medium RSS feed
 - [ ] Plain HTTP fetch with a real User-Agent
@@ -93,18 +91,23 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [ ] Auto detect code language when missing
 
 ### Block format
+
 ```json
-{ "blocks": [
-  { "type": "heading", "level": 2, "text": "..." },
-  { "type": "paragraph", "text": "..." },
-  { "type": "code", "language": "yaml", "content": "..." },
-  { "type": "image", "src": "...", "alt": "..." },
-  { "type": "math", "tex": "..." }
-] }
+{
+  "blocks": [
+    { "type": "heading", "level": 2, "text": "..." },
+    { "type": "paragraph", "text": "..." },
+    { "type": "code", "language": "yaml", "content": "..." },
+    { "type": "image", "src": "...", "alt": "..." },
+    { "type": "math", "tex": "..." }
+  ]
+}
 ```
+
 - [ ] Define block types in TypeScript and Rust (shared schema, one source of truth)
 
 ### Site rules
+
 - [ ] Kubernetes / Hugo docs (tabs, callouts)
 - [ ] Docusaurus
 - [ ] MkDocs
@@ -112,6 +115,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [ ] Medium (bot checks, missing code language tags, lazy images, RSS fallback)
 
 ### Reader components
+
 - [ ] Heading
 - [ ] Paragraph (inline code, links, emphasis)
 - [ ] Code block with Shiki
@@ -119,6 +123,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [ ] Math with KaTeX
 
 ### Tests
+
 - [ ] Fixture HTML snapshots per target site -> expected block JSON
 
 **Exit criteria**: a Kubernetes doc page, a dev.to post, and a free Medium article all render cleanly.
@@ -147,12 +152,14 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 **Goal**: the app can reach a logged in Codex and stream a reply.
 
 ### Onboarding
+
 - [ ] Detect Codex install (and adapter)
 - [ ] Check login status
 - [ ] "Sign in with ChatGPT" button runs `codex login` and opens the browser
 - [ ] `agent_status` command: `missing | logged_out | ready`
 
 ### ACP client
+
 - [ ] Implement `AgentHarness` interface (`status`, `login`, `newSession`, `prompt`)
 - [ ] Spawn adapter, JSON-RPC over stdio
 - [ ] `session/new` with an empty temp dir as cwd
@@ -160,15 +167,18 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [ ] Normalize events for the UI: `token`, `done`, `error`, `permission_request`
 
 ### Safety
+
 - [ ] Read only sandbox: no file writes, no shell commands
 - [ ] Temp working directory, never user projects
 - [ ] Permission requests surfaced in UI, default deny
 
 ### Lifecycle
+
 - [ ] Restart adapter on crash
 - [ ] Kill all child processes on app quit
 
 ### Auth rules (non negotiable)
+
 - Never read, copy, or send the Codex token
 - Never call OpenAI's backend directly
 - All model calls go through the official Codex binary
@@ -229,12 +239,12 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| OpenAI changes rules on subscription use in third party apps | Keep `AgentHarness` swappable; review terms before launch |
-| Codex ACP adapter is community maintained, may lag Codex releases | Pin versions; watch upstream; keep app server protocol as fallback |
-| Medium and other sites block or change markup | RSS fallback, hidden webview, fixture tests to catch breakage early |
-| Onboarding friction (Codex install + login) | Clear status screen, one click login, good docs |
+| Risk                                                              | Mitigation                                                          |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------- |
+| OpenAI changes rules on subscription use in third party apps      | Keep `AgentHarness` swappable; review terms before launch           |
+| Codex ACP adapter is community maintained, may lag Codex releases | Pin versions; watch upstream; keep app server protocol as fallback  |
+| Medium and other sites block or change markup                     | RSS fallback, hidden webview, fixture tests to catch breakage early |
+| Onboarding friction (Codex install + login)                       | Clear status screen, one click login, good docs                     |
 
 ## Open questions
 

@@ -8,3 +8,12 @@ An agent native desktop reader for technical blogs and docs.
 - Everything runs locally: Tauri 2, React, SQLite, ACP
 
 See [ROADMAP.md](./ROADMAP.md) for the build plan.
+
+## Development
+
+```bash
+npm install
+npm run tauri dev
+```
+
+Requires Rust and the Tauri prerequisites for your OS: https://tauri.app/start/prerequisites/
