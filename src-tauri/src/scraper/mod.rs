@@ -84,3 +84,10 @@ fn now_millis() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
+
+/// Normalizes a URL without fetching anything. Used by the frontend to
+/// compute a cache key before deciding whether a scrape is even needed
+/// (see the `articles` cache-by-canonical-url flow in ROADMAP.md M3).
+pub fn canonical_url(raw_url: &str) -> Result<String, ScrapeError> {
+    Ok(normalize::canonicalize(raw_url)?.to_string())
+}

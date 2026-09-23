@@ -137,14 +137,14 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 **Goal**: articles persist locally.
 
-- [ ] SQLite setup with migrations
-- [ ] Schema: `articles`, `highlights`, `chats`, `messages` (see plan)
-- [ ] Commands: `save_article`, `list_articles`, open, delete
-- [ ] Cache by canonical URL (re-opening a saved URL skips the network)
-- [ ] Sidebar list: title, site, saved date; search by title
-- [ ] Highlights stored as block index + character offsets so they survive re-renders
+- [x] SQLite setup with migrations (`tauri-plugin-sql`, migration in `src-tauri/src/db.rs`)
+- [x] Schema: `articles`, `highlights`, `chats`, `messages` (`highlights`/`chats`/`messages` created now, unused until M5)
+- [x] Commands: save (upsert), list, open, delete — implemented as `@tauri-apps/plugin-sql` calls from `src/lib/db.ts` rather than bespoke Tauri commands, plus a `canonicalize_url` command for cache lookups without a network call
+- [x] Cache by canonical URL (re-opening a saved URL skips the network — verified: no second `scrape_url` call on reopen)
+- [x] Sidebar list: title, site, relative saved date; search by title/site
+- [ ] Highlights stored as block index + character offsets — table exists, wiring lands with M5 (Explain)
 
-**Exit criteria**: save, restart the app, reopen offline, delete. No duplicates for the same canonical URL.
+**Exit criteria**: save, restart the app, reopen offline, delete. No duplicates for the same canonical URL. Verified end to end (mocked backend): open → saved, reopen same URL → cache hit not re-scraped, reopen via sidebar → no scrape, delete → row removed.
 
 ---
 

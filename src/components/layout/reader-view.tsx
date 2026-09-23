@@ -2,35 +2,19 @@ import { useState, type FormEvent } from "react";
 import { LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlockRenderer } from "@/components/reader/block-renderer";
-import { scrapeUrl } from "@/lib/commands";
-import type { ScrapedArticle } from "@/types/article";
-
-type State =
-  | { status: "empty" }
-  | { status: "loading"; url: string }
-  | { status: "error"; url: string; message: string }
-  | { status: "ready"; article: ScrapedArticle };
+import { useReaderStore, type ReaderState } from "@/stores/reader-store";
+import type { StoredArticle } from "@/types/library";
 
 export function ReaderView() {
-  const [state, setState] = useState<State>({ status: "empty" });
+  const state = useReaderStore((s) => s.state);
+  const openUrl = useReaderStore((s) => s.openUrl);
   const [input, setInput] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const url = input.trim();
     if (!url) return;
-
-    setState({ status: "loading", url });
-    try {
-      const article = await scrapeUrl(url);
-      setState({ status: "ready", article });
-    } catch (err) {
-      setState({
-        status: "error",
-        url,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
+    void openUrl(url);
   }
 
   return (
@@ -58,7 +42,7 @@ function EmptyState({
   input: string;
   onInputChange: (value: string) => void;
   onSubmit: (e: FormEvent) => void;
-  state: State;
+  state: ReaderState;
 }) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
@@ -101,7 +85,7 @@ function EmptyState({
   );
 }
 
-function Article({ article }: { article: ScrapedArticle }) {
+function Article({ article }: { article: StoredArticle }) {
   return (
     <article className="mx-auto w-full max-w-2xl px-6 py-10">
       <header className="border-border mb-6 border-b pb-6">

@@ -9,3 +9,8 @@ import type { ScrapedArticle } from "@/types/article";
 export async function scrapeUrl(url: string): Promise<ScrapedArticle> {
   return invoke<ScrapedArticle>("scrape_url", { url });
 }
+
+/** Normalizes a URL with no network round trip, for cache lookups. */
+export async function canonicalizeUrl(url: string): Promise<string> {
+  return invoke<string>("canonicalize_url", { url });
+}
