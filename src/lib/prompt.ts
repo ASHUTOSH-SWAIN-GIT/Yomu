@@ -1,3 +1,4 @@
+import { blockText } from "@/lib/article-text";
 import type { Block } from "@/types/article";
 import type { Highlight, StoredArticle } from "@/types/library";
 
@@ -5,40 +6,6 @@ import type { Highlight, StoredArticle } from "@/types/library";
 // above it, only the section around the selection.
 const FULL_ARTICLE_MAX_CHARS = 8000;
 const NEARBY_BLOCKS = 3;
-
-function blockText(block: Block): string {
-  switch (block.type) {
-    case "heading":
-      return `${"#".repeat(block.level)} ${block.text}`;
-    case "paragraph":
-      return block.spans.map((s) => s.text).join("");
-    case "code":
-      return "```" + (block.language ?? "") + "\n" + block.content + "\n```";
-    case "math":
-      return `$$${block.tex}$$`;
-    case "image":
-      return block.alt ? `[image: ${block.alt}]` : "";
-    case "list":
-      return block.items
-        .map(
-          (item, i) =>
-            `${"  ".repeat(item.depth)}${block.ordered ? `${i + 1}.` : "-"} ${item.spans.map((s) => s.text).join("")}`,
-        )
-        .join("\n");
-    case "quote":
-      return block.spans
-        .map((s) => s.text)
-        .join("")
-        .split("\n")
-        .map((line) => `> ${line}`)
-        .join("\n");
-    case "table":
-      return [block.header, ...block.rows]
-        .filter((row) => row.length > 0)
-        .map((row) => `| ${row.join(" | ")} |`)
-        .join("\n");
-  }
-}
 
 function sectionHeading(blocks: Block[], blockIndex: number): string | null {
   for (let i = blockIndex; i >= 0; i--) {

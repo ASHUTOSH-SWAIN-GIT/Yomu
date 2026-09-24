@@ -12,6 +12,9 @@ export interface StoredArticle {
   blocks: Block[];
   scrapedAt: number;
   saved: boolean;
+  /** How far down the article the reader got, 0 to 1. */
+  progress: number;
+  archived: boolean;
 }
 
 /** Lightweight row for the library sidebar list — no blocks, so listing
@@ -23,6 +26,17 @@ export interface ArticleSummary {
   site: string;
   canonicalUrl: string;
   scrapedAt: number;
+  progress: number;
+  archived: boolean;
+  tags: string[];
+}
+
+/** One full-text search match. `kind` says where it matched. */
+export interface SearchHit {
+  articleId: string;
+  kind: "article" | "chat";
+  /** Snippet with matches wrapped in \u0001 ... \u0002 (never HTML). */
+  snippet: string;
 }
 
 /** A passage the user asked the agent to explain. `blockIndex` and the

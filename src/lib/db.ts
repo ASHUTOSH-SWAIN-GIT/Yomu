@@ -1,9 +1,11 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { Block } from "@/types/article";
+import { articleText } from "@/lib/article-text";
 import type {
   ArticleSummary,
   Chat,
   Highlight,
+  SearchHit,
   StoredArticle,
   StoredMessage,
 } from "@/types/library";
@@ -31,6 +33,8 @@ interface ArticleRow {
   blocks_json: string;
   scraped_at: number;
   saved: number;
+  progress: number;
+  archived: number;
 }
 
 function rowToStoredArticle(row: ArticleRow): StoredArticle {
@@ -44,13 +48,15 @@ function rowToStoredArticle(row: ArticleRow): StoredArticle {
     blocks: JSON.parse(row.blocks_json) as Block[],
     scrapedAt: row.scraped_at,
     saved: row.saved === 1,
+    progress: row.progress,
+    archived: row.archived === 1,
   };
 }
 
 export async function listArticles(): Promise<ArticleSummary[]> {
   const db = await getDb();
   const rows = await db.select<
-    Pick<
+    (Pick<
       ArticleRow,
       | "id"
       | "url"
@@ -59,9 +65,14 @@ export async function listArticles(): Promise<ArticleSummary[]> {
       | "author"
       | "site"
       | "scraped_at"
-    >[]
+      | "progress"
+      | "archived"
+    > & { tags: string | null })[]
   >(
-    "SELECT id, url, canonical_url, title, author, site, scraped_at FROM articles ORDER BY scraped_at DESC",
+    `SELECT a.id, a.url, a.canonical_url, a.title, a.author, a.site, a.scraped_at,
+            a.progress, a.archived,
+            (SELECT group_concat(tag, char(31)) FROM article_tags t WHERE t.article_id = a.id) AS tags
+     FROM articles a ORDER BY a.scraped_at DESC`,
   );
   return rows.map((row) => ({
     id: row.id,
@@ -70,6 +81,9 @@ export async function listArticles(): Promise<ArticleSummary[]> {
     site: row.site ?? "",
     canonicalUrl: row.canonical_url,
     scrapedAt: row.scraped_at,
+    progress: row.progress,
+    archived: row.archived === 1,
+    tags: row.tags ? row.tags.split("\u001f").sort() : [],
   }));
 }
 
@@ -109,14 +123,15 @@ export async function upsertArticle(
   const blocksJson = JSON.stringify(article.blocks);
 
   await db.execute(
-    `INSERT INTO articles (id, url, canonical_url, title, author, site, blocks_json, scraped_at, saved)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)
+    `INSERT INTO articles (id, url, canonical_url, title, author, site, blocks_json, scraped_at, saved, text_content)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9)
      ON CONFLICT(canonical_url) DO UPDATE SET
        url = excluded.url,
        title = excluded.title,
        author = excluded.author,
        site = excluded.site,
        blocks_json = excluded.blocks_json,
+       text_content = excluded.text_content,
        scraped_at = excluded.scraped_at`,
     [
       id,
@@ -127,6 +142,7 @@ export async function upsertArticle(
       article.site,
       blocksJson,
       article.scrapedAt,
+      articleText(article.blocks),
     ],
   );
 
@@ -140,6 +156,9 @@ export async function upsertArticle(
     blocks: article.blocks,
     scrapedAt: article.scrapedAt,
     saved: true,
+    // Re-fetching keeps the reading position and archive state.
+    progress: existing?.progress ?? 0,
+    archived: existing?.archived ?? false,
   };
 }
 
@@ -296,5 +315,100 @@ export async function deleteLastAssistantMessage(
        SELECT id FROM messages WHERE chat_id = $1 AND role = 'assistant'
        ORDER BY created_at DESC, rowid DESC LIMIT 1)`,
     [chatId],
+  );
+}
+
+// ---- Library: search, progress, archive, tags (migration 2) ----
+
+/** Fills `text_content` for articles saved before search existed. The
+ * update triggers then index them. Cheap no-op once everything is done. */
+export async function backfillSearchText(): Promise<void> {
+  const db = await getDb();
+  const rows = await db.select<{ id: string; blocks_json: string }[]>(
+    "SELECT id, blocks_json FROM articles WHERE text_content IS NULL",
+  );
+  for (const row of rows) {
+    await db.execute("UPDATE articles SET text_content = $1 WHERE id = $2", [
+      articleText(JSON.parse(row.blocks_json) as Block[]),
+      row.id,
+    ]);
+  }
+}
+
+/** Turns free text into a safe FTS5 query: every word must match, as a
+ * prefix. Quoting each token means user input can never be parsed as FTS
+ * syntax (AND/OR/NEAR, column filters, stray quotes). */
+export function toMatchQuery(input: string): string | null {
+  const tokens = input.match(/[\p{L}\p{N}_]+/gu);
+  return tokens ? tokens.map((t) => `"${t}"*`).join(" ") : null;
+}
+
+/** Best match per article, across article text and chat messages. */
+export async function searchLibrary(input: string): Promise<SearchHit[]> {
+  const match = toMatchQuery(input);
+  if (!match) return [];
+  const db = await getDb();
+  const rows = await db.select<
+    { article_id: string; kind: "article" | "chat"; snip: string }[]
+  >(
+    `SELECT article_id, kind, snippet(search_index, 3, char(1), char(2), '…', 14) AS snip
+     FROM search_index WHERE search_index MATCH $1 ORDER BY rank LIMIT 80`,
+    [match],
+  );
+  const seen = new Set<string>();
+  const hits: SearchHit[] = [];
+  for (const row of rows) {
+    if (seen.has(row.article_id)) continue;
+    seen.add(row.article_id);
+    hits.push({
+      articleId: row.article_id,
+      kind: row.kind,
+      snippet: row.snip,
+    });
+  }
+  return hits;
+}
+
+export async function setArticleProgress(
+  id: string,
+  progress: number,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE articles SET progress = $1 WHERE id = $2", [
+    Math.min(1, Math.max(0, progress)),
+    id,
+  ]);
+}
+
+export async function setArticleArchived(
+  id: string,
+  archived: boolean,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE articles SET archived = $1 WHERE id = $2", [
+    archived ? 1 : 0,
+    id,
+  ]);
+}
+
+export function normalizeTag(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 32);
+}
+
+export async function addArticleTag(id: string, raw: string): Promise<void> {
+  const tag = normalizeTag(raw);
+  if (!tag) return;
+  const db = await getDb();
+  await db.execute(
+    "INSERT OR IGNORE INTO article_tags (article_id, tag) VALUES ($1, $2)",
+    [id, tag],
+  );
+}
+
+export async function removeArticleTag(id: string, tag: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "DELETE FROM article_tags WHERE article_id = $1 AND tag = $2",
+    [id, tag],
   );
 }

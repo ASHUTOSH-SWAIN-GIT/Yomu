@@ -44,7 +44,15 @@ Original outline:
 - Site rules module (`scraper/rules.rs`): pick a content selector by host/markers before Readability (mdBook `#content main`, Docusaurus `article`, MkDocs `.md-content`, Hugo/K8s `.td-content`, dev.to `#article-body`). Fixture HTML tests per site.
 - Fallback for JS-rendered pages when extracted text is under ~200 words (hidden webview), and Medium RSS fallback. These are the roadmap's deferred M2 items.
 
-### Theme 3 outline
+### Theme 3: Library
+
+**Status: implemented.** Verified: the migration SQL (triggers, backfill, cascades) against SQLite with old data; migration v2 applied to a real existing database and the backfill indexed its article and chats; a real search returned snippets. Not yet clicked through in the app window.
+
+Done: full-text search across article text and chat messages (SQLite FTS5, porter stemming, prefix match, kept in sync by triggers, safe quoting of user input, snippets rendered without HTML); reading progress saved and restored per article; archive/unarchive with an Archived view; tags with a sidebar filter; Markdown export (article plus explanations) via a save dialog; delete confirmation and keyboard-reachable rows (from Theme 1).
+
+Not done: collections beyond tags, importing from other readers, exporting the whole library at once.
+
+Original outline:
 
 - Migration v2 in `src-tauri/src/db.rs`: FTS5 index over article text and messages; search UI across both. Tags/collections, read/archive state, saved scroll position, markdown export (article plus explanations), delete confirmation, sidebar rows as real buttons.
 
