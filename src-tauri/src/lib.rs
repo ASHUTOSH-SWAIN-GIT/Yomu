@@ -12,8 +12,8 @@ use tauri::Emitter;
 use tokio::sync::mpsc;
 
 #[tauri::command]
-async fn scrape_url(url: String) -> Result<ScrapedArticle, String> {
-    scraper::scrape(&url).await.map_err(|e| {
+async fn scrape_url(app: tauri::AppHandle, url: String) -> Result<ScrapedArticle, String> {
+    scraper::scrape(&url, Some(&app)).await.map_err(|e| {
         log::error!("scrape failed for {url}: {e}");
         e.to_string()
     })

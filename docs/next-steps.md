@@ -34,8 +34,7 @@ Done: `list` (with nesting), `quote` and `table` blocks end to end (Rust, TS typ
 
 **Not done, and why**
 
-- Hidden webview fallback for JS-rendered pages: needs its own design (webview lifecycle, getting the rendered HTML back over IPC, interaction with a future CSP).
-- Medium (RSS fallback, bot checks): depends on the same fallback work.
+- ~~Hidden webview fallback~~ **done** (see below). Medium RSS fallback deliberately not built (covers only each publication's latest 10 posts; paywalled posts are empty).
 - Hashnode rule, Docusaurus/Kubernetes tabs and callouts, Wikipedia infobox tables (Readability drops them).
 
 Original outline:

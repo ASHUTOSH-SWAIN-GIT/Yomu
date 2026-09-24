@@ -3,6 +3,7 @@ mod fetch;
 mod lang_detect;
 mod meta;
 mod normalize;
+mod render;
 mod rules;
 
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -23,6 +24,10 @@ pub enum ScrapeError {
     HttpStatus(u16),
     #[error("could not extract readable content from this page")]
     ExtractionFailed,
+    #[error("the site blocked automated access (a bot check); try opening it in your browser")]
+    Blocked,
+    #[error("could not render this page: {0}")]
+    Render(String),
 }
 
 /// The result of scraping one article. Distinct from the eventual
@@ -40,18 +45,96 @@ pub struct ScrapedArticle {
     pub scraped_at: u64,
 }
 
+/// Pages with fewer words than this are suspected of being JavaScript
+/// rendered (or blocked), so a hidden webview gets a try (ROADMAP.md M2).
+const MIN_WORDS: usize = 200;
+
+fn word_count(blocks: &[Block]) -> usize {
+    let spans = |spans: &[blocks::Span]| -> usize {
+        spans
+            .iter()
+            .map(|s| s.text.split_whitespace().count())
+            .sum()
+    };
+    blocks
+        .iter()
+        .map(|b| match b {
+            Block::Heading { text, .. } => text.split_whitespace().count(),
+            Block::Paragraph { spans: s } | Block::Quote { spans: s } => spans(s),
+            Block::List { items, .. } => items.iter().map(|i| spans(&i.spans)).sum(),
+            Block::Table { header, rows } => header
+                .iter()
+                .chain(rows.iter().flatten())
+                .map(|c| c.split_whitespace().count())
+                .sum(),
+            Block::Code { .. } | Block::Image { .. } | Block::Math { .. } => 0,
+        })
+        .sum()
+}
+
 /// Scrapes and parses a single article on demand. No crawling, no caching:
 /// every call re-fetches. Caching by canonical URL is a library (M3)
 /// concern once articles are actually persisted.
-pub async fn scrape(raw_url: &str) -> Result<ScrapedArticle, ScrapeError> {
+///
+/// A plain HTTP fetch is tried first (fast, no window). If that fails or
+/// yields a thin page and an `app` handle is given, the page is re-read
+/// through a hidden webview, and the fuller result wins.
+pub async fn scrape(
+    raw_url: &str,
+    app: Option<&tauri::AppHandle>,
+) -> Result<ScrapedArticle, ScrapeError> {
     let canonical = normalize::canonicalize(raw_url)?;
 
     let client = fetch::build_client()?;
-    let fetched = fetch::fetch_html(&client, canonical.as_str()).await?;
+    let plain = match fetch::fetch_html(&client, canonical.as_str()).await {
+        Ok(fetched) => extract(&fetched.html, &fetched.final_url, &canonical),
+        Err(e) => Err(e),
+    };
 
-    let original_document = Html::parse_document(&fetched.html);
-    let final_url = url::Url::parse(&fetched.final_url).unwrap_or(canonical.clone());
-    let host = final_url.host_str().unwrap_or("unknown").to_string();
+    let thin = match &plain {
+        Ok(article) => word_count(&article.blocks) < MIN_WORDS,
+        Err(_) => true,
+    };
+    let Some(app) = app.filter(|_| thin) else {
+        return plain;
+    };
+
+    log::info!("plain fetch of {canonical} was thin or failed; trying a rendered page");
+    let rendered = match render::render_html(app, canonical.as_str()).await {
+        Ok(html) if render::looks_like_bot_check(&html) => Err(ScrapeError::Blocked),
+        Ok(html) => extract(&html, canonical.as_str(), &canonical),
+        Err(e) => Err(e),
+    };
+
+    match (plain, rendered) {
+        (Ok(p), Ok(r)) => Ok(if word_count(&r.blocks) > word_count(&p.blocks) {
+            r
+        } else {
+            p
+        }),
+        (Ok(p), Err(_)) => Ok(p),
+        (Err(_), Ok(r)) => Ok(r),
+        // Both failed: the rendered error usually says more (e.g. a bot
+        // check) than a bare HTTP status.
+        (Err(plain_err), Err(render_err)) => {
+            log::warn!("scrape of {canonical} failed: {plain_err}; rendered: {render_err}");
+            Err(match render_err {
+                ScrapeError::Blocked => ScrapeError::Blocked,
+                _ => plain_err,
+            })
+        }
+    }
+}
+
+/// Turns fetched or rendered HTML into an article.
+fn extract(
+    html: &str,
+    final_url: &str,
+    canonical: &url::Url,
+) -> Result<ScrapedArticle, ScrapeError> {
+    let original_document = Html::parse_document(html);
+    let final_parsed = url::Url::parse(final_url).unwrap_or(canonical.clone());
+    let host = final_parsed.host_str().unwrap_or("unknown").to_string();
 
     // Known docs frameworks first (see rules.rs), Readability otherwise.
     let (mut blocks, title) = if let Some(found) = rules::extract_content(&original_document) {
@@ -69,12 +152,12 @@ pub async fn scrape(raw_url: &str) -> Result<ScrapedArticle, ScrapeError> {
                 .unwrap_or_else(|| host.clone()),
         )
     } else {
-        let mut html_bytes = fetched.html.as_bytes();
-        let product = readability::extractor::extract(&mut html_bytes, &final_url)
+        let mut html_bytes = html.as_bytes();
+        let product = readability::extractor::extract(&mut html_bytes, &final_parsed)
             .map_err(|_| ScrapeError::ExtractionFailed)?;
         let title = match product.title.trim() {
             "" => host.clone(),
-            t => t.to_string(),
+            t => meta::clean_title(&original_document, t),
         };
         (blocks::html_to_blocks(&product.content), title)
     };
@@ -84,7 +167,7 @@ pub async fn scrape(raw_url: &str) -> Result<ScrapedArticle, ScrapeError> {
     drop_repeated_title(&mut blocks, &title);
 
     Ok(ScrapedArticle {
-        url: fetched.final_url,
+        url: final_url.to_string(),
         canonical_url: canonical.to_string(),
         title,
         author: meta::extract_author(&original_document),
@@ -137,7 +220,7 @@ mod timing {
             "https://dev.to/wiseai/i-built-a-version-bump-tool-in-rust-that-is-10000x-faster-than-its-python-counterparts-i6b",
         ] {
             let start = Instant::now();
-            match super::scrape(url).await {
+            match super::scrape(url, None).await {
                 Ok(a) => {
                     let count = |name: &str| {
                         a.blocks

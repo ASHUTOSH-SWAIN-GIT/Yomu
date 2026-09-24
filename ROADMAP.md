@@ -85,7 +85,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] Normalize URL: strip tracking params, use as cache key (redirect resolution happens at fetch time via the final response URL)
 - [ ] Shortcuts first: `llms.txt`, markdown versions of docs pages, Medium RSS feed — deferred, plain fetch only for now
 - [x] Plain HTTP fetch with a real User-Agent
-- [ ] Fallback: if extracted text is under ~200 words, retry in a hidden webview — deferred, needs the hidden webview from M4/M5 era tooling
+- [x] Fallback: if the plain fetch fails or extracts under ~200 words, the page is re-read in a hidden webview and the fuller result wins (`src-tauri/src/scraper/render.rs`). Verified on a client-rendered test page (small and 2,500 blocks with Unicode), not yet on a page that really blocks plain fetches.
 - [x] Extractor selection: Mozilla-style Readability (via the `readability` crate)
 - [x] Convert cleaned HTML into block JSON
 - [x] Auto detect code language when missing (hand written regex signatures, not a full highlight.js-style classifier)
@@ -112,7 +112,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] Docusaurus
 - [x] MkDocs (Material)
 - [ ] dev.to done (`#article-body`); Hashnode not done
-- [ ] Medium (bot checks, missing code language tags, lazy images, RSS fallback)
+- [ ] Medium: a free article scrapes cleanly with a proper title (plain fetch got through when tested; curl got a Cloudflare 403). If Cloudflare does block, the hidden webview is tried, then a clear "blocked by a bot check" error. RSS fallback not built: it only covers each publication's latest 10 posts and paywalled ones come back empty.
 
 ### Reader components
 

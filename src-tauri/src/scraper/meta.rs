@@ -51,6 +51,23 @@ pub fn extract_title(document: &Html) -> Option<String> {
     None
 }
 
+/// Readability's title is the raw `<title>`, which often carries site
+/// noise ("Medium" prefix, "| by Author | Sep 2026 | Medium"). When the
+/// page's `og:title` is contained in it, that's the clean article title.
+/// It only ever trims: an og:title that isn't part of the title is ignored.
+pub fn clean_title(document: &Html, raw: &str) -> String {
+    let og = Selector::parse("meta[property=\"og:title\"]")
+        .ok()
+        .and_then(|sel| document.select(&sel).next())
+        .and_then(|el| el.value().attr("content"))
+        .map(super::blocks::clean_heading)
+        .filter(|t| !t.is_empty());
+    match og {
+        Some(og) if raw.contains(og.as_str()) => og,
+        _ => raw.to_string(),
+    }
+}
+
 /// The `<title>` without its trailing " - Site" / " | Site" suffix.
 pub fn extract_title_tag(document: &Html) -> Option<String> {
     let selector = Selector::parse("title").ok()?;
@@ -108,6 +125,27 @@ mod tests {
         assert_eq!(
             extract_title_tag(&doc),
             Some("What is Ownership?".to_string())
+        );
+    }
+
+    #[test]
+    fn clean_title_trims_site_noise_using_og_title() {
+        let doc =
+            Html::parse_document(r#"<head><meta property="og:title" content="Why Rust?"></head>"#);
+        assert_eq!(
+            clean_title(&doc, "MediumWhy Rust? | by Ann | Sep, 2026 | Medium"),
+            "Why Rust?"
+        );
+    }
+
+    #[test]
+    fn clean_title_ignores_an_unrelated_og_title() {
+        let doc =
+            Html::parse_document(r#"<head><meta property="og:title" content="Site name"></head>"#);
+        assert_eq!(clean_title(&doc, "Real Article"), "Real Article");
+        assert_eq!(
+            clean_title(&Html::parse_document("<head></head>"), "T"),
+            "T"
         );
     }
 
