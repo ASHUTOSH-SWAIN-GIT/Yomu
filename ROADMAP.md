@@ -119,7 +119,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] Heading
 - [x] Paragraph (inline code, links, emphasis — rendered from structured spans, not raw HTML)
 - [x] Code block with Shiki (fine grained bundle, JS regex engine, light/dark themes)
-- [x] Image (lazy load, alt text)
+- [x] Image (lazy load, alt text; offline cache and "Ask about image" added later, see docs/next-steps.md)
 - [x] Math with KaTeX
 
 ### Tests

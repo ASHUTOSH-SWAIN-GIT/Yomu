@@ -8,7 +8,13 @@ import { ListBlock } from "@/components/reader/list-block";
 import { QuoteBlock } from "@/components/reader/quote-block";
 import { TableBlock } from "@/components/reader/table-block";
 
-export function BlockRenderer({ blocks }: { blocks: Block[] }) {
+export function BlockRenderer({
+  blocks,
+  baseUrl,
+}: {
+  blocks: Block[];
+  baseUrl: string;
+}) {
   return (
     <>
       {blocks.map((block, i) => (
@@ -21,14 +27,22 @@ export function BlockRenderer({ blocks }: { blocks: Block[] }) {
           data-block-index={i}
           className="[contain-intrinsic-size:auto_80px] [content-visibility:auto]"
         >
-          <BlockView block={block} />
+          <BlockView block={block} baseUrl={baseUrl} index={i} />
         </div>
       ))}
     </>
   );
 }
 
-function BlockView({ block }: { block: Block }) {
+function BlockView({
+  block,
+  baseUrl,
+  index,
+}: {
+  block: Block;
+  baseUrl: string;
+  index: number;
+}) {
   switch (block.type) {
     case "heading":
       return <HeadingBlock level={block.level} text={block.text} />;
@@ -37,7 +51,14 @@ function BlockView({ block }: { block: Block }) {
     case "code":
       return <CodeBlock language={block.language} content={block.content} />;
     case "image":
-      return <ImageBlock src={block.src} alt={block.alt} />;
+      return (
+        <ImageBlock
+          src={block.src}
+          alt={block.alt}
+          baseUrl={baseUrl}
+          blockIndex={index}
+        />
+      );
     case "math":
       return <MathBlock tex={block.tex} />;
     case "list":

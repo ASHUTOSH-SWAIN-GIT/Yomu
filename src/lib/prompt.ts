@@ -1,4 +1,5 @@
 import { blockText } from "@/lib/article-text";
+import { parseImageQuote } from "@/lib/images";
 import type { Block } from "@/types/article";
 import type { Highlight, StoredArticle } from "@/types/library";
 
@@ -35,10 +36,15 @@ export function buildPrompt(
   highlight: Highlight,
   question?: string,
 ): string {
+  const image = parseImageQuote(highlight.text);
   const section = sectionHeading(article.blocks, highlight.blockIndex);
-  const task = question
-    ? `The developer has a follow-up question about this passage:\n${question}`
-    : "Explain the selected passage for a developer: be concise, refer back to the article where relevant, and include a short code example only when it helps.";
+  const task = image
+    ? question
+      ? `The developer has a follow-up question about the attached image:\n${question}`
+      : "Explain the attached image for a developer: say what it shows and how it relates to the surrounding text of the article. Be concise, and describe any labels, axes or code visible in it."
+    : question
+      ? `The developer has a follow-up question about this passage:\n${question}`
+      : "Explain the selected passage for a developer: be concise, refer back to the article where relevant, and include a short code example only when it helps.";
 
   return [
     "You are helping a developer read a technical article. Answer from the text below and your own knowledge. Do not use tools, read files, or browse. Reply in Markdown.",
@@ -49,8 +55,10 @@ export function buildPrompt(
     "Article context:",
     contextFor(article, highlight.blockIndex),
     "",
-    "Selected passage:",
-    `"""\n${highlight.text}\n"""`,
+    image
+      ? `Selected image: ${image.alt || "(no alt text)"}. It is attached to this message.`
+      : "Selected passage:",
+    ...(image ? [] : [`"""\n${highlight.text}\n"""`]),
     "",
     task,
   ]

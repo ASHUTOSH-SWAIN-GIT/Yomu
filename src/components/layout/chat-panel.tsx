@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/stores/ui-store";
+import { parseImageQuote } from "@/lib/images";
 import { logError } from "@/lib/log";
 import { SetupChecklist } from "@/components/chat/setup-checklist";
 import { Markdown } from "@/components/chat/markdown";
@@ -233,7 +234,9 @@ function Message({
       >
         {message.quote && (
           <blockquote className="border-primary-foreground/40 mb-1 line-clamp-4 border-l-2 pl-2 text-xs opacity-80">
-            {message.quote}
+            {parseImageQuote(message.quote)
+              ? `Image: ${parseImageQuote(message.quote)?.alt || "attached image"}`
+              : message.quote}
           </blockquote>
         )}
         {message.quote ? "Explain this" : message.text}

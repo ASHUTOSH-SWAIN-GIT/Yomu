@@ -129,6 +129,115 @@ describe("explain", () => {
   });
 });
 
+describe("explainImage", () => {
+  const image = {
+    blockIndex: 1,
+    src: "https://cdn.x/diagram.png",
+    alt: "Pod diagram",
+  };
+  const imageMarkdown = "![Pod diagram](https://cdn.x/diagram.png)";
+  const imageHighlight = {
+    id: "h-img",
+    articleId: "a1",
+    blockIndex: 1,
+    startOffset: 0,
+    endOffset: 0,
+    text: imageMarkdown,
+  };
+
+  beforeEach(() => {
+    m(db.addHighlight).mockResolvedValue(imageHighlight);
+  });
+
+  it("attaches the image and asks about it, not about a text passage", async () => {
+    agentReplies("It shows a pod.");
+    await useChatStore.getState().explainImage(article, image);
+
+    expect(m(db.addHighlight).mock.calls[0][0]).toMatchObject({
+      blockIndex: 1,
+      startOffset: 0,
+      endOffset: 0,
+      text: imageMarkdown,
+    });
+    const [sessionId, prompt, imageUrl] = m(commands.agentPrompt).mock.calls[0];
+    expect(sessionId).toBe("s1");
+    expect(imageUrl).toBe("https://cdn.x/diagram.png");
+    expect(prompt).toContain("attached image");
+    expect(prompt).toContain("Selected image: Pod diagram");
+    expect(prompt).not.toContain('"""'); // no quoted passage
+    expect(useChatStore.getState().messages[0]?.quote).toBe(imageMarkdown);
+  });
+
+  it("does not attach anything for an ordinary text question", async () => {
+    m(db.addHighlight).mockResolvedValue(highlight); // a text highlight
+    agentReplies("x");
+    await useChatStore.getState().explain(article, selection);
+    expect(m(commands.agentPrompt).mock.calls[0]).toHaveLength(2);
+  });
+
+  it("re-sends the image when regenerating an image answer", async () => {
+    m(db.getChatForArticle).mockResolvedValue({
+      id: "c1",
+      articleId: "a1",
+      acpSessionId: "old",
+    });
+    m(db.listHighlights).mockResolvedValue([imageHighlight]);
+    m(db.listMessages).mockResolvedValue([
+      {
+        id: "m1",
+        role: "user",
+        content: imageMarkdown,
+        highlight: imageHighlight,
+      },
+      { id: "m2", role: "assistant", content: "First answer", highlight: null },
+    ]);
+    m(commands.agentResumeSession).mockResolvedValue(undefined);
+    await useChatStore.getState().loadForArticle("a1");
+
+    agentReplies("Second answer");
+    await useChatStore.getState().regenerate(article);
+    expect(m(commands.agentPrompt).mock.calls[0][2]).toBe(
+      "https://cdn.x/diagram.png",
+    );
+  });
+
+  it("re-sends the image with a follow up when the session had to be recreated", async () => {
+    m(db.getChatForArticle).mockResolvedValue({
+      id: "c1",
+      articleId: "a1",
+      acpSessionId: "old",
+    });
+    m(db.listHighlights).mockResolvedValue([imageHighlight]);
+    m(db.listMessages).mockResolvedValue([
+      {
+        id: "m1",
+        role: "user",
+        content: imageMarkdown,
+        highlight: imageHighlight,
+      },
+      { id: "m2", role: "assistant", content: "First answer", highlight: null },
+    ]);
+    m(commands.agentResumeSession).mockRejectedValue(
+      new Error("session not found"),
+    );
+    await useChatStore.getState().loadForArticle("a1");
+
+    agentReplies("More detail");
+    await useChatStore.getState().send(article, "what is the arrow?");
+    const [, prompt, imageUrl] = m(commands.agentPrompt).mock.calls[0];
+    expect(imageUrl).toBe("https://cdn.x/diagram.png");
+    expect(prompt).toContain("what is the arrow?");
+  });
+
+  it("shows a failed image download as an error the user can read", async () => {
+    m(commands.agentPrompt).mockRejectedValue(
+      new Error("SVG diagrams can't be sent to the agent as images."),
+    );
+    await useChatStore.getState().explainImage(article, image);
+    expect(useChatStore.getState().error?.message).toContain("SVG");
+  });
+});
+
 describe("stop", () => {
   it("cancels the live session and keeps what streamed so far", async () => {
     let finish!: () => void;

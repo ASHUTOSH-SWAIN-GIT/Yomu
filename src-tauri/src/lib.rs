@@ -1,6 +1,7 @@
 mod agent;
 mod db;
 mod env;
+mod imgcache;
 mod scraper;
 
 use std::sync::Arc;
@@ -17,6 +18,33 @@ async fn scrape_url(app: tauri::AppHandle, url: String) -> Result<ScrapedArticle
         log::error!("scrape failed for {url}: {e}");
         e.to_string()
     })
+}
+
+/// Downloads an article's images into the offline cache. Returns the cached
+/// file name for each URL (same order), `null` where one couldn't be saved.
+#[tauri::command]
+async fn cache_images(
+    app: tauri::AppHandle,
+    urls: Vec<String>,
+) -> Result<Vec<Option<String>>, String> {
+    let client = scraper::http_client().map_err(|e| e.to_string())?;
+    imgcache::cache_images(&client, &imgcache::images_dir(&app)?, &urls).await
+}
+
+/// Absolute path of the image cache directory (created if missing).
+#[tauri::command]
+async fn image_cache_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = imgcache::images_dir(&app)?;
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("could not create the image cache: {e}"))?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
+/// Deletes cached images that no article uses any more.
+#[tauri::command]
+async fn prune_images(app: tauri::AppHandle, keep: Vec<String>) -> Result<usize, String> {
+    Ok(imgcache::prune(&imgcache::images_dir(&app)?, &keep))
 }
 
 /// Normalizes a URL without a network round trip, so the frontend can
@@ -89,11 +117,20 @@ async fn agent_cancel(
 
 #[tauri::command]
 async fn agent_prompt(
+    app: tauri::AppHandle,
     session_id: String,
     text: String,
+    image_url: Option<String>,
     harness: tauri::State<'_, Arc<AgentHarness>>,
 ) -> Result<(), String> {
-    harness.prompt(&session_id, &text).await
+    let Some(url) = image_url else {
+        return harness.prompt(&session_id, &text).await;
+    };
+    let client = scraper::http_client().map_err(|e| e.to_string())?;
+    let image = imgcache::load_for_agent(&client, &imgcache::images_dir(&app)?, &url).await?;
+    harness
+        .prompt_with_image(&session_id, &text, Some((image.mime, &image.base64)))
+        .await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -138,6 +175,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scrape_url,
             canonicalize_url,
+            cache_images,
+            image_cache_dir,
+            prune_images,
             agent_diagnose,
             agent_login,
             agent_new_session,

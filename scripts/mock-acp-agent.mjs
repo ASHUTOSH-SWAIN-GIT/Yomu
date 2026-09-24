@@ -39,6 +39,9 @@ async function handlePrompt(id, { sessionId, prompt }) {
 
   const text = prompt?.[0]?.text ?? "";
   let reply = `You said: ${text}`;
+  // Report attached images so tests can assert the wire format.
+  const image = (prompt ?? []).find((part) => part.type === "image");
+  if (image) reply += ` [image ${image.mimeType} ${image.data?.length}]`;
 
   if (text.includes("PERMISSION")) {
     const answer = await askClient("session/request_permission", {

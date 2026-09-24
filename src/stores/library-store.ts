@@ -4,10 +4,12 @@ import {
   backfillSearchText,
   deleteArticle,
   listArticles,
+  listUsedImageFiles,
   removeArticleTag,
   searchLibrary,
   setArticleArchived,
 } from "@/lib/db";
+import { pruneImages } from "@/lib/commands";
 import { logError } from "@/lib/log";
 import type { ArticleSummary, SearchHit } from "@/types/library";
 
@@ -58,6 +60,12 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
 
   async remove(id) {
     await deleteArticle(id);
+    // Free the cached images nothing else uses (rows cascade with the article).
+    try {
+      await pruneImages(await listUsedImageFiles());
+    } catch (err) {
+      logError("pruning cached images failed", err);
+    }
     // Refetch rather than filter locally, so the list stays correct even
     // if something else changed the table in the meantime.
     await get().refresh();

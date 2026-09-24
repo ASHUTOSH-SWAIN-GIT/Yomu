@@ -412,3 +412,39 @@ export async function removeArticleTag(id: string, tag: string): Promise<void> {
     [id, tag],
   );
 }
+
+// ---- Offline image cache index (migration 3) ----
+
+/** url -> cached file name, for one article. */
+export async function getArticleImages(
+  articleId: string,
+): Promise<Record<string, string>> {
+  const db = await getDb();
+  const rows = await db.select<{ url: string; file: string }[]>(
+    "SELECT url, file FROM article_images WHERE article_id = $1",
+    [articleId],
+  );
+  return Object.fromEntries(rows.map((r) => [r.url, r.file]));
+}
+
+export async function saveArticleImages(
+  articleId: string,
+  images: { url: string; file: string }[],
+): Promise<void> {
+  const db = await getDb();
+  for (const { url, file } of images) {
+    await db.execute(
+      "INSERT OR REPLACE INTO article_images (article_id, url, file) VALUES ($1, $2, $3)",
+      [articleId, url, file],
+    );
+  }
+}
+
+/** Every cached file some article still uses (everything else can be pruned). */
+export async function listUsedImageFiles(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select<{ file: string }[]>(
+    "SELECT DISTINCT file FROM article_images",
+  );
+  return rows.map((r) => r.file);
+}

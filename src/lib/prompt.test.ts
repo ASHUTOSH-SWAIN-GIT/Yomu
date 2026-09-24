@@ -71,6 +71,49 @@ describe("buildPrompt", () => {
   });
 });
 
+describe("buildPrompt for an image", () => {
+  const imageHighlight: Highlight = {
+    id: "h",
+    articleId: "a1",
+    blockIndex: 1,
+    startOffset: 0,
+    endOffset: 0,
+    text: "![Pod creation diagram](https://x.dev/pod.png)",
+  };
+  const article = makeArticle([
+    { type: "heading", level: 2, text: "Pods" },
+    {
+      type: "image",
+      src: "https://x.dev/pod.png",
+      alt: "Pod creation diagram",
+    },
+    p("A pod is the smallest deployable unit."),
+  ]);
+
+  it("says the image is attached and keeps the surrounding article context", () => {
+    const prompt = buildPrompt(article, imageHighlight);
+    expect(prompt).toContain("Selected image: Pod creation diagram");
+    expect(prompt).toContain("attached");
+    expect(prompt).toContain("Section: Pods");
+    expect(prompt).toContain("A pod is the smallest deployable unit.");
+    expect(prompt).not.toContain('"""');
+  });
+
+  it("handles images with no alt text", () => {
+    const prompt = buildPrompt(article, {
+      ...imageHighlight,
+      text: "![](https://x.dev/pod.png)",
+    });
+    expect(prompt).toContain("(no alt text)");
+  });
+
+  it("frames a follow up as being about the image", () => {
+    const prompt = buildPrompt(article, imageHighlight, "what is the arrow?");
+    expect(prompt).toContain("follow-up question about the attached image");
+    expect(prompt).toContain("what is the arrow?");
+  });
+});
+
 describe("buildSummaryPrompt", () => {
   it("truncates very long articles and says so", () => {
     const article = makeArticle([p("y".repeat(40000))]);

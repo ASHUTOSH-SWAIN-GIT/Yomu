@@ -141,14 +141,26 @@ impl AgentHarness {
     /// events while this is in flight; `Done` is emitted once the turn
     /// ends. Failures are returned, not emitted.
     pub async fn prompt(&self, session_id: &str, text: &str) -> Result<(), String> {
+        self.prompt_with_image(session_id, text, None).await
+    }
+
+    /// Like [`prompt`](Self::prompt), attaching an image (ACP `image`
+    /// content block: base64 data plus MIME type) after the text.
+    pub async fn prompt_with_image(
+        &self,
+        session_id: &str,
+        text: &str,
+        image: Option<(&str, &str)>,
+    ) -> Result<(), String> {
         let conn = self.connection().await?;
+        let mut parts = vec![json!({ "type": "text", "text": text })];
+        if let Some((mime, base64)) = image {
+            parts.push(json!({ "type": "image", "data": base64, "mimeType": mime }));
+        }
         conn.client
             .request(
                 "session/prompt",
-                json!({
-                    "sessionId": session_id,
-                    "prompt": [{ "type": "text", "text": text }],
-                }),
+                json!({ "sessionId": session_id, "prompt": parts }),
             )
             .await
             .inspect_err(|e| log::error!("prompt failed: {e}"))?;

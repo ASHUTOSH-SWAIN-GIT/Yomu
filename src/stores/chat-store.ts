@@ -18,6 +18,7 @@ import {
   setChatSession,
 } from "@/lib/db";
 import { logError } from "@/lib/log";
+import { imageQuote, parseImageQuote } from "@/lib/images";
 import { buildPrompt, buildSummaryPrompt } from "@/lib/prompt";
 import { useAgentStore } from "@/stores/agent-store";
 import { useReaderStore } from "@/stores/reader-store";
@@ -54,6 +55,11 @@ interface ChatStore {
   retry: () => Promise<void>;
   /** Asks for a fresh answer to the last question, replacing the last reply. */
   regenerate: (article: StoredArticle) => Promise<void>;
+  /** Asks the agent about one image in the article (sent as an attachment). */
+  explainImage: (
+    article: StoredArticle,
+    image: { blockIndex: number; src: string; alt: string | null },
+  ) => Promise<void>;
   /** Summarizes the whole article, no selection needed. */
   summarize: (article: StoredArticle) => Promise<void>;
   /** Stops the reply in flight; the partial text is kept and saved. */
@@ -61,7 +67,24 @@ interface ChatStore {
 }
 
 // What to re-run on Retry, plus the highlight follow ups refer to.
-type PromptBuilder = (freshSession: boolean) => string;
+/** What to send: the prompt text and, for image questions, the image URL. */
+interface PromptSpec {
+  text: string;
+  imageUrl?: string;
+}
+type PromptBuilder = (freshSession: boolean) => PromptSpec;
+
+/** Prompt about a highlight; an image highlight also attaches the image. */
+function specFor(
+  article: StoredArticle,
+  highlight: Highlight,
+  question?: string,
+): PromptSpec {
+  return {
+    text: buildPrompt(article, highlight, question),
+    imageUrl: parseImageQuote(highlight.text)?.src,
+  };
+}
 let lastBuild: PromptBuilder | null = null;
 let lastHighlight: Highlight | null = null;
 
@@ -138,7 +161,9 @@ export const useChatStore = create<ChatStore>((set, get) => {
     set({ streaming: true, error: null });
     try {
       const { sessionId, fresh } = await ensureSession(chat);
-      await agentPrompt(sessionId, build(fresh));
+      const { text, imageUrl } = build(fresh);
+      if (imageUrl) await agentPrompt(sessionId, text, imageUrl);
+      else await agentPrompt(sessionId, text);
     } catch (err) {
       logError("explain turn failed", err);
       const error = classifyError(
@@ -233,7 +258,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           },
         ],
       }));
-      await runTurn(chat, () => buildPrompt(article, highlight));
+      await runTurn(chat, () => specFor(article, highlight));
     },
 
     async send(article, text) {
@@ -246,7 +271,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       // session was lost (fresh), re-send the passage context with it.
       const highlight = lastHighlight;
       await runTurn(chat, (fresh) =>
-        fresh && highlight ? buildPrompt(article, highlight, text) : text,
+        fresh && highlight ? specFor(article, highlight, text) : { text },
       );
     },
 
@@ -262,11 +287,22 @@ export const useChatStore = create<ChatStore>((set, get) => {
       await deleteLastAssistantMessage(chat.id);
       set({ messages: messages.slice(0, -1) });
       await runTurn(chat, (fresh) => {
-        if (highlight) return buildPrompt(article, highlight);
-        if (lastUser.summary) return buildSummaryPrompt(article);
+        if (highlight) return specFor(article, highlight);
+        if (lastUser.summary) return { text: buildSummaryPrompt(article) };
         return fresh && lastHighlight
-          ? buildPrompt(article, lastHighlight, lastUser.text)
-          : lastUser.text;
+          ? specFor(article, lastHighlight, lastUser.text)
+          : { text: lastUser.text };
+      });
+    },
+
+    async explainImage(article, image) {
+      // An image is stored as a highlight whose text is Markdown for it, so
+      // it survives restarts and can be regenerated with the same image.
+      await get().explain(article, {
+        blockIndex: image.blockIndex,
+        startOffset: 0,
+        endOffset: 0,
+        text: imageQuote(image.alt, image.src),
       });
     },
 
@@ -281,7 +317,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           { role: "user", text: SUMMARY_LABEL, summary: true },
         ],
       }));
-      await runTurn(chat, () => buildSummaryPrompt(article));
+      await runTurn(chat, () => ({ text: buildSummaryPrompt(article) }));
     },
 
     async stop() {

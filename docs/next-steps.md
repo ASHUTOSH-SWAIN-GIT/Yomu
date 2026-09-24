@@ -15,6 +15,16 @@ M1–M6 are built: paste a URL, read it, select text, Explain via real Codex, ch
 - **Accessibility miss from M6:** sidebar rows are clickable `div`s (`library-sidebar.tsx`), not keyboard reachable.
 - **Trust:** `csp` is `null` in `tauri.conf.json`; no frontend tests exist and CI runs none.
 
+## Images (added after Theme 4)
+
+**Status: implemented; the in-app display has not been seen by me** (no screen capture here), so please open an article and check. Verified: 68 Rust tests, 80 frontend tests (with mutation checks), the downloader against real Wikimedia, Medium, react.dev and Kubernetes images, and real Codex describing both a PNG and a WebP diagram sent as ACP image blocks.
+
+1. **Finding images (was broken).** Relative and protocol-relative URLs were saved as-is and would break inside the app; lazy (`data-src`), `srcset` and `<picture>` images were missed; UI icons and logos were kept. Worse, the `readability` crate deletes `<picture>`, src-less images and any container with more images than paragraphs, so **every Medium image was lost before our code ran**. Fix: content images are swapped for long text placeholders before Readability and restored after (`scraper/images.rs`), URLs are resolved against the page, the largest `srcset` entry wins, and icons, logos, avatars, tiny images and click-handler buttons are dropped. Medium article: 0 to 3 images; react.dev: 1 to 2; Kubernetes: the copy-icon junk is gone. Old saved articles are resolved against their URL in the reader; "Re-fetch" upgrades them.
+2. **Offline cache.** Opening an article downloads its images into `<app data>/images/` (`imgcache.rs`): image types only (checked by content, not just the header), 10 MB each, 80 per article, 4 at a time, names from a hash of the URL, atomic writes, no `file:`/`data:` URLs. Served through Tauri's asset protocol scoped to that folder only. A new `article_images` table (migration 3) links articles to files; deleting an article prunes unused files. The reader never renders a remote image until the cache index has loaded, so a cached article does not contact image hosts again. With "Block remote images" on, nothing is downloaded either. If a local copy fails to load, the reader falls back to the remote URL.
+3. **Agent sees images.** "Ask about image" on each image sends it (from the cache, or downloaded on demand) to Codex as an ACP image block along with the surrounding article text. Stored as a highlight, so it survives restarts and Regenerate / fresh-session follow-ups re-attach the image. Not offered for SVG (models can't read them); images over 5 MB are refused with a clear message. It uses plan quota, like any explain.
+
+Not done: resizing large images before sending, image search, storing images inside exports, and cache size limits across the whole library.
+
 ## Ordered roadmap
 
 | #   | Theme                    | Why this order                                                                                                                           | Size |

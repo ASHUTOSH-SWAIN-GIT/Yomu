@@ -172,7 +172,7 @@ function Article({
         </a>
         <ArticleTools article={article} />
       </header>
-      <BlockRenderer blocks={article.blocks} />
+      <BlockRenderer blocks={article.blocks} baseUrl={article.url} />
       {anchor && (
         <ExplainButton
           anchor={anchor}

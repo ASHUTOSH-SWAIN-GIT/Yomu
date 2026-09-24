@@ -1,6 +1,7 @@
 use scraper::{ElementRef, Html, Node};
 use serde::Serialize;
 
+use super::images::{is_decorative_image, pick_image_url, pick_picture_url};
 use super::lang_detect::detect_language;
 
 /// A single formatted run of text inside a paragraph or heading.
@@ -25,7 +26,7 @@ fn is_false(value: &bool) -> bool {
 }
 
 impl Span {
-    fn plain(text: String) -> Self {
+    pub(super) fn plain(text: String) -> Self {
         Span {
             text,
             bold: false,
@@ -84,22 +85,29 @@ pub struct ListItem {
 /// Walks cleaned article HTML (already run through Readability) and turns
 /// it into a flat list of blocks. Nested containers (div, section, article)
 /// are flattened; only leaf block-level elements produce a `Block`.
+#[cfg(test)]
 pub fn html_to_blocks(html: &str) -> Vec<Block> {
+    html_to_blocks_with_base(html, None)
+}
+
+/// Like [`html_to_blocks`], resolving image URLs against `base` (the page
+/// URL) so relative and protocol-relative `src`s become absolute.
+pub fn html_to_blocks_with_base(html: &str, base: Option<&url::Url>) -> Vec<Block> {
     let document = Html::parse_fragment(html);
     let mut blocks = Vec::new();
-    walk_children(document.root_element(), &mut blocks);
+    walk_children(document.root_element(), base, &mut blocks);
     blocks
 }
 
-fn walk_children(el: ElementRef, blocks: &mut Vec<Block>) {
+fn walk_children(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>) {
     for child in el.children() {
         if let Some(child_el) = ElementRef::wrap(child) {
-            walk_element(child_el, blocks);
+            walk_element(child_el, base, blocks);
         }
     }
 }
 
-fn walk_element(el: ElementRef, blocks: &mut Vec<Block>) {
+fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>) {
     let tag = el.value().name();
 
     match tag {
@@ -154,11 +162,37 @@ fn walk_element(el: ElementRef, blocks: &mut Vec<Block>) {
             }
         }
         "img" => {
-            if let Some(src) = el.value().attr("src") {
-                blocks.push(Block::Image {
-                    src: src.to_string(),
-                    alt: el.value().attr("alt").map(|s| s.to_string()),
-                });
+            if !is_decorative_image(el) {
+                if let Some(src) = pick_image_url(el, base) {
+                    blocks.push(Block::Image {
+                        src,
+                        alt: el
+                            .value()
+                            .attr("alt")
+                            .map(str::trim)
+                            .filter(|a| !a.is_empty())
+                            .map(str::to_string),
+                    });
+                }
+            }
+        }
+        "picture" => {
+            // Sources first: the fallback `img` is often empty (Medium).
+            let img = el
+                .descendants()
+                .filter_map(ElementRef::wrap)
+                .find(|e| e.value().name() == "img");
+            if !img.is_some_and(is_decorative_image) {
+                if let Some(src) = pick_picture_url(el, base) {
+                    blocks.push(Block::Image {
+                        src,
+                        alt: img
+                            .and_then(|i| i.value().attr("alt"))
+                            .map(str::trim)
+                            .filter(|a| !a.is_empty())
+                            .map(str::to_string),
+                    });
+                }
             }
         }
         "annotation" if el.value().attr("encoding") == Some("application/x-tex") => {
@@ -171,12 +205,12 @@ fn walk_element(el: ElementRef, blocks: &mut Vec<Block>) {
         }
         // Containers: recurse without emitting a block of their own.
         "div" | "section" | "article" | "figure" | "main" | "body" | "html" | "span" => {
-            walk_children(el, blocks);
+            walk_children(el, base, blocks);
         }
         // Skip non-content elements entirely.
         "script" | "style" | "nav" | "header" | "footer" | "aside" | "form" | "svg" => {}
         _ => {
-            walk_children(el, blocks);
+            walk_children(el, base, blocks);
         }
     }
 }
@@ -438,6 +472,110 @@ kind: Pod</code></pre>"#;
             Block::Image {
                 src: "https://example.com/a.png".to_string(),
                 alt: Some("diagram".to_string()),
+            }
+        );
+    }
+
+    fn images(html: &str, base: &str) -> Vec<String> {
+        let base = url::Url::parse(base).unwrap();
+        html_to_blocks_with_base(html, Some(&base))
+            .into_iter()
+            .filter_map(|b| match b {
+                Block::Image { src, .. } => Some(src),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn resolves_relative_and_protocol_relative_image_urls() {
+        let html = r#"<img src="/images/pod.svg"><img src="//cdn.example.com/x.png"><img src="../up.png"><img src="rel.png">"#;
+        assert_eq!(
+            images(html, "https://site.dev/docs/guide/page.html"),
+            vec![
+                "https://site.dev/images/pod.svg",
+                "https://cdn.example.com/x.png",
+                "https://site.dev/docs/up.png",
+                "https://site.dev/docs/guide/rel.png",
+            ]
+        );
+    }
+
+    #[test]
+    fn prefers_the_largest_srcset_candidate() {
+        let html =
+            r#"<img src="small.jpg" srcset="a-480.jpg 480w, a-1080.jpg 1080w, a-720.jpg 720w">"#;
+        assert_eq!(
+            images(html, "https://x.dev/p/"),
+            vec!["https://x.dev/p/a-1080.jpg"]
+        );
+    }
+
+    #[test]
+    fn finds_lazy_loaded_images_behind_placeholders() {
+        let placeholder =
+            "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+        let html = format!(r#"<img src="{placeholder}" data-src="/real.jpg">"#);
+        assert_eq!(
+            images(&html, "https://x.dev/"),
+            vec!["https://x.dev/real.jpg"]
+        );
+        // A placeholder with nothing better is dropped, not shown as a blank.
+        let only = format!(r#"<img src="{placeholder}">"#);
+        assert!(images(&only, "https://x.dev/").is_empty());
+    }
+
+    #[test]
+    fn keeps_real_embedded_data_uris_but_not_other_schemes() {
+        let long = format!("data:image/png;base64,{}", "A".repeat(400));
+        let html = format!(
+            r#"<img src="{long}"><img src="javascript:alert(1)"><img src="file:///etc/passwd">"#
+        );
+        assert_eq!(images(&html, "https://x.dev/"), vec![long]);
+    }
+
+    #[test]
+    fn skips_ui_chrome_but_keeps_content_images() {
+        let html = r#"
+            <img src="/i/copycode.svg" class="icon-copycode" onclick="copyCode()">
+            <img src="/i/logo.svg" width="32" height="32">
+            <img src="/i/avatar.png" class="user-avatar">
+            <img src="/i/spacer.gif" aria-hidden="true">
+            <img src="/i/medium-photo.jpg" role="presentation" alt="">
+            <img src="/i/diagram.svg" alt="Pod creation diagram">
+            <img src="/i/photo.jpg" width="800" height="600">"#;
+        assert_eq!(
+            images(html, "https://x.dev/"),
+            vec![
+                "https://x.dev/i/medium-photo.jpg",
+                "https://x.dev/i/diagram.svg",
+                "https://x.dev/i/photo.jpg"
+            ]
+        );
+    }
+
+    #[test]
+    fn picture_element_uses_its_sources_when_the_img_has_no_src() {
+        // Shape taken from a real Medium page.
+        let html = r#"<figure><picture><source srcset="https://cdn.x/a-640.webp 640w, https://cdn.x/a-1400.webp 1400w"><img alt="Fig 1" width="700" height="317" role="presentation"></picture></figure>"#;
+        let blocks = html_to_blocks(html);
+        assert_eq!(
+            blocks,
+            vec![Block::Image {
+                src: "https://cdn.x/a-1400.webp".into(),
+                alt: Some("Fig 1".into())
+            }]
+        );
+    }
+
+    #[test]
+    fn empty_alt_becomes_none() {
+        let blocks = html_to_blocks(r#"<img src="https://x.dev/a.png" alt="  ">"#);
+        assert_eq!(
+            blocks[0],
+            Block::Image {
+                src: "https://x.dev/a.png".into(),
+                alt: None
             }
         );
     }

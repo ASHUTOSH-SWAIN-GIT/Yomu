@@ -16,6 +16,22 @@ export async function canonicalizeUrl(url: string): Promise<string> {
   return invoke<string>("canonicalize_url", { url });
 }
 
+/** Downloads images into the offline cache. Returns a file name per URL
+ * (same order), or null where one could not be saved. */
+export async function cacheImages(urls: string[]): Promise<(string | null)[]> {
+  return invoke<(string | null)[]>("cache_images", { urls });
+}
+
+/** Absolute path of the folder holding cached images. */
+export async function imageCacheDir(): Promise<string> {
+  return invoke<string>("image_cache_dir");
+}
+
+/** Deletes cached images not in `keep`; returns how many were removed. */
+export async function pruneImages(keep: string[]): Promise<number> {
+  return invoke<number>("prune_images", { keep });
+}
+
 /** What's installed (Node, Codex) and whether Codex is signed in. */
 export async function agentDiagnose(): Promise<Diagnosis> {
   return invoke<Diagnosis>("agent_diagnose");
@@ -47,9 +63,16 @@ export async function agentCancel(sessionId: string): Promise<void> {
   return invoke("agent_cancel", { sessionId });
 }
 
+/** Sends a prompt. With `imageUrl`, that image (from the offline cache, or
+ * downloaded now) is attached for the agent to look at. */
 export async function agentPrompt(
   sessionId: string,
   text: string,
+  imageUrl?: string,
 ): Promise<void> {
-  return invoke("agent_prompt", { sessionId, text });
+  return invoke("agent_prompt", {
+    sessionId,
+    text,
+    imageUrl: imageUrl ?? null,
+  });
 }

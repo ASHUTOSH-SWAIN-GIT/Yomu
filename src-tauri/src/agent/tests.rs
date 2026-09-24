@@ -127,6 +127,25 @@ async fn agent_errors_reach_the_caller() {
 }
 
 #[tokio::test]
+async fn images_are_sent_as_acp_image_blocks_after_the_text() {
+    let mut f = fixture("image").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+
+    f.harness
+        .prompt_with_image(&session, "what is this", Some(("image/png", "QUJD")))
+        .await
+        .unwrap();
+
+    let events = until_done(&mut f.events).await;
+    // The mock echoes the mime type and the length of the base64 data.
+    assert_eq!(
+        joined_tokens(&events).trim(),
+        "You said: what is this [image image/png 4]"
+    );
+    f.harness.shutdown().await;
+}
+
+#[tokio::test]
 async fn cancel_stops_a_turn_early_but_still_finishes_it() {
     let mut f = fixture("cancel").await;
     let session = f.harness.new_session(&f.cwd).await.unwrap();

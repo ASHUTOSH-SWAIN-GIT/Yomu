@@ -62,6 +62,12 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_2,
         },
+        Migration {
+            version: 3,
+            description: "offline image cache index",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_3,
+        },
     ]
 }
 
@@ -118,4 +124,15 @@ pub const MIGRATION_2: &str = r#"
     INSERT INTO search_index (article_id, kind, ref_id, text)
     SELECT c.article_id, 'chat', m.id, m.content
     FROM messages m JOIN chats c ON c.id = m.chat_id;
+"#;
+
+/// Which cached image file (in `<app data>/images/`, see `imgcache.rs`)
+/// holds each image URL of an article. Rows vanish with their article.
+pub const MIGRATION_3: &str = r#"
+    CREATE TABLE article_images (
+        article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+        url TEXT NOT NULL,
+        file TEXT NOT NULL,
+        PRIMARY KEY (article_id, url)
+    );
 "#;
