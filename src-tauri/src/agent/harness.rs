@@ -159,6 +159,26 @@ impl AgentHarness {
         Ok(())
     }
 
+    /// Starts the agent process ahead of the first prompt so the user
+    /// doesn't pay the `npx` startup on their first Explain. Safe to call
+    /// repeatedly; a no-op if it's already running.
+    pub async fn warm(&self) -> Result<(), String> {
+        let started = std::time::Instant::now();
+        self.connection().await?;
+        log::info!("agent ready after {} ms", started.elapsed().as_millis());
+        Ok(())
+    }
+
+    /// Asks the agent to stop the turn in flight. The pending `prompt`
+    /// then resolves normally (stop reason "cancelled"), so the text
+    /// streamed so far still arrives followed by `Done`.
+    pub async fn cancel(&self, session_id: &str) -> Result<(), String> {
+        let conn = self.connection().await?;
+        conn.client
+            .notify("session/cancel", json!({ "sessionId": session_id }))
+            .await
+    }
+
     /// Kills the agent subprocess, if one is running.
     pub async fn shutdown(&self) {
         if let Some(conn) = self.client.lock().await.take() {

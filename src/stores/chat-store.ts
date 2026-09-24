@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+  agentCancel,
   agentNewSession,
   agentPrompt,
   agentResumeSession,
@@ -10,12 +11,14 @@ import {
   addHighlight,
   addMessage,
   createChat,
+  deleteLastAssistantMessage,
   getChatForArticle,
+  listHighlights,
   listMessages,
   setChatSession,
 } from "@/lib/db";
 import { logError } from "@/lib/log";
-import { buildPrompt } from "@/lib/prompt";
+import { buildPrompt, buildSummaryPrompt } from "@/lib/prompt";
 import { useAgentStore } from "@/stores/agent-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -26,7 +29,12 @@ export interface ChatMessage {
   text: string;
   /** Set on the message that started an explain. */
   quote?: string;
+  highlightId?: string;
+  /** True for the "Summarize this article" request. */
+  summary?: boolean;
 }
+
+const SUMMARY_LABEL = "Summarize this article";
 
 export type Selection = Omit<Highlight, "id" | "articleId">;
 
@@ -36,12 +44,20 @@ interface ChatStore {
   /** Live ACP session id. Null until first use after a restart. */
   sessionId: string | null;
   messages: ChatMessage[];
+  /** Every passage explained in this article, painted in the reader. */
+  highlights: Highlight[];
   streaming: boolean;
   error: ChatError | null;
   loadForArticle: (articleId: string | null) => Promise<void>;
   explain: (article: StoredArticle, selection: Selection) => Promise<void>;
   send: (article: StoredArticle, text: string) => Promise<void>;
   retry: () => Promise<void>;
+  /** Asks for a fresh answer to the last question, replacing the last reply. */
+  regenerate: (article: StoredArticle) => Promise<void>;
+  /** Summarizes the whole article, no selection needed. */
+  summarize: (article: StoredArticle) => Promise<void>;
+  /** Stops the reply in flight; the partial text is kept and saved. */
+  stop: () => Promise<void>;
 }
 
 // What to re-run on Retry, plus the highlight follow ups refer to.
@@ -152,6 +168,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     chat: null,
     sessionId: null,
     messages: [],
+    highlights: [],
     streaming: false,
     error: null,
 
@@ -161,12 +178,17 @@ export const useChatStore = create<ChatStore>((set, get) => {
         chat: null,
         sessionId: null,
         messages: [],
+        highlights: [],
         streaming: false,
         error: null,
       });
       lastBuild = null;
       lastHighlight = null;
       if (!articleId) return;
+
+      const highlights = await listHighlights(articleId);
+      if (get().articleId !== articleId) return;
+      set({ highlights });
 
       const chat = await getChatForArticle(articleId);
       if (get().articleId !== articleId || !chat) return;
@@ -181,6 +203,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
           role: m.role,
           text: m.content,
           quote: m.highlight?.text,
+          highlightId: m.highlight?.id,
+          summary: m.role === "user" && m.content === SUMMARY_LABEL,
         })),
       });
     },
@@ -198,9 +222,15 @@ export const useChatStore = create<ChatStore>((set, get) => {
       await addMessage(chat.id, "user", highlight.text, highlight.id);
       set((s) => ({
         chat,
+        highlights: [...s.highlights, highlight],
         messages: [
           ...s.messages,
-          { role: "user", text: "Explain this", quote: highlight.text },
+          {
+            role: "user",
+            text: "Explain this",
+            quote: highlight.text,
+            highlightId: highlight.id,
+          },
         ],
       }));
       await runTurn(chat, () => buildPrompt(article, highlight));
@@ -217,6 +247,49 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const highlight = lastHighlight;
       await runTurn(chat, (fresh) =>
         fresh && highlight ? buildPrompt(article, highlight, text) : text,
+      );
+    },
+
+    async regenerate(article) {
+      const { chat, messages, highlights, streaming } = get();
+      if (!chat || streaming) return;
+      const lastUser = [...messages].reverse().find((m) => m.role === "user");
+      if (!lastUser || messages[messages.length - 1]?.role !== "assistant") {
+        return;
+      }
+      const highlight = highlights.find((h) => h.id === lastUser.highlightId);
+
+      await deleteLastAssistantMessage(chat.id);
+      set({ messages: messages.slice(0, -1) });
+      await runTurn(chat, (fresh) => {
+        if (highlight) return buildPrompt(article, highlight);
+        if (lastUser.summary) return buildSummaryPrompt(article);
+        return fresh && lastHighlight
+          ? buildPrompt(article, lastHighlight, lastUser.text)
+          : lastUser.text;
+      });
+    },
+
+    async summarize(article) {
+      if (get().streaming) return;
+      const chat = await chatFor(article);
+      await addMessage(chat.id, "user", SUMMARY_LABEL);
+      set((s) => ({
+        chat,
+        messages: [
+          ...s.messages,
+          { role: "user", text: SUMMARY_LABEL, summary: true },
+        ],
+      }));
+      await runTurn(chat, () => buildSummaryPrompt(article));
+    },
+
+    async stop() {
+      const { sessionId, streaming } = get();
+      if (!sessionId || !streaming) return;
+      // `streaming` clears when the resulting Done event arrives.
+      await agentCancel(sessionId).catch((err) =>
+        logError("cancel failed", err),
       );
     },
 

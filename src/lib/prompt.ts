@@ -71,3 +71,22 @@ export function buildPrompt(
     .filter((line) => line !== null)
     .join("\n");
 }
+
+// Long articles are cut to keep the request a sensible size.
+const SUMMARY_MAX_CHARS = 30000;
+
+/** Prompt for "Summarize this article" (no selection needed). */
+export function buildSummaryPrompt(article: StoredArticle): string {
+  const body = article.blocks.map(blockText).filter(Boolean).join("\n\n");
+  const truncated = body.length > SUMMARY_MAX_CHARS;
+  return [
+    "You are helping a developer decide what to take from a technical article. Use only the text below. Do not use tools, read files, or browse. Reply in Markdown.",
+    "",
+    `Article: ${article.title} (${article.url})`,
+    "",
+    body.slice(0, SUMMARY_MAX_CHARS) +
+      (truncated ? "\n\n[article truncated]" : ""),
+    "",
+    "Summarize it: a few bullet points with the key ideas, then one sentence on who should read it and why.",
+  ].join("\n");
+}

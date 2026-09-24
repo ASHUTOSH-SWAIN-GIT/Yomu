@@ -18,6 +18,7 @@ export function LibrarySidebar() {
 
   const [query, setQuery] = useState("");
   const [addingUrl, setAddingUrl] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
     void refresh();
@@ -94,35 +95,66 @@ export function LibrarySidebar() {
         ) : (
           <ul>
             {filtered.map((article) => (
-              <li key={article.id}>
-                <div
-                  className={cn(
-                    "group hover:bg-accent flex cursor-pointer items-start gap-2 px-3 py-2 text-left",
-                    activeId === article.id && "bg-accent",
-                  )}
-                  onClick={() => void openArticle(article.id)}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-foreground truncate text-sm font-medium">
-                      {article.title}
-                    </p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {article.site} · {formatRelativeTime(article.scrapedAt)}
-                    </p>
+              <li
+                key={article.id}
+                className={cn(
+                  "group hover:bg-accent focus-within:bg-accent flex items-start gap-1 px-3 py-2",
+                  activeId === article.id && "bg-accent",
+                )}
+              >
+                {confirmingId === article.id ? (
+                  <div className="flex flex-1 items-center justify-between gap-2 text-sm">
+                    <span>Delete this article?</span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          setConfirmingId(null);
+                          void remove(article.id);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setConfirmingId(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-6 shrink-0 opacity-0 group-hover:opacity-100"
-                    aria-label="Delete article"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void remove(article.id);
-                    }}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    {/* A real button so the row is reachable and
+                        activatable from the keyboard. */}
+                    <button
+                      type="button"
+                      className="focus-visible:ring-ring/50 min-w-0 flex-1 rounded text-left outline-none focus-visible:ring-2"
+                      aria-current={
+                        activeId === article.id ? "true" : undefined
+                      }
+                      onClick={() => void openArticle(article.id)}
+                    >
+                      <p className="text-foreground truncate text-sm font-medium">
+                        {article.title}
+                      </p>
+                      <p className="text-muted-foreground truncate text-xs">
+                        {article.site} · {formatRelativeTime(article.scrapedAt)}
+                      </p>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
+                      aria-label={`Delete ${article.title}`}
+                      onClick={() => setConfirmingId(article.id)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </>
+                )}
               </li>
             ))}
           </ul>

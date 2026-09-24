@@ -72,6 +72,20 @@ async fn agent_resume_session(
         .await
 }
 
+/// Starts the agent in the background so the first Explain is fast.
+#[tauri::command]
+async fn agent_warm(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<(), String> {
+    harness.warm().await
+}
+
+#[tauri::command]
+async fn agent_cancel(
+    session_id: String,
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<(), String> {
+    harness.cancel(&session_id).await
+}
+
 #[tauri::command]
 async fn agent_prompt(
     session_id: String,
@@ -125,6 +139,8 @@ pub fn run() {
             agent_login,
             agent_new_session,
             agent_resume_session,
+            agent_warm,
+            agent_cancel,
             agent_prompt
         ])
         .build(tauri::generate_context!())

@@ -36,6 +36,16 @@ export async function agentResumeSession(sessionId: string): Promise<void> {
   return invoke("agent_resume_session", { sessionId });
 }
 
+/** Starts the agent in the background so the first Explain is fast. */
+export async function agentWarm(): Promise<void> {
+  return invoke("agent_warm");
+}
+
+/** Stops the turn in flight; the streamed text so far is kept. */
+export async function agentCancel(sessionId: string): Promise<void> {
+  return invoke("agent_cancel", { sessionId });
+}
+
 export async function agentPrompt(
   sessionId: string,
   text: string,

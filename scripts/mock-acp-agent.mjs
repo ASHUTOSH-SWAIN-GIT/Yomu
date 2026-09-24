@@ -17,6 +17,7 @@ let sessionCounter = 0;
 const sessions = new Map(); // sessionId -> modeId
 let requestCounter = 0;
 const pendingClientReplies = new Map();
+const cancelled = new Set();
 
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n");
 const respond = (id, result) => send({ jsonrpc: "2.0", id, result });
@@ -51,7 +52,13 @@ async function handlePrompt(id, { sessionId, prompt }) {
     return respondError(id, "You've hit your usage limit");
   }
 
-  for (const word of reply.split(" ")) {
+  // "SLOW" gives a test time to cancel mid-stream.
+  const words = text.includes("SLOW")
+    ? Array(200).fill("word")
+    : reply.split(" ");
+  for (const word of words) {
+    if (cancelled.delete(sessionId))
+      return respond(id, { stopReason: "cancelled" });
     notify("session/update", {
       sessionId,
       update: {
@@ -59,8 +66,9 @@ async function handlePrompt(id, { sessionId, prompt }) {
         content: { type: "text", text: word + " " },
       },
     });
-    await sleep(5);
+    await sleep(text.includes("SLOW") ? 20 : 5);
   }
+  cancelled.delete(sessionId);
   respond(id, { stopReason: "end_turn" });
 }
 
@@ -101,6 +109,9 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
         sessions.set(params.sessionId, params.modeId);
         respond(id, {});
       }
+      break;
+    case "session/cancel":
+      cancelled.add(params.sessionId); // a notification: no response
       break;
     case "session/prompt":
       // Refuse to run unless locked down, so tests catch a missing set_mode.

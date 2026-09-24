@@ -30,6 +30,7 @@
   --accent-foreground: oklch(0.2 0 0);
   --destructive: oklch(0.52 0.22 27);
   --destructive-foreground: oklch(0.98 0 0);
+  --highlight: oklch(0.88 0.12 95 / 0.6);
 }
 
 .dark {
@@ -52,6 +53,7 @@
   --accent-foreground: oklch(0.94 0 0);
   --destructive: oklch(0.72 0.17 27);
   --destructive-foreground: oklch(0.14 0 0);
+  --highlight: oklch(0.5 0.1 95 / 0.55);
 }
 
 @theme inline {
@@ -102,4 +104,9 @@
 :root.dark .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg) !important;
+}
+
+/* Passages the user has asked the agent to explain (hooks/use-highlights). */
+::highlight(yomu) {
+  background-color: var(--highlight);
 }

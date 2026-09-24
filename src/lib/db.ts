@@ -261,3 +261,40 @@ export async function listMessages(chatId: string): Promise<StoredMessage[]> {
       : null,
   }));
 }
+
+export async function listHighlights(articleId: string): Promise<Highlight[]> {
+  const db = await getDb();
+  const rows = await db.select<
+    {
+      id: string;
+      article_id: string;
+      block_index: number;
+      start_offset: number;
+      end_offset: number;
+      text: string;
+    }[]
+  >("SELECT * FROM highlights WHERE article_id = $1 ORDER BY created_at", [
+    articleId,
+  ]);
+  return rows.map((r) => ({
+    id: r.id,
+    articleId: r.article_id,
+    blockIndex: r.block_index,
+    startOffset: r.start_offset,
+    endOffset: r.end_offset,
+    text: r.text,
+  }));
+}
+
+/** Removes the newest assistant message (used when regenerating it). */
+export async function deleteLastAssistantMessage(
+  chatId: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `DELETE FROM messages WHERE id = (
+       SELECT id FROM messages WHERE chat_id = $1 AND role = 'assistant'
+       ORDER BY created_at DESC, rowid DESC LIMIT 1)`,
+    [chatId],
+  );
+}

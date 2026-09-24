@@ -42,6 +42,8 @@ Parked: agent picker (Claude/Gemini via ACP), sync, browser extension.
 
 ## Theme 1 in detail: Explain experience
 
+**Status: implemented, not yet clicked through in the app.** Checked so far: Rust tests (mock cancel test), `session/cancel` against real Codex (stops with `stopReason: "cancelled"`), typecheck, lint, build. Still to check by hand: first Explain speed after launch, Stop mid-answer, shaded highlights and click-to-jump, Copy/Regenerate/chips, Summarize, keyboard use of the sidebar.
+
 Build order, each step independently shippable:
 
 1. **Pre-warm the agent.** Add `AgentHarness::warm()` (calls the existing private `connection()` in `agent/harness.rs`), an `agent_warm` command in `lib.rs`, register it, and call it from `agent-store.ts` `refreshStatus()` when status becomes `ready`. Log elapsed time so we can see the win.

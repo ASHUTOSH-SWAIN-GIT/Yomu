@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlockRenderer } from "@/components/reader/block-renderer";
 import { ExplainButton } from "@/components/reader/explain-button";
+import { useHighlights } from "@/hooks/use-highlights";
 import { useTextSelection } from "@/hooks/use-text-selection";
+import { useUiStore } from "@/stores/ui-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useReaderStore, type ReaderState } from "@/stores/reader-store";
 import type { StoredArticle } from "@/types/library";
@@ -94,6 +102,23 @@ function Article({ article }: { article: StoredArticle }) {
   const [anchor, clear] = useTextSelection(ref);
   const streaming = useChatStore((s) => s.streaming);
   const explain = useChatStore((s) => s.explain);
+  const highlights = useChatStore((s) => s.highlights);
+  const setChatPanelOpen = useUiStore((s) => s.setChatPanelOpen);
+
+  // Clicking a shaded passage jumps to its explanation in the chat.
+  const showExplanation = useCallback(
+    (highlightId: string) => {
+      setChatPanelOpen(true);
+      // Wait a frame in case the panel was collapsed and is mounting.
+      requestAnimationFrame(() =>
+        document
+          .getElementById(`highlight-${highlightId}`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" }),
+      );
+    },
+    [setChatPanelOpen],
+  );
+  useHighlights(ref, highlights, showExplanation);
 
   function handleExplain() {
     if (!anchor) return;

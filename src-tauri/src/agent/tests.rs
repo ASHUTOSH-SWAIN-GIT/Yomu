@@ -126,6 +126,34 @@ async fn agent_errors_reach_the_caller() {
     f.harness.shutdown().await;
 }
 
+#[tokio::test]
+async fn cancel_stops_a_turn_early_but_still_finishes_it() {
+    let mut f = fixture("cancel").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+
+    let harness = std::sync::Arc::new(f.harness);
+    let running = {
+        let harness = harness.clone();
+        let session = session.clone();
+        tokio::spawn(async move { harness.prompt(&session, "SLOW please").await })
+    };
+
+    // Wait for the first token, then cancel.
+    let first = timeout(Duration::from_secs(5), f.events.recv()).await;
+    assert!(matches!(first, Ok(Some(AgentEvent::Token { .. }))));
+    harness.cancel(&session).await.unwrap();
+
+    running
+        .await
+        .unwrap()
+        .expect("a cancelled turn still resolves Ok");
+    let events = until_done(&mut f.events).await;
+    // 200 words were queued; a cancel must cut that far short.
+    assert!(joined_tokens(&events).matches("word").count() < 100);
+    assert!(matches!(events.last(), Some(AgentEvent::Done { .. })));
+    harness.shutdown().await;
+}
+
 /// Opt-in: talks to the real Codex adapter via `npx` and your ChatGPT
 /// login, so it's slow and uses plan quota. Run with
 /// `cargo test real_codex -- --ignored --nocapture`.

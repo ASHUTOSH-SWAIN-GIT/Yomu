@@ -109,6 +109,13 @@ impl RpcClient {
             .map_err(|_| "agent process closed before responding".to_string())?
     }
 
+    /// Sends a notification (no `id`, no response expected).
+    pub async fn notify(&self, method: &str, params: Value) -> Result<(), String> {
+        self.write_line(&json!({ "jsonrpc": "2.0", "method": method, "params": params }))
+            .await
+            .map_err(|e| format!("failed to write to agent process: {e}"))
+    }
+
     async fn write_line(&self, payload: &Value) -> std::io::Result<()> {
         let mut line = serde_json::to_vec(payload).expect("Value always serializes");
         line.push(b'\n');
