@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { ReaderView } from "@/components/layout/reader-view";
 import { ChatPanel } from "@/components/layout/chat-panel";
+import { UpdateBanner } from "@/components/layout/update-banner";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useUiStore } from "@/stores/ui-store";
 import { useThemeEffect } from "@/hooks/use-theme";
@@ -17,6 +18,7 @@ export function AppShell() {
       <header className="border-border flex h-10 shrink-0 items-center justify-between border-b px-3">
         <span className="text-sm font-semibold tracking-tight">Yomu</span>
         <div className="flex items-center gap-2">
+          <UpdateBanner />
           {!chatPanelOpen && (
             <Button
               variant="ghost"

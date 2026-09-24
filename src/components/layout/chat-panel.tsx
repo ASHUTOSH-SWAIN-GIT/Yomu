@@ -161,7 +161,7 @@ function ChatBody() {
           placeholder="Ask a follow up…"
           aria-label="Ask a follow up"
           disabled={streaming || messages.length === 0}
-          className="border-border bg-background focus-visible:ring-ring/50 h-8 flex-1 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 disabled:opacity-60"
+          className="border-input bg-background focus-visible:ring-ring/50 h-8 flex-1 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 disabled:opacity-60"
         />
         <Button
           size="sm"

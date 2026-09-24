@@ -91,3 +91,31 @@ fn now_millis() -> u64 {
 pub fn canonical_url(raw_url: &str) -> Result<String, ScrapeError> {
     Ok(normalize::canonicalize(raw_url)?.to_string())
 }
+
+/// Opt-in timing check for ROADMAP.md M6 ("scrape under a few seconds on
+/// normal pages"). Hits the network: `cargo test scrape_timing -- --ignored --nocapture`.
+#[cfg(test)]
+mod timing {
+    use std::time::Instant;
+
+    #[tokio::test]
+    #[ignore]
+    async fn scrape_timing() {
+        for url in [
+            "https://kubernetes.io/docs/concepts/workloads/pods/",
+            "https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html",
+            "https://react.dev/learn/thinking-in-react",
+            "https://en.wikipedia.org/wiki/Rust_(programming_language)",
+        ] {
+            let start = Instant::now();
+            match super::scrape(url).await {
+                Ok(a) => println!(
+                    "{:>6} ms  {:>5} blocks  {url}",
+                    start.elapsed().as_millis(),
+                    a.blocks.len()
+                ),
+                Err(e) => println!("{:>6} ms  ERROR {e}  {url}", start.elapsed().as_millis()),
+            }
+        }
+    }
+}

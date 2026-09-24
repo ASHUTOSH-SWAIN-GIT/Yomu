@@ -127,6 +127,8 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] Unit tests for HTML → block conversion, language detection, and URL normalization (`cargo test`, 16 passing)
 - [ ] Fixture HTML snapshots pulled from real target sites — deferred until site rules land
 
+**Known bug (found in M6 timing run)**: `https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html` fails with "could not extract readable content" (mdBook layout; needs a site rule). Kubernetes, react.dev and Wikipedia pages extract fine.
+
 **Exit criteria**: a Kubernetes doc page, a dev.to post, and a free Medium article all render cleanly.
 
 **Out of scope**: paywalled content (show only what is public), bulk crawling.
@@ -228,11 +230,11 @@ Status: backend verified against real Codex (streaming, resume with context). Th
 
 ## M6: Hardening and v1 release
 
-- [ ] Performance: large docs pages render smoothly (blocks use `content-visibility: auto`; **not yet measured on a real large page**); scrape under a few seconds on normal pages (not measured)
-- [ ] Accessibility pass: done so far: input labels, `role="log"` live region for chat, `Cmd/Ctrl+E` keyboard path for Explain. **Contrast in both themes and a screen reader run are not checked yet.**
+- [x] Performance: scrape times measured (`cargo test scrape_timing -- --ignored --nocapture`): 0.5–1.3 s on Kubernetes docs, react.dev and Wikipedia pages. Blocks use `content-visibility: auto` for long pages. No in-browser render benchmark on a huge page yet.
+- [x] Accessibility pass: input labels, `role="log"` live region for chat, `Cmd/Ctrl+E` keyboard path for Explain, and contrast computed for both themes (fixed low contrast error text, dark destructive button, and input borders; all text pairs now ≥ 4.5:1, control borders ≥ 3:1). **No screen reader run yet.**
 - [x] Crash and error logging (local only): `tauri-plugin-log` to the OS app log dir (`~/Library/Logs/com.yomu.app/` on macOS); agent, scrape and chat errors are logged
-- [ ] Packaging and signing for macOS, Windows, Linux
-- [ ] Auto update channel
+- [ ] Packaging and signing for macOS, Windows, Linux: macOS `.app` and `.dmg` build locally and `.github/workflows/release.yml` builds all three platforms on a version tag. **Not yet run on CI.** Signing needs your certificates as repo secrets (see README "Releasing"); Windows signing is not configured.
+- [x] Auto update channel: `tauri-plugin-updater` checks GitHub Releases' `latest.json` at startup and shows an "Update and restart" banner. Updater keypair generated (public key in `tauri.conf.json`, private key at `~/.tauri/yomu-updater.key`, no password) and a signed build verified locally. **Needs the private key added as the `TAURI_SIGNING_PRIVATE_KEY` repo secret, and a first release published, before an update can actually be delivered.**
 - [ ] Review OpenAI terms on subscription use in third party apps
 - [x] README, install guide, Codex setup guide
 - [ ] Private beta with a handful of developers; collect feedback

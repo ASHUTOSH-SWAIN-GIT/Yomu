@@ -37,6 +37,8 @@ thiserror = "2"
 log = "0.4"
 tauri-plugin-log = "2"
 tauri-plugin-sql = { version = "2.4.1", features = ["sqlite"] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

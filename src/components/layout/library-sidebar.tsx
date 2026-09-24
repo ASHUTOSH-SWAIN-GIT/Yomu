@@ -65,7 +65,7 @@ export function LibrarySidebar() {
       )}
 
       <div className="px-3 pb-2">
-        <div className="border-border bg-background flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm">
+        <div className="border-input bg-background flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm">
           <Search className="text-muted-foreground size-3.5" />
           <input
             value={query}
@@ -151,7 +151,7 @@ function AddUrlForm({ onSubmit }: { onSubmit: (url: string) => void }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="https://..."
-        className="border-border bg-background focus-visible:ring-ring/50 w-full rounded-md border px-2 py-1.5 text-sm outline-none focus-visible:ring-2"
+        className="border-input bg-background focus-visible:ring-ring/50 w-full rounded-md border px-2 py-1.5 text-sm outline-none focus-visible:ring-2"
       />
     </form>
   );
