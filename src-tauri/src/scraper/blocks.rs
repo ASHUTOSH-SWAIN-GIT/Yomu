@@ -58,6 +58,27 @@ pub enum Block {
     Math {
         tex: String,
     },
+    List {
+        ordered: bool,
+        items: Vec<ListItem>,
+    },
+    Quote {
+        spans: Vec<Span>,
+    },
+    Table {
+        /// Empty when the table has no header row.
+        header: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
+}
+
+/// One list entry. Nested lists are flattened into the same list with a
+/// larger `depth`, which keeps the block format simple to render.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ListItem {
+    pub spans: Vec<Span>,
+    pub depth: u8,
 }
 
 /// Walks cleaned article HTML (already run through Readability) and turns
@@ -84,25 +105,36 @@ fn walk_element(el: ElementRef, blocks: &mut Vec<Block>) {
     match tag {
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             let level = tag[1..].parse().unwrap_or(2);
-            let text = collect_text(el);
-            if !text.trim().is_empty() {
-                blocks.push(Block::Heading {
-                    level,
-                    text: text.trim().to_string(),
-                });
+            let text = clean_heading(&collect_text(el));
+            if !text.is_empty() {
+                blocks.push(Block::Heading { level, text });
             }
         }
-        "p" | "blockquote" => {
+        "p" => {
             let spans = collect_spans(el);
             if spans.iter().any(|s| !s.text.trim().is_empty()) {
                 blocks.push(Block::Paragraph { spans });
             }
         }
-        "li" => {
-            let mut spans = vec![Span::plain("\u{2022} ".to_string())];
-            spans.extend(collect_spans(el));
+        "blockquote" => {
+            let spans = trim_trailing_newlines(collect_spans(el));
             if spans.iter().any(|s| !s.text.trim().is_empty()) {
-                blocks.push(Block::Paragraph { spans });
+                blocks.push(Block::Quote { spans });
+            }
+        }
+        "ul" | "ol" => {
+            let mut items = Vec::new();
+            collect_list_items(el, 0, &mut items);
+            if !items.is_empty() {
+                blocks.push(Block::List {
+                    ordered: tag == "ol",
+                    items,
+                });
+            }
+        }
+        "table" => {
+            if let Some(table) = table_block(el) {
+                blocks.push(table);
             }
         }
         "pre" => {
@@ -138,8 +170,7 @@ fn walk_element(el: ElementRef, blocks: &mut Vec<Block>) {
             }
         }
         // Containers: recurse without emitting a block of their own.
-        "div" | "section" | "article" | "ul" | "ol" | "figure" | "main" | "body" | "html"
-        | "span" => {
+        "div" | "section" | "article" | "figure" | "main" | "body" | "html" | "span" => {
             walk_children(el, blocks);
         }
         // Skip non-content elements entirely.
@@ -148,6 +179,87 @@ fn walk_element(el: ElementRef, blocks: &mut Vec<Block>) {
             walk_children(el, blocks);
         }
     }
+}
+
+/// Collapses whitespace and drops the permalink glyphs docs frameworks
+/// append to headings (MkDocs "¶", "#" anchors, zero width spaces).
+pub(super) fn clean_heading(text: &str) -> String {
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    collapsed
+        .trim_end_matches(['\u{b6}', '#', '\u{200b}', ' '])
+        .to_string()
+}
+
+/// Flattens a `ul`/`ol` (and any lists nested inside its items) into
+/// `items`, recording nesting depth. An item's own text excludes its nested
+/// lists, which become separate deeper items.
+fn collect_list_items(list: ElementRef, depth: u8, items: &mut Vec<ListItem>) {
+    for child in list.children().filter_map(ElementRef::wrap) {
+        if child.value().name() != "li" {
+            continue;
+        }
+        let spans = trim_trailing_newlines(collect_spans(child));
+        if spans.iter().any(|s| !s.text.trim().is_empty()) {
+            items.push(ListItem { spans, depth });
+        }
+        for nested in child.children().filter_map(ElementRef::wrap) {
+            if matches!(nested.value().name(), "ul" | "ol") {
+                collect_list_items(nested, depth.saturating_add(1), items);
+            }
+        }
+    }
+}
+
+fn cell_text(cell: ElementRef) -> String {
+    collect_text(cell)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Turns a `table` into a header plus rows of plain text cells. The header
+/// is the first row if it is in a `thead` or made of `th` cells.
+fn table_block(table: ElementRef) -> Option<Block> {
+    let mut rows: Vec<(bool, Vec<String>)> = Vec::new();
+    for row in table
+        .descendants()
+        .filter_map(ElementRef::wrap)
+        .filter(|e| e.value().name() == "tr")
+    {
+        let cells: Vec<ElementRef> = row
+            .children()
+            .filter_map(ElementRef::wrap)
+            .filter(|c| matches!(c.value().name(), "th" | "td"))
+            .collect();
+        if cells.is_empty() {
+            continue;
+        }
+        let is_header = cells.iter().all(|c| c.value().name() == "th");
+        rows.push((is_header, cells.into_iter().map(cell_text).collect()));
+    }
+
+    let header = match rows.first() {
+        Some((true, _)) => rows.remove(0).1,
+        _ => Vec::new(),
+    };
+    let rows: Vec<Vec<String>> = rows.into_iter().map(|(_, cells)| cells).collect();
+    if header.is_empty() && rows.is_empty() {
+        return None;
+    }
+    Some(Block::Table { header, rows })
+}
+
+fn trim_trailing_newlines(mut spans: Vec<Span>) -> Vec<Span> {
+    while let Some(last) = spans.last_mut() {
+        let trimmed = last.text.trim_end_matches('\n').len();
+        last.text.truncate(trimmed);
+        if last.text.is_empty() {
+            spans.pop();
+        } else {
+            break;
+        }
+    }
+    spans
 }
 
 /// Collects the visible text of an element, ignoring child element structure.
@@ -202,7 +314,17 @@ fn collect_spans_inner(
                         collect_spans_inner(child_el, bold, italic, code, link, out)
                     }
                     "br" => out.push(Span::plain("\n".to_string())),
-                    "script" | "style" => {}
+                    // Nested lists are emitted as their own deeper items
+                    // (see `collect_list_items`).
+                    "ul" | "ol" | "script" | "style" => {}
+                    // Paragraphs inside a blockquote or list item.
+                    "p" => {
+                        if out.last().is_some_and(|l| !l.text.ends_with('\n')) {
+                            out.push(Span::plain("\n".to_string()));
+                        }
+                        collect_spans_inner(child_el, bold, italic, code, href.clone(), out);
+                        out.push(Span::plain("\n".to_string()));
+                    }
                     _ => collect_spans_inner(child_el, bold, italic, code, href.clone(), out),
                 }
             }
@@ -271,6 +393,19 @@ mod tests {
     }
 
     #[test]
+    fn heading_drops_permalink_glyphs() {
+        let blocks =
+            html_to_blocks(r##"<h2>Getting started<a class="headerlink" href="#x">¶</a></h2>"##);
+        assert_eq!(
+            blocks[0],
+            Block::Heading {
+                level: 2,
+                text: "Getting started".to_string()
+            }
+        );
+    }
+
+    #[test]
     fn extracts_code_block_with_declared_language() {
         let html = r#"<pre><code class="language-yaml">apiVersion: v1
 kind: Pod</code></pre>"#;
@@ -308,13 +443,62 @@ kind: Pod</code></pre>"#;
     }
 
     #[test]
-    fn flattens_list_items_into_paragraphs() {
-        let html = "<ul><li>First</li><li>Second</li></ul>";
+    fn keeps_lists_as_lists_with_nesting() {
+        let html = "<ol><li>First<ul><li>Nested</li></ul></li><li>Second</li></ol>";
         let blocks = html_to_blocks(html);
-        assert_eq!(blocks.len(), 2);
-        for block in &blocks {
-            assert!(matches!(block, Block::Paragraph { .. }));
-        }
+        let [Block::List { ordered, items }] = blocks.as_slice() else {
+            panic!("expected one list, got {blocks:?}");
+        };
+        assert!(*ordered);
+        let texts: Vec<(String, u8)> = items
+            .iter()
+            .map(|i| (i.spans.iter().map(|s| s.text.as_str()).collect(), i.depth))
+            .collect();
+        assert_eq!(
+            texts,
+            vec![
+                ("First".to_string(), 0),
+                ("Nested".to_string(), 1),
+                ("Second".to_string(), 0)
+            ]
+        );
+    }
+
+    #[test]
+    fn keeps_blockquotes_as_quotes() {
+        let html = "<blockquote><p>One</p><p>Two</p></blockquote>";
+        let blocks = html_to_blocks(html);
+        let [Block::Quote { spans }] = blocks.as_slice() else {
+            panic!("expected one quote, got {blocks:?}");
+        };
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        assert_eq!(text, "One\nTwo");
+    }
+
+    #[test]
+    fn extracts_table_with_header() {
+        let html = "<table><thead><tr><th>Name</th><th>Type</th></tr></thead>\
+            <tbody><tr><td>id</td><td> u64 </td></tr></tbody></table>";
+        let blocks = html_to_blocks(html);
+        assert_eq!(
+            blocks,
+            vec![Block::Table {
+                header: vec!["Name".into(), "Type".into()],
+                rows: vec![vec!["id".into(), "u64".into()]],
+            }]
+        );
+    }
+
+    #[test]
+    fn table_without_header_row_keeps_all_rows() {
+        let blocks = html_to_blocks("<table><tr><td>a</td><td>b</td></tr></table>");
+        assert_eq!(
+            blocks,
+            vec![Block::Table {
+                header: vec![],
+                rows: vec![vec!["a".into(), "b".into()]],
+            }]
+        );
     }
 
     #[test]

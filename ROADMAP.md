@@ -108,10 +108,10 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 ### Site rules
 
-- [ ] Kubernetes / Hugo docs (tabs, callouts) — generic Readability extraction only so far
-- [ ] Docusaurus
-- [ ] MkDocs
-- [ ] dev.to, Hashnode
+- [x] Kubernetes / Hugo docs (Docsy `.td-content`); tabs and callouts are not specially handled
+- [x] Docusaurus
+- [x] MkDocs (Material)
+- [ ] dev.to done (`#article-body`); Hashnode not done
 - [ ] Medium (bot checks, missing code language tags, lazy images, RSS fallback)
 
 ### Reader components
@@ -127,7 +127,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] Unit tests for HTML → block conversion, language detection, and URL normalization (`cargo test`, 16 passing)
 - [ ] Fixture HTML snapshots pulled from real target sites — deferred until site rules land
 
-**Known bug (found in M6 timing run)**: `https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html` fails with "could not extract readable content" (mdBook layout; needs a site rule). Kubernetes, react.dev and Wikipedia pages extract fine.
+**Fixed (Theme 2)**: the mdBook failure on the Rust book. Docs frameworks now have content rules in `src-tauri/src/scraper/rules.rs`.
 
 **Exit criteria**: a Kubernetes doc page, a dev.to post, and a free Medium article all render cleanly.
 

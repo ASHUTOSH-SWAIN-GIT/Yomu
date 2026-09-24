@@ -16,7 +16,7 @@ export function ParagraphBlock({ spans }: { spans: Span[] }) {
   );
 }
 
-function SpanText({ span }: { span: Span }) {
+export function SpanText({ span }: { span: Span }) {
   const className = cn(
     span.bold && "font-semibold",
     span.italic && "italic",

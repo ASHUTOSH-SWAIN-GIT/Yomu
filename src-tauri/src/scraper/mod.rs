@@ -3,6 +3,7 @@ mod fetch;
 mod lang_detect;
 mod meta;
 mod normalize;
+mod rules;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -52,20 +53,35 @@ pub async fn scrape(raw_url: &str) -> Result<ScrapedArticle, ScrapeError> {
     let final_url = url::Url::parse(&fetched.final_url).unwrap_or(canonical.clone());
     let host = final_url.host_str().unwrap_or("unknown").to_string();
 
-    let mut html_bytes = fetched.html.as_bytes();
-    let product = readability::extractor::extract(&mut html_bytes, &final_url)
-        .map_err(|_| ScrapeError::ExtractionFailed)?;
-
-    let blocks = blocks::html_to_blocks(&product.content);
+    // Known docs frameworks first (see rules.rs), Readability otherwise.
+    let (mut blocks, title) = if let Some(found) = rules::extract_content(&original_document) {
+        let title = match found.title_source {
+            rules::TitleSource::ContentH1 => {
+                meta::extract_title(&Html::parse_fragment(&found.html))
+            }
+            rules::TitleSource::PageH1 => meta::extract_title(&original_document),
+            rules::TitleSource::TitleTag => meta::extract_title_tag(&original_document),
+        };
+        (
+            blocks::html_to_blocks(&found.html),
+            title
+                .or_else(|| meta::extract_title(&original_document))
+                .unwrap_or_else(|| host.clone()),
+        )
+    } else {
+        let mut html_bytes = fetched.html.as_bytes();
+        let product = readability::extractor::extract(&mut html_bytes, &final_url)
+            .map_err(|_| ScrapeError::ExtractionFailed)?;
+        let title = match product.title.trim() {
+            "" => host.clone(),
+            t => t.to_string(),
+        };
+        (blocks::html_to_blocks(&product.content), title)
+    };
     if blocks.is_empty() {
         return Err(ScrapeError::ExtractionFailed);
     }
-
-    let title = if product.title.trim().is_empty() {
-        host.clone()
-    } else {
-        product.title.trim().to_string()
-    };
+    drop_repeated_title(&mut blocks, &title);
 
     Ok(ScrapedArticle {
         url: fetched.final_url,
@@ -76,6 +92,16 @@ pub async fn scrape(raw_url: &str) -> Result<ScrapedArticle, ScrapeError> {
         blocks,
         scraped_at: now_millis(),
     })
+}
+
+/// Docs pages start their content with an `h1` that repeats the title the
+/// reader already shows in its header.
+fn drop_repeated_title(blocks: &mut Vec<Block>, title: &str) {
+    if let Some(Block::Heading { level: 1, text }) = blocks.first() {
+        if title.contains(text.as_str()) {
+            blocks.remove(0);
+        }
+    }
 }
 
 fn now_millis() -> u64 {
@@ -106,14 +132,32 @@ mod timing {
             "https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html",
             "https://react.dev/learn/thinking-in-react",
             "https://en.wikipedia.org/wiki/Rust_(programming_language)",
+            "https://docusaurus.io/docs",
+            "https://squidfunk.github.io/mkdocs-material/getting-started/",
+            "https://dev.to/wiseai/i-built-a-version-bump-tool-in-rust-that-is-10000x-faster-than-its-python-counterparts-i6b",
         ] {
             let start = Instant::now();
             match super::scrape(url).await {
-                Ok(a) => println!(
-                    "{:>6} ms  {:>5} blocks  {url}",
-                    start.elapsed().as_millis(),
-                    a.blocks.len()
-                ),
+                Ok(a) => {
+                    let count = |name: &str| {
+                        a.blocks
+                            .iter()
+                            .filter(|b| {
+                                serde_json::to_value(b).unwrap()["type"] == name
+                            })
+                            .count()
+                    };
+                    println!(
+                        "{:>6} ms  {:>4} blocks (list {}, table {}, quote {}, code {})  {:?}  {url}",
+                        start.elapsed().as_millis(),
+                        a.blocks.len(),
+                        count("list"),
+                        count("table"),
+                        count("quote"),
+                        count("code"),
+                        a.title,
+                    )
+                }
                 Err(e) => println!("{:>6} ms  ERROR {e}  {url}", start.elapsed().as_millis()),
             }
         }

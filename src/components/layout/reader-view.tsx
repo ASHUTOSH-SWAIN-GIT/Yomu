@@ -5,7 +5,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { LinkIcon, Loader2 } from "lucide-react";
+import { LinkIcon, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlockRenderer } from "@/components/reader/block-renderer";
 import { ExplainButton } from "@/components/reader/explain-button";
@@ -101,6 +101,7 @@ function Article({ article }: { article: StoredArticle }) {
   const ref = useRef<HTMLElement>(null);
   const [anchor, clear] = useTextSelection(ref);
   const streaming = useChatStore((s) => s.streaming);
+  const rescrape = useReaderStore((s) => s.rescrape);
   const explain = useChatStore((s) => s.explain);
   const highlights = useChatStore((s) => s.highlights);
   const setChatPanelOpen = useUiStore((s) => s.setChatPanelOpen);
@@ -148,6 +149,14 @@ function Article({ article }: { article: StoredArticle }) {
         <p className="text-muted-foreground mt-2 text-sm">
           {[article.author, article.site].filter(Boolean).join(" · ")}
         </p>
+        <button
+          type="button"
+          onClick={() => void rescrape(article)}
+          className="text-muted-foreground focus-visible:ring-ring/50 mt-2 inline-flex items-center gap-1 rounded text-xs underline-offset-2 outline-none hover:underline focus-visible:ring-2"
+        >
+          <RefreshCw className="size-3" />
+          Re-fetch article
+        </button>
         <a
           href={article.url}
           target="_blank"

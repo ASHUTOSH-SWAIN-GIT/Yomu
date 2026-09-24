@@ -20,6 +20,9 @@ interface ReaderStore {
   /** Opens a pasted URL: serves it from the library if already saved
    * (no network), otherwise scrapes it and saves the result. */
   openUrl: (url: string) => Promise<void>;
+  /** Re-fetches an open article and replaces its saved content (same id,
+   * so its chat is kept). Upgrades articles saved by an older scraper. */
+  rescrape: (article: StoredArticle) => Promise<void>;
   /** Opens an already saved article directly from the library, by id. */
   openArticle: (id: string) => Promise<void>;
 }
@@ -47,6 +50,23 @@ export const useReaderStore = create<ReaderStore>((set) => ({
         state: {
           status: "error",
           url,
+          message: err instanceof Error ? err.message : String(err),
+        },
+      });
+    }
+  },
+
+  async rescrape(article) {
+    try {
+      const saved = await upsertArticle(await scrapeUrl(article.url));
+      set({ state: { status: "ready", article: saved } });
+      await useLibraryStore.getState().refresh();
+    } catch (err) {
+      logError(`re-scrape of ${article.url} failed`, err);
+      set({
+        state: {
+          status: "error",
+          url: article.url,
           message: err instanceof Error ? err.message : String(err),
         },
       });

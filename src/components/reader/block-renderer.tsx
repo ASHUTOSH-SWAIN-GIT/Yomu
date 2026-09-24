@@ -4,6 +4,9 @@ import { ParagraphBlock } from "@/components/reader/paragraph-block";
 import { CodeBlock } from "@/components/reader/code-block";
 import { ImageBlock } from "@/components/reader/image-block";
 import { MathBlock } from "@/components/reader/math-block";
+import { ListBlock } from "@/components/reader/list-block";
+import { QuoteBlock } from "@/components/reader/quote-block";
+import { TableBlock } from "@/components/reader/table-block";
 
 export function BlockRenderer({ blocks }: { blocks: Block[] }) {
   return (
@@ -37,5 +40,11 @@ function BlockView({ block }: { block: Block }) {
       return <ImageBlock src={block.src} alt={block.alt} />;
     case "math":
       return <MathBlock tex={block.tex} />;
+    case "list":
+      return <ListBlock ordered={block.ordered} items={block.items} />;
+    case "quote":
+      return <QuoteBlock spans={block.spans} />;
+    case "table":
+      return <TableBlock header={block.header} rows={block.rows} />;
   }
 }

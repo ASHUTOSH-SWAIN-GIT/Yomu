@@ -18,6 +18,25 @@ function blockText(block: Block): string {
       return `$$${block.tex}$$`;
     case "image":
       return block.alt ? `[image: ${block.alt}]` : "";
+    case "list":
+      return block.items
+        .map(
+          (item, i) =>
+            `${"  ".repeat(item.depth)}${block.ordered ? `${i + 1}.` : "-"} ${item.spans.map((s) => s.text).join("")}`,
+        )
+        .join("\n");
+    case "quote":
+      return block.spans
+        .map((s) => s.text)
+        .join("")
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+    case "table":
+      return [block.header, ...block.rows]
+        .filter((row) => row.length > 0)
+        .map((row) => `| ${row.join(" | ")} |`)
+        .join("\n");
   }
 }
 

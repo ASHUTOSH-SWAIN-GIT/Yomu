@@ -26,7 +26,19 @@ M1–M6 are built: paste a URL, read it, select text, Explain via real Codex, ch
 
 Parked: agent picker (Claude/Gemini via ACP), sync, browser extension.
 
-### Theme 2 outline (plan in detail when we get there)
+### Theme 2: Reader fidelity
+
+**Status: implemented except the two fallbacks below.** Checked on real pages (`cargo test scrape_timing -- --ignored --nocapture`): Kubernetes, the Rust book (was failing), react.dev, Wikipedia, Docusaurus, MkDocs Material and a dev.to post all extract with correct titles in 0.4–1.3 s. The dev.to post produced 4 tables, 3 quotes and 3 lists. Not yet viewed in the app window.
+
+Done: `list` (with nesting), `quote` and `table` blocks end to end (Rust, TS types, renderers, prompt text); list markers are CSS so selecting an item doesn't include "•"; site rules for mdBook, Docusaurus, MkDocs Material, Hugo Docsy and dev.to with per-site title sources; heading permalink glyphs stripped; "Re-fetch article" button so articles saved earlier get the new blocks.
+
+**Not done, and why**
+
+- Hidden webview fallback for JS-rendered pages: needs its own design (webview lifecycle, getting the rendered HTML back over IPC, interaction with a future CSP).
+- Medium (RSS fallback, bot checks): depends on the same fallback work.
+- Hashnode rule, Docusaurus/Kubernetes tabs and callouts, Wikipedia infobox tables (Readability drops them).
+
+Original outline:
 
 - Extend `Block` additively: `list {ordered, items}`, `table {headers, rows}`, `quote`. Old saved articles keep working (variants are additive), add a "Re-scrape" action to upgrade them.
 - Site rules module (`scraper/rules.rs`): pick a content selector by host/markers before Readability (mdBook `#content main`, Docusaurus `article`, MkDocs `.md-content`, Hugo/K8s `.td-content`, dev.to `#article-body`). Fixture HTML tests per site.

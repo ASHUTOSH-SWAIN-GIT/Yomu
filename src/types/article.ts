@@ -12,12 +12,21 @@ export interface Span {
   href?: string;
 }
 
+export interface ListItem {
+  spans: Span[];
+  /** Nesting level, 0 for top level items. */
+  depth: number;
+}
+
 export type Block =
   | { type: "heading"; level: number; text: string }
   | { type: "paragraph"; spans: Span[] }
   | { type: "code"; language: string | null; content: string }
   | { type: "image"; src: string; alt: string | null }
-  | { type: "math"; tex: string };
+  | { type: "math"; tex: string }
+  | { type: "list"; ordered: boolean; items: ListItem[] }
+  | { type: "quote"; spans: Span[] }
+  | { type: "table"; header: string[]; rows: string[][] };
 
 export interface ScrapedArticle {
   url: string;
