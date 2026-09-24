@@ -5,6 +5,7 @@ import {
   getArticleById,
   upsertArticle,
 } from "@/lib/db";
+import { logError } from "@/lib/log";
 import { useLibraryStore } from "@/stores/library-store";
 import type { StoredArticle } from "@/types/library";
 
@@ -41,6 +42,7 @@ export const useReaderStore = create<ReaderStore>((set) => ({
       set({ state: { status: "ready", article: saved } });
       await useLibraryStore.getState().refresh();
     } catch (err) {
+      logError(`opening ${url} failed`, err);
       set({
         state: {
           status: "error",

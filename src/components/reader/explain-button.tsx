@@ -2,6 +2,8 @@ import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ReaderSelection } from "@/hooks/use-text-selection";
 
+const SHORTCUT = /Mac/.test(navigator.platform) ? "⌘E" : "Ctrl+E";
+
 export function ExplainButton({
   anchor,
   disabled,
@@ -28,6 +30,7 @@ export function ExplainButton({
     >
       <Sparkles className="size-3.5" />
       Explain
+      <kbd className="text-[10px] opacity-70">{SHORTCUT}</kbd>
     </Button>
   );
 }

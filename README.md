@@ -7,7 +7,24 @@ An agent native desktop reader for technical blogs and docs.
 - Uses your ChatGPT subscription via Codex CLI, no API keys
 - Everything runs locally: Tauri 2, React, SQLite, ACP
 
-See [ROADMAP.md](./ROADMAP.md) for the build plan.
+See [ROADMAP.md](./ROADMAP.md) for the build plan and [docs/decisions](./docs/decisions) for design decisions.
+
+## Requirements
+
+| Tool                | Why                                                          |
+| ------------------- | ------------------------------------------------------------ |
+| Node.js 22+         | Frontend build, and runs the Codex ACP adapter through `npx` |
+| Rust (stable)       | Tauri core. Install with [rustup](https://rustup.rs)         |
+| Codex CLI           | The agent. Needs a paid ChatGPT plan                         |
+| Tauri prerequisites | https://tauri.app/start/prerequisites/                       |
+
+## Codex setup
+
+1. Install the Codex CLI (see OpenAI's Codex CLI docs) and check `codex --version` works.
+2. Sign in: `codex login` (or use the **Sign in with ChatGPT** button in Yomu's Explain panel).
+3. Check: `codex login status` should print `Logged in using ChatGPT`.
+
+Yomu never reads your Codex token; it only launches the official binary and adapter.
 
 ## Development
 
@@ -16,4 +33,23 @@ npm install
 npm run tauri dev
 ```
 
-Requires Rust and the Tauri prerequisites for your OS: https://tauri.app/start/prerequisites/
+Handy commands:
+
+```bash
+npm run lint && npm run typecheck   # frontend checks
+cd src-tauri && cargo test          # Rust tests (uses a mock agent, no Codex needed)
+cargo test real_codex -- --ignored --nocapture   # optional: real Codex, uses plan quota
+```
+
+## Using it
+
+1. Paste a URL and press Open. Articles are saved to your library automatically.
+2. Select a passage, then press **Explain** (or `Cmd/Ctrl+E`).
+3. Ask follow ups in the panel. Chats are saved per article and resume after a restart.
+
+## Troubleshooting
+
+- **"Couldn't start the Codex adapter"**: Node.js/`npx` isn't on the app's `PATH`. Launch from a terminal or install Node.
+- **"Codex isn't signed in"**: run `codex login`.
+- **Usage limit message**: your ChatGPT plan's Codex allowance is used up; try again after it resets.
+- **Logs**: in the OS app log directory (macOS: `~/Library/Logs/com.yomu.app/`). They stay on your machine.

@@ -51,7 +51,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] **Protocol**: ACP, for multi agent support
 - [x] **ACP spike**: ran against real Codex with `@agentclientprotocol/codex-acp` (the `@zed-industries` package is deprecated and breaks on current Codex). Kept as the opt-in test `real_codex_streams_and_resumes`.
 
-**Exit criteria**: all four items decided and written down; spike streams a response from Codex. (ADR files in `docs/decisions/` still not written.)
+**Exit criteria**: all four items decided and written down; spike streams a response from Codex. ADRs are in `docs/decisions/`.
 
 ---
 
@@ -196,7 +196,7 @@ M4 was first built against a mock with a guessed protocol. That is now corrected
 - Permission requests from the agent are always answered "cancelled" (`agent/rpc.rs`).
 - Login check (`codex login status`) works: prints "Logged in using ChatGPT".
 - The mock agent (`scripts/mock-acp-agent.mjs`) now speaks the real shapes so CI still needs no Codex. Real run: `cargo test real_codex -- --ignored --nocapture`.
-- Not handled yet: the GUI app launched from Finder has a minimal `PATH`, so `npx`/`codex` may not be found (M6 packaging).
+- GUI launches have a minimal `PATH`; `env::inherit_shell_path` (M6) merges the login shell's `PATH` at startup. Unit tested, **not yet tried from a Finder-launched bundle**.
 
 ---
 
@@ -228,13 +228,13 @@ Status: backend verified against real Codex (streaming, resume with context). Th
 
 ## M6: Hardening and v1 release
 
-- [ ] Performance: large docs pages render smoothly; scrape under a few seconds on normal pages
-- [ ] Accessibility pass: keyboard navigation, focus states, contrast in both themes
-- [ ] Crash and error logging (local only)
+- [ ] Performance: large docs pages render smoothly (blocks use `content-visibility: auto`; **not yet measured on a real large page**); scrape under a few seconds on normal pages (not measured)
+- [ ] Accessibility pass: done so far: input labels, `role="log"` live region for chat, `Cmd/Ctrl+E` keyboard path for Explain. **Contrast in both themes and a screen reader run are not checked yet.**
+- [x] Crash and error logging (local only): `tauri-plugin-log` to the OS app log dir (`~/Library/Logs/com.yomu.app/` on macOS); agent, scrape and chat errors are logged
 - [ ] Packaging and signing for macOS, Windows, Linux
 - [ ] Auto update channel
 - [ ] Review OpenAI terms on subscription use in third party apps
-- [ ] README, install guide, Codex setup guide
+- [x] README, install guide, Codex setup guide
 - [ ] Private beta with a handful of developers; collect feedback
 
 **Exit criteria**: signed builds on all three platforms; beta users complete the core loop without help.

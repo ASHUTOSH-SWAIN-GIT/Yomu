@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlockRenderer } from "@/components/reader/block-renderer";
@@ -68,6 +68,7 @@ function EmptyState({
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           placeholder="https://..."
+          aria-label="Article URL"
           disabled={state.status === "loading"}
           className="border-border bg-background focus-visible:ring-ring/50 h-9 flex-1 rounded-md border px-3 text-sm outline-none focus-visible:ring-2 disabled:opacity-60"
         />
@@ -100,6 +101,18 @@ function Article({ article }: { article: StoredArticle }) {
     window.getSelection()?.removeAllRanges();
     clear();
   }
+
+  // Keyboard path for Explain: select with Shift+arrows, then Cmd/Ctrl+E.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e" && anchor) {
+        e.preventDefault();
+        handleExplain();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   return (
     <article ref={ref} className="mx-auto w-full max-w-2xl px-6 py-10">

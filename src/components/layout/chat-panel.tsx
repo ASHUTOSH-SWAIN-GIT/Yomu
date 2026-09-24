@@ -104,7 +104,12 @@ function ChatBody() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div
+        role="log"
+        aria-live="polite"
+        aria-label="Explanation chat"
+        className="flex-1 overflow-y-auto px-4 py-3"
+      >
         {messages.length === 0 && !error ? (
           <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-center text-sm">
             <p>
@@ -154,6 +159,7 @@ function ChatBody() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a follow up…"
+          aria-label="Ask a follow up"
           disabled={streaming || messages.length === 0}
           className="border-border bg-background focus-visible:ring-ring/50 h-8 flex-1 rounded-md border px-2 text-sm outline-none focus-visible:ring-2 disabled:opacity-60"
         />

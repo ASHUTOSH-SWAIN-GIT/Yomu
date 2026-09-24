@@ -11,7 +11,13 @@ export function BlockRenderer({ blocks }: { blocks: Block[] }) {
       {blocks.map((block, i) => (
         // The index is what highlights are anchored to (see
         // hooks/use-text-selection.ts).
-        <div key={i} data-block-index={i}>
+        // content-visibility skips layout/paint of off-screen blocks, which
+        // keeps very long docs pages smooth.
+        <div
+          key={i}
+          data-block-index={i}
+          className="[contain-intrinsic-size:auto_80px] [content-visibility:auto]"
+        >
           <BlockView block={block} />
         </div>
       ))}

@@ -14,6 +14,7 @@ import {
   listMessages,
   setChatSession,
 } from "@/lib/db";
+import { logError } from "@/lib/log";
 import { buildPrompt } from "@/lib/prompt";
 import { useAgentStore } from "@/stores/agent-store";
 import { useReaderStore } from "@/stores/reader-store";
@@ -123,6 +124,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const { sessionId, fresh } = await ensureSession(chat);
       await agentPrompt(sessionId, build(fresh));
     } catch (err) {
+      logError("explain turn failed", err);
       const error = classifyError(
         err instanceof Error ? err.message : String(err),
       );

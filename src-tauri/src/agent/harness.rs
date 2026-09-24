@@ -80,7 +80,9 @@ impl AgentHarness {
 
         let command =
             (self.command_factory)().ok_or_else(|| format!("`{AGENT_LABEL}` is not available"))?;
-        let conn = spawn_agent(command, self.event_tx.clone())?;
+        let conn = spawn_agent(command, self.event_tx.clone()).inspect_err(|e| {
+            log::error!("{e}");
+        })?;
         // No fs/terminal capabilities: the agent can't ask us to touch
         // files or run commands, on top of the read-only mode below.
         conn.client
@@ -88,7 +90,8 @@ impl AgentHarness {
                 "initialize",
                 json!({ "protocolVersion": 1, "clientCapabilities": {} }),
             )
-            .await?;
+            .await
+            .inspect_err(|e| log::error!("agent initialize failed: {e}"))?;
 
         *guard = Some(conn.clone());
         Ok(conn)
@@ -147,7 +150,8 @@ impl AgentHarness {
                     "prompt": [{ "type": "text", "text": text }],
                 }),
             )
-            .await?;
+            .await
+            .inspect_err(|e| log::error!("prompt failed: {e}"))?;
         let _ = conn.notify_tx.send((
             TURN_FINISHED.to_string(),
             json!({ "sessionId": session_id }),

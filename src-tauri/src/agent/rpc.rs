@@ -220,7 +220,7 @@ fn spawn_stderr_logger(stderr: tokio::process::ChildStderr) {
         while let Ok(Some(line)) = lines.next_line().await {
             // The agent's stderr is useful for debugging a failed
             // connection but isn't part of the protocol.
-            eprintln!("[agent stderr] {line}");
+            log::debug!("[agent stderr] {line}");
         }
     });
 }

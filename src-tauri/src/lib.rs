@@ -1,5 +1,6 @@
 mod agent;
 mod db;
+mod env;
 mod scraper;
 
 use std::sync::Arc;
@@ -12,7 +13,10 @@ use tokio::sync::mpsc;
 
 #[tauri::command]
 async fn scrape_url(url: String) -> Result<ScrapedArticle, String> {
-    scraper::scrape(&url).await.map_err(|e| e.to_string())
+    scraper::scrape(&url).await.map_err(|e| {
+        log::error!("scrape failed for {url}: {e}");
+        e.to_string()
+    })
 }
 
 /// Normalizes a URL without a network round trip, so the frontend can
@@ -79,11 +83,20 @@ async fn agent_prompt(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    env::inherit_shell_path();
+
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<agent::AgentEvent>();
     let harness = Arc::new(AgentHarness::new(event_tx));
     let harness_for_exit = Arc::clone(&harness);
 
     tauri::Builder::default()
+        // Local only: logs go to the OS app log dir, never off the machine
+        // (ROADMAP.md M6 "crash and error logging (local only)").
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_sql::Builder::default()

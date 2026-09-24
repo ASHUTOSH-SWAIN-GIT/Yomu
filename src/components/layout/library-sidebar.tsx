@@ -71,6 +71,7 @@ export function LibrarySidebar() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search articles"
+            aria-label="Search articles"
             className="placeholder:text-muted-foreground w-full bg-transparent outline-none"
           />
         </div>
