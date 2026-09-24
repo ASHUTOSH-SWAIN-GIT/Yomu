@@ -30,6 +30,12 @@ export async function agentNewSession(): Promise<string> {
   return invoke<string>("agent_new_session");
 }
 
+/** Re-attaches to a session from an earlier app run; rejects if the agent
+ * no longer has it, in which case the caller opens a new one. */
+export async function agentResumeSession(sessionId: string): Promise<void> {
+  return invoke("agent_resume_session", { sessionId });
+}
+
 export async function agentPrompt(
   sessionId: string,
   text: string,

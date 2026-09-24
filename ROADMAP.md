@@ -49,9 +49,9 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] **ACP client location**: Rust ACP crate in the core (decided, not yet validated with a spike)
 - [x] **Codex distribution**: detect and guide install for v1, revisit bundling later
 - [x] **Protocol**: ACP, for multi agent support
-- [ ] **ACP spike**: throwaway script that spawns the adapter, opens a session, sends a prompt, prints streamed updates. Do this before M4.
+- [x] **ACP spike**: ran against real Codex with `@agentclientprotocol/codex-acp` (the `@zed-industries` package is deprecated and breaks on current Codex). Kept as the opt-in test `real_codex_streams_and_resumes`.
 
-**Exit criteria**: all four items decided and written down; spike streams a response from Codex.
+**Exit criteria**: all four items decided and written down; spike streams a response from Codex. (ADR files in `docs/decisions/` still not written.)
 
 ---
 
@@ -142,7 +142,7 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 - [x] Commands: save (upsert), list, open, delete — implemented as `@tauri-apps/plugin-sql` calls from `src/lib/db.ts` rather than bespoke Tauri commands, plus a `canonicalize_url` command for cache lookups without a network call
 - [x] Cache by canonical URL (re-opening a saved URL skips the network — verified: no second `scrape_url` call on reopen)
 - [x] Sidebar list: title, site, relative saved date; search by title/site
-- [ ] Highlights stored as block index + character offsets — table exists, wiring lands with M5 (Explain)
+- [x] Highlights stored as block index + character offsets (wired in M5)
 
 **Exit criteria**: save, restart the app, reopen offline, delete. No duplicates for the same canonical URL. Verified end to end (mocked backend): open → saved, reopen same URL → cache hit not re-scraped, reopen via sidebar → no scrape, delete → row removed.
 
@@ -186,20 +186,17 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 **Exit criteria**: fresh machine -> install prompt -> login -> "hello" prompt streams back in a debug panel. Verified against a mock ACP agent (below); **not yet verified against real Codex**.
 
-### Important caveat: no real Codex in this dev environment
+### Verified against real Codex (M5 follow up)
 
-This sandbox has no `codex` binary and no way to sign in to ChatGPT, so none of the above has been run against the real thing. What's actually verified:
+M4 was first built against a mock with a guessed protocol. That is now corrected and checked against Codex CLI 0.142 + `@agentclientprotocol/codex-acp@1.13.1`:
 
-- The ACP spike from Phase 0, kept as an automated test (`src-tauri/src/agent/tests.rs`) instead of a throwaway script, against `scripts/mock-acp-agent.mjs` — a small stand-in agent implementing this project's own minimal JSON-RPC-over-stdio protocol. Covers: process spawn, `initialize`, `session/new`, `session/prompt`, streamed `session/update` tokens, error handling, and the full `AgentHarness` path.
-- The onboarding → login → streamed-reply UI flow, browser-tested against a mocked Tauri backend.
-
-What's unverified and should be treated as a first guess, not a spec:
-
-- `codex login status` as the login-check command and its output format
-- The exact adapter binary/invocation (`codex-acp` is a guess at the package name from ROADMAP.md)
-- Whether real ACP's wire format matches this project's simplified one (real `initialize`/`session/new`/`session/prompt` shapes, capability negotiation, real permission-request semantics)
-
-Revisit `agent/status.rs` and `agent/harness.rs`'s doc comments once a real Codex + ACP adapter install is available to test against.
+- Real wire format: numeric `protocolVersion`, `session/new` needs `mcpServers`, text streams as `session/update` → `agent_message_chunk`, and there is no `done` notification (the prompt response carries `stopReason`, so the harness emits `Done` itself).
+- Codex sessions default to an auto-approve mode. The harness now calls `session/set_mode` → `read-only` on every new or resumed session and fails the session if that fails.
+- **Sandbox reality**: `read-only` still allows writes _inside the session's cwd_. That cwd is always a fresh empty temp dir, so nothing outside is reachable, but "no file writes at all" is not literally true. The explain prompt also tells the agent not to use tools.
+- Permission requests from the agent are always answered "cancelled" (`agent/rpc.rs`).
+- Login check (`codex login status`) works: prints "Logged in using ChatGPT".
+- The mock agent (`scripts/mock-acp-agent.mjs`) now speaks the real shapes so CI still needs no Codex. Real run: `cargo test real_codex -- --ignored --nocapture`.
+- Not handled yet: the GUI app launched from Finder has a minimal `PATH`, so `npx`/`codex` may not be found (M6 packaging).
 
 ---
 
@@ -207,23 +204,25 @@ Revisit `agent/status.rs` and `agent/harness.rs`'s doc comments once a real Code
 
 **Goal**: the full v1 loop works.
 
-- [ ] Text selection listener with floating "Explain" button
-- [ ] `start_explain(selection, articleId)` command
-- [ ] Prompt builder
-  - [ ] Style: explain for a developer, reference the article, concise, code examples when useful
-  - [ ] Context: title, URL, section heading, surrounding paragraphs, selection
-  - [ ] Full article only if short; otherwise nearby sections
-- [ ] Chat panel with streaming and markdown rendering (reuse Shiki and KaTeX)
-- [ ] `send_followup(text)` in the same ACP session
-- [ ] One session per article; persist `acp_session_id` to resume
-- [ ] Save highlights and messages to SQLite
-- [ ] Error states in the panel
-  - [ ] Codex not installed
-  - [ ] Logged out
-  - [ ] Plan usage limit hit
-  - [ ] Adapter crash
+- [x] Text selection listener with floating "Explain" button
+- [x] Explain flow: `explain()` in `src/stores/chat-store.ts` (frontend store instead of a Rust command; the prompt is built in `src/lib/prompt.ts`)
+- [x] Prompt builder
+  - [x] Style: explain for a developer, reference the article, concise, code examples when useful
+  - [x] Context: title, URL, section heading, surrounding paragraphs, selection
+  - [x] Full article only if short; otherwise nearby sections
+- [x] Chat panel with streaming and markdown rendering (reuse Shiki and KaTeX)
+- [x] `send_followup(text)` in the same ACP session
+- [x] One session per article; persist `acp_session_id` to resume
+- [x] Save highlights and messages to SQLite
+- [x] Error states in the panel
+  - [x] Codex not installed
+  - [x] Logged out
+  - [x] Plan usage limit hit
+  - [x] Adapter crash
 
 **Exit criteria**: paste URL, select a paragraph, get a streamed explanation, ask a follow up, restart the app, and see the chat still there.
+
+Status: backend verified against real Codex (streaming, resume with context). The UI flow builds, lints and launches in `tauri dev` but has **not yet been clicked through end to end** in the real window.
 
 ---
 

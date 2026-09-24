@@ -1,7 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlockRenderer } from "@/components/reader/block-renderer";
+import { ExplainButton } from "@/components/reader/explain-button";
+import { useTextSelection } from "@/hooks/use-text-selection";
+import { useChatStore } from "@/stores/chat-store";
 import { useReaderStore, type ReaderState } from "@/stores/reader-store";
 import type { StoredArticle } from "@/types/library";
 
@@ -86,8 +89,20 @@ function EmptyState({
 }
 
 function Article({ article }: { article: StoredArticle }) {
+  const ref = useRef<HTMLElement>(null);
+  const [anchor, clear] = useTextSelection(ref);
+  const streaming = useChatStore((s) => s.streaming);
+  const explain = useChatStore((s) => s.explain);
+
+  function handleExplain() {
+    if (!anchor) return;
+    void explain(article, anchor.selection);
+    window.getSelection()?.removeAllRanges();
+    clear();
+  }
+
   return (
-    <article className="mx-auto w-full max-w-2xl px-6 py-10">
+    <article ref={ref} className="mx-auto w-full max-w-2xl px-6 py-10">
       <header className="border-border mb-6 border-b pb-6">
         <h1 className="text-foreground text-2xl font-semibold">
           {article.title}
@@ -105,6 +120,13 @@ function Article({ article }: { article: StoredArticle }) {
         </a>
       </header>
       <BlockRenderer blocks={article.blocks} />
+      {anchor && (
+        <ExplainButton
+          anchor={anchor}
+          disabled={streaming}
+          onExplain={handleExplain}
+        />
+      )}
     </article>
   );
 }

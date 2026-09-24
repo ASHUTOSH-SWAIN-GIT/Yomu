@@ -6,31 +6,42 @@ use tokio::process::Command;
 use tokio::sync::{mpsc, Mutex};
 
 use super::events::AgentEvent;
-use super::rpc::RpcClient;
+use super::rpc::{NotificationSender, RpcClient};
 
-/// Command used to launch the ACP agent adapter. This targets the Codex
-/// ACP adapter package name from ROADMAP.md; not verified against a real
-/// install (no Codex in this dev sandbox — see status.rs). Wrapping
-/// everything behind this one constant plus the notification mapping
-/// below is the "swappable agent layer" from ROADMAP.md: pointing this
-/// at a different ACP adapter is the whole change needed to try Claude
-/// or Gemini once one of those is available.
-const AGENT_COMMAND: &str = "codex-acp";
+/// Real Codex ACP adapter, pinned (ROADMAP.md risk: "pin versions").
+/// This constant plus the notification mapping below is the "swappable
+/// agent layer": another ACP adapter (Claude, Gemini) only needs a
+/// different command here.
+const AGENT_LABEL: &str = "@agentclientprotocol/codex-acp";
 
 fn default_command() -> Option<Command> {
-    Some(Command::new(AGENT_COMMAND))
+    let mut command = Command::new("npx");
+    command.args(["-y", "@agentclientprotocol/codex-acp@1.13.1"]);
+    Some(command)
 }
+
+/// Synthetic notification the harness injects after a prompt resolves.
+/// Real ACP has no "done" notification (the prompt response carries the
+/// stop reason), and sending it through the same channel as the chunks
+/// guarantees `Done` can't overtake the last token.
+const TURN_FINISHED: &str = "yomu/turn_finished";
 
 /// Owns the ACP agent subprocess and turns its raw JSON-RPC notifications
 /// into normalized [`AgentEvent`]s. One process is shared across all
 /// sessions; ACP sessions are lightweight (see `new_session`).
 pub struct AgentHarness {
-    client: Mutex<Option<Arc<RpcClient>>>,
+    client: Mutex<Option<Connection>>,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
     // A factory rather than a fixed command so tests can point this at
     // `scripts/mock-acp-agent.mjs` instead of the real `codex-acp`
     // binary (see agent/tests.rs). `None` means "not available".
     command_factory: fn() -> Option<Command>,
+}
+
+#[derive(Clone)]
+struct Connection {
+    client: Arc<RpcClient>,
+    notify_tx: NotificationSender,
 }
 
 impl AgentHarness {
@@ -56,55 +67,79 @@ impl AgentHarness {
 
     /// Returns the current connection, starting (or restarting, if the
     /// previous process died) the agent subprocess as needed.
-    async fn connection(&self) -> Result<Arc<RpcClient>, String> {
+    async fn connection(&self) -> Result<Connection, String> {
         let mut guard = self.client.lock().await;
 
-        if let Some(client) = guard.as_ref() {
-            if !client.has_exited().await {
-                return Ok(Arc::clone(client));
+        if let Some(conn) = guard.as_ref() {
+            if !conn.client.has_exited().await {
+                return Ok(conn.clone());
             }
             // Previous process crashed or exited; fall through and
             // respawn (ROADMAP.md: "Restart the adapter if it crashes").
         }
 
-        let command = (self.command_factory)()
-            .ok_or_else(|| format!("`{AGENT_COMMAND}` is not installed"))?;
-        let client = Arc::new(spawn_agent(command, self.event_tx.clone())?);
-        // Best effort handshake; some adapters may not implement this
-        // exact method name, so a failure here isn't fatal.
-        let _ = client
-            .request("initialize", json!({ "protocolVersion": "1" }))
-            .await;
+        let command =
+            (self.command_factory)().ok_or_else(|| format!("`{AGENT_LABEL}` is not available"))?;
+        let conn = spawn_agent(command, self.event_tx.clone())?;
+        // No fs/terminal capabilities: the agent can't ask us to touch
+        // files or run commands, on top of the read-only mode below.
+        conn.client
+            .request(
+                "initialize",
+                json!({ "protocolVersion": 1, "clientCapabilities": {} }),
+            )
+            .await?;
 
-        *guard = Some(Arc::clone(&client));
-        Ok(client)
+        *guard = Some(conn.clone());
+        Ok(conn)
     }
 
     /// Opens a new ACP session rooted at `cwd`. Callers must pass an
-    /// empty temp directory for explain sessions (ROADMAP.md M4 Safety:
-    /// "Run in an empty temp working directory, never the user's
-    /// projects") — the harness doesn't create it itself so the caller
-    /// stays in control of cleanup.
+    /// empty temp directory (ROADMAP.md M4 Safety) — the harness doesn't
+    /// create it so the caller stays in control of cleanup.
     pub async fn new_session(&self, cwd: &Path) -> Result<String, String> {
-        let client = self.connection().await?;
-        let result = client
-            .request("session/new", json!({ "cwd": cwd.to_string_lossy() }))
+        let conn = self.connection().await?;
+        let result = conn
+            .client
+            .request(
+                "session/new",
+                json!({ "cwd": cwd.to_string_lossy(), "mcpServers": [] }),
+            )
             .await?;
-
-        result
+        let session_id = result
             .get("sessionId")
             .and_then(Value::as_str)
             .map(str::to_string)
-            .ok_or_else(|| "agent did not return a sessionId".to_string())
+            .ok_or_else(|| "agent did not return a sessionId".to_string())?;
+
+        lock_down(&conn.client, &session_id).await?;
+        Ok(session_id)
     }
 
-    /// Sends a prompt in an existing session. Resolves once the agent
-    /// signals the turn is complete; the actual text arrives as `Token`
-    /// events on the event channel passed to [`AgentHarness::new`] while
-    /// this is in flight.
+    /// Re-attaches to a session from a previous app run so a follow up
+    /// keeps its context. Fails if the agent no longer has it; callers
+    /// then fall back to `new_session`.
+    pub async fn resume_session(&self, session_id: &str, cwd: &Path) -> Result<(), String> {
+        let conn = self.connection().await?;
+        conn.client
+            .request(
+                "session/resume",
+                json!({
+                    "sessionId": session_id,
+                    "cwd": cwd.to_string_lossy(),
+                    "mcpServers": [],
+                }),
+            )
+            .await?;
+        lock_down(&conn.client, session_id).await
+    }
+
+    /// Sends a prompt in an existing session. Text arrives as `Token`
+    /// events while this is in flight; `Done` is emitted once the turn
+    /// ends. Failures are returned, not emitted.
     pub async fn prompt(&self, session_id: &str, text: &str) -> Result<(), String> {
-        let client = self.connection().await?;
-        client
+        let conn = self.connection().await?;
+        conn.client
             .request(
                 "session/prompt",
                 json!({
@@ -112,78 +147,90 @@ impl AgentHarness {
                     "prompt": [{ "type": "text", "text": text }],
                 }),
             )
-            .await
-            .map(|_| ())
+            .await?;
+        let _ = conn.notify_tx.send((
+            TURN_FINISHED.to_string(),
+            json!({ "sessionId": session_id }),
+        ));
+        Ok(())
     }
 
     /// Kills the agent subprocess, if one is running.
     pub async fn shutdown(&self) {
-        if let Some(client) = self.client.lock().await.take() {
-            client.kill().await;
+        if let Some(conn) = self.client.lock().await.take() {
+            conn.client.kill().await;
         }
     }
 }
 
-/// Spawns the agent and routes its `session/update` notifications into
-/// normalized [`AgentEvent`]s. Everything else is dropped: this app
-/// doesn't need the full ACP surface, only enough to drive one prompt at
-/// a time per session.
+/// Codex's default mode auto-approves actions; explain sessions must be
+/// read-only (ROADMAP.md M4 Safety). Failing here fails the session
+/// rather than running it unrestricted.
+async fn lock_down(client: &RpcClient, session_id: &str) -> Result<(), String> {
+    client
+        .request(
+            "session/set_mode",
+            json!({ "sessionId": session_id, "modeId": "read-only" }),
+        )
+        .await
+        .map(|_| ())
+        .map_err(|e| format!("could not switch the session to read-only: {e}"))
+}
+
+/// Spawns the agent and routes its notifications into normalized
+/// [`AgentEvent`]s. Everything else is dropped: this app only needs
+/// enough of ACP to drive one prompt at a time per session.
 fn spawn_agent(
     command: Command,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
-) -> Result<RpcClient, String> {
-    let (notification_tx, mut notification_rx) = mpsc::unbounded_channel::<(String, Value)>();
+) -> Result<Connection, String> {
+    let (notify_tx, mut notification_rx) = mpsc::unbounded_channel::<(String, Value)>();
 
     tokio::spawn(async move {
         while let Some((method, params)) = notification_rx.recv().await {
-            if method != "session/update" {
-                continue;
-            }
-            if let Some(event) = parse_session_update(&params) {
+            if let Some(event) = parse_notification(&method, &params) {
                 let _ = event_tx.send(event);
             }
         }
     });
 
-    RpcClient::spawn(command, notification_tx)
-        .map_err(|e| format!("could not start the agent (`{AGENT_COMMAND}`): {e}"))
-}
-
-fn parse_session_update(params: &Value) -> Option<AgentEvent> {
-    let session_id = params.get("sessionId")?.as_str()?.to_string();
-    let update = params.get("update")?;
-    let kind = update.get("kind")?.as_str()?;
-
-    Some(match kind {
-        "token" => AgentEvent::Token {
-            session_id,
-            text: update.get("text")?.as_str()?.to_string(),
-        },
-        "done" => AgentEvent::Done { session_id },
-        "error" => AgentEvent::Error {
-            session_id,
-            message: update
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("agent error")
-                .to_string(),
-        },
-        // Explain sessions run read-only in an empty temp dir (see
-        // `new_session`), so this is surfaced for visibility but never
-        // acted on — there is deliberately no code path that grants one.
-        "permission_request" => AgentEvent::PermissionRequest {
-            session_id,
-            description: update
-                .get("description")
-                .and_then(Value::as_str)
-                .unwrap_or("requested a permission")
-                .to_string(),
-        },
-        _ => return None,
+    let client = RpcClient::spawn(command, notify_tx.clone())
+        .map_err(|e| format!("could not start the agent (`{AGENT_LABEL}`, needs Node/npx): {e}"))?;
+    Ok(Connection {
+        client: Arc::new(client),
+        notify_tx,
     })
 }
 
-#[cfg(test)]
-pub(super) fn parse_session_update_for_tests(params: &Value) -> Option<AgentEvent> {
-    parse_session_update(params)
+fn parse_notification(method: &str, params: &Value) -> Option<AgentEvent> {
+    let session_id = params.get("sessionId")?.as_str()?.to_string();
+
+    match method {
+        TURN_FINISHED => Some(AgentEvent::Done { session_id }),
+        "session/update" => {
+            let update = params.get("update")?;
+            if update.get("sessionUpdate")?.as_str()? != "agent_message_chunk" {
+                return None;
+            }
+            let content = update.get("content")?;
+            if content.get("type")?.as_str()? != "text" {
+                return None;
+            }
+            Some(AgentEvent::Token {
+                session_id,
+                text: content.get("text")?.as_str()?.to_string(),
+            })
+        }
+        // Already denied in rpc.rs; surfaced so the UI can say why an
+        // action didn't happen.
+        "session/request_permission" => Some(AgentEvent::PermissionRequest {
+            session_id,
+            description: params
+                .pointer("/toolCall/title")
+                .and_then(Value::as_str)
+                .unwrap_or("perform an action")
+                .to_string(),
+        }),
+        _ => None,
+    }
 }

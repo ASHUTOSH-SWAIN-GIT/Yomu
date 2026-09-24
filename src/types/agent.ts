@@ -11,5 +11,4 @@ export type AgentStatus = "missing" | "logged_out" | "ready";
 export type AgentEvent =
   | { kind: "token"; session_id: string; text: string }
   | { kind: "done"; session_id: string }
-  | { kind: "error"; session_id: string; message: string }
   | { kind: "permission_request"; session_id: string; description: string };

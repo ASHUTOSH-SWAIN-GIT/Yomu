@@ -1,73 +1,70 @@
 #!/usr/bin/env node
-// A minimal stand-in ACP agent used for the ACP spike test
-// (src-tauri/tests/acp_spike.rs) and for manual smoke testing without a
-// real Codex install. It speaks the small JSON-RPC-over-stdio protocol
-// implemented in src-tauri/src/agent/rpc.rs and harness.rs:
+// Stand-in ACP agent for the Rust tests (src-tauri/src/agent/tests.rs), so
+// CI needs no Codex install. It speaks the subset of real ACP the app
+// uses, with the message shapes observed from @agentclientprotocol/codex-acp:
 //
-//   -> initialize                  { protocolVersion }
-//   <- result                      { protocolVersion, agentCapabilities: {} }
-//   -> session/new                 { cwd }
-//   <- result                      { sessionId }
-//   -> session/prompt              { sessionId, prompt: [{ type: "text", text }] }
-//   <- notification session/update { sessionId, update: { kind: "token", text } }  (repeated)
-//   <- notification session/update { sessionId, update: { kind: "done" } }
-//   <- result                      {} (prompt request resolves once the turn is done)
+//   initialize / session/new / session/resume / session/set_mode
+//   session/prompt -> session/update { update: { sessionUpdate: "agent_message_chunk", content } }
+//                     then a result { stopReason: "end_turn" }
 //
-// This is NOT the real ACP wire format — it's this project's own minimal
-// subset, chosen because a real `codex-acp` adapter isn't available in
-// this dev sandbox (see ROADMAP.md M4 and src-tauri/src/agent/*.rs doc
-// comments). Swap AGENT_COMMAND in harness.rs to point at a real adapter
-// once one is available, and adjust this mock (or better, a real fixture)
-// to match its actual message shapes.
+// A prompt containing "PERMISSION" makes the mock ask the client for a
+// permission first (a request *from* agent to client), and it replies with
+// the client's outcome, so the default-deny path can be asserted.
 
 import readline from "node:readline";
 
 let sessionCounter = 0;
-const sessions = new Set();
+const sessions = new Map(); // sessionId -> modeId
+let requestCounter = 0;
+const pendingClientReplies = new Map();
 
-function send(message) {
-  process.stdout.write(JSON.stringify(message) + "\n");
-}
-
-function respond(id, result) {
-  send({ jsonrpc: "2.0", id, result });
-}
-
-function respondError(id, message) {
+const send = (message) => process.stdout.write(JSON.stringify(message) + "\n");
+const respond = (id, result) => send({ jsonrpc: "2.0", id, result });
+const respondError = (id, message) =>
   send({ jsonrpc: "2.0", id, error: { code: -1, message } });
+const notify = (method, params) => send({ jsonrpc: "2.0", method, params });
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function askClient(method, params) {
+  const id = `agent-${++requestCounter}`;
+  return new Promise((resolve) => {
+    pendingClientReplies.set(id, resolve);
+    send({ jsonrpc: "2.0", id, method, params });
+  });
 }
 
-function notify(method, params) {
-  send({ jsonrpc: "2.0", method, params });
-}
-
-async function handlePrompt(id, params) {
-  const { sessionId, prompt } = params;
-  if (!sessions.has(sessionId)) {
-    respondError(id, "unknown session");
-    return;
-  }
+async function handlePrompt(id, { sessionId, prompt }) {
+  if (!sessions.has(sessionId)) return respondError(id, "unknown session");
 
   const text = prompt?.[0]?.text ?? "";
-  const words = `You said: ${text}`.split(" ");
+  let reply = `You said: ${text}`;
 
-  for (const word of words) {
-    notify("session/update", {
+  if (text.includes("PERMISSION")) {
+    const answer = await askClient("session/request_permission", {
       sessionId,
-      update: { kind: "token", text: word + " " },
+      toolCall: { toolCallId: "t1", title: "write a file" },
+      options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }],
     });
-    // Small delay so a real client can observe incremental streaming
-    // rather than getting everything in one microtask.
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    reply = `permission outcome: ${answer?.result?.outcome?.outcome}`;
+  }
+  if (text.includes("USAGE_LIMIT")) {
+    return respondError(id, "You've hit your usage limit");
   }
 
-  notify("session/update", { sessionId, update: { kind: "done" } });
-  respond(id, {});
+  for (const word of reply.split(" ")) {
+    notify("session/update", {
+      sessionId,
+      update: {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: word + " " },
+      },
+    });
+    await sleep(5);
+  }
+  respond(id, { stopReason: "end_turn" });
 }
 
-const rl = readline.createInterface({ input: process.stdin });
-
-rl.on("line", (line) => {
+readline.createInterface({ input: process.stdin }).on("line", (line) => {
   if (!line.trim()) return;
   let message;
   try {
@@ -75,25 +72,45 @@ rl.on("line", (line) => {
   } catch {
     return;
   }
-
   const { id, method, params } = message;
+
+  // A response to something the mock asked the client.
+  if (method === undefined && pendingClientReplies.has(id)) {
+    pendingClientReplies.get(id)(message);
+    pendingClientReplies.delete(id);
+    return;
+  }
 
   switch (method) {
     case "initialize":
-      respond(id, { protocolVersion: "1", agentCapabilities: {} });
+      respond(id, { protocolVersion: 1, agentCapabilities: {} });
       break;
     case "session/new": {
       const sessionId = `mock-session-${++sessionCounter}`;
-      sessions.add(sessionId);
+      sessions.set(sessionId, "agent"); // like Codex: NOT read-only by default
       respond(id, { sessionId });
       break;
     }
+    case "session/resume":
+      if (sessions.has(params.sessionId)) respond(id, {});
+      else respondError(id, "session not found");
+      break;
+    case "session/set_mode":
+      if (!sessions.has(params.sessionId)) respondError(id, "unknown session");
+      else {
+        sessions.set(params.sessionId, params.modeId);
+        respond(id, {});
+      }
+      break;
     case "session/prompt":
-      void handlePrompt(id, params);
+      // Refuse to run unless locked down, so tests catch a missing set_mode.
+      if (sessions.get(params.sessionId) !== "read-only") {
+        respondError(id, "session is not read-only");
+      } else {
+        void handlePrompt(id, params);
+      }
       break;
     default:
-      if (id !== undefined) {
-        respondError(id, `unknown method: ${method}`);
-      }
+      if (id !== undefined) respondError(id, `unknown method: ${method}`);
   }
 });

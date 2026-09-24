@@ -9,7 +9,11 @@ export function BlockRenderer({ blocks }: { blocks: Block[] }) {
   return (
     <>
       {blocks.map((block, i) => (
-        <BlockView key={i} block={block} />
+        // The index is what highlights are anchored to (see
+        // hooks/use-text-selection.ts).
+        <div key={i} data-block-index={i}>
+          <BlockView block={block} />
+        </div>
       ))}
     </>
   );

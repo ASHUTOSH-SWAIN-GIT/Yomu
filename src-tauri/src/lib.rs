@@ -32,10 +32,9 @@ async fn agent_login() -> Result<(), String> {
     agent::login().await
 }
 
-/// Opens a fresh ACP session rooted in a new, empty temp directory —
-/// never a user project — per ROADMAP.md M4 safety settings.
-#[tauri::command]
-async fn agent_new_session(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<String, String> {
+/// Creates a new, empty temp directory to use as an agent's working
+/// directory — never a user project (ROADMAP.md M4 Safety).
+async fn fresh_temp_dir() -> Result<std::path::PathBuf, String> {
     let dir_name = format!(
         "yomu-explain-{}-{}",
         std::process::id(),
@@ -48,8 +47,25 @@ async fn agent_new_session(harness: tauri::State<'_, Arc<AgentHarness>>) -> Resu
     tokio::fs::create_dir_all(&cwd)
         .await
         .map_err(|e| format!("could not create a temp working directory: {e}"))?;
+    Ok(cwd)
+}
 
-    harness.new_session(&cwd).await
+#[tauri::command]
+async fn agent_new_session(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<String, String> {
+    harness.new_session(&fresh_temp_dir().await?).await
+}
+
+/// Re-attaches to a session saved from an earlier app run (M5: "persist
+/// acp_session_id to resume"). The frontend falls back to
+/// `agent_new_session` if this errors.
+#[tauri::command]
+async fn agent_resume_session(
+    session_id: String,
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<(), String> {
+    harness
+        .resume_session(&session_id, &fresh_temp_dir().await?)
+        .await
 }
 
 #[tauri::command]
@@ -93,6 +109,7 @@ pub fn run() {
             agent_status,
             agent_login,
             agent_new_session,
+            agent_resume_session,
             agent_prompt
         ])
         .build(tauri::generate_context!())

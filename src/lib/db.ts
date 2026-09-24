@@ -1,6 +1,12 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { Block } from "@/types/article";
-import type { ArticleSummary, StoredArticle } from "@/types/library";
+import type {
+  ArticleSummary,
+  Chat,
+  Highlight,
+  StoredArticle,
+  StoredMessage,
+} from "@/types/library";
 import type { ScrapedArticle } from "@/types/article";
 
 // Must match `db::DB_URL` in src-tauri/src/db.rs.
@@ -140,4 +146,118 @@ export async function upsertArticle(
 export async function deleteArticle(id: string): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM articles WHERE id = $1", [id]);
+}
+
+// Chats, highlights and messages (M5). One chat per article, which maps to
+// one ACP session; `acp_session_id` is kept so the session can be resumed
+// after a restart.
+
+export async function getChatForArticle(
+  articleId: string,
+): Promise<Chat | null> {
+  const db = await getDb();
+  const rows = await db.select<
+    { id: string; article_id: string; acp_session_id: string | null }[]
+  >("SELECT * FROM chats WHERE article_id = $1 LIMIT 1", [articleId]);
+  const row = rows[0];
+  return row
+    ? {
+        id: row.id,
+        articleId: row.article_id,
+        acpSessionId: row.acp_session_id,
+      }
+    : null;
+}
+
+export async function createChat(articleId: string): Promise<Chat> {
+  const db = await getDb();
+  const id = crypto.randomUUID();
+  await db.execute(
+    "INSERT INTO chats (id, article_id, agent, acp_session_id, created_at) VALUES ($1, $2, 'codex', NULL, $3)",
+    [id, articleId, Date.now()],
+  );
+  return { id, articleId, acpSessionId: null };
+}
+
+export async function setChatSession(
+  chatId: string,
+  acpSessionId: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE chats SET acp_session_id = $1 WHERE id = $2", [
+    acpSessionId,
+    chatId,
+  ]);
+}
+
+export async function addHighlight(
+  highlight: Omit<Highlight, "id">,
+): Promise<Highlight> {
+  const db = await getDb();
+  const id = crypto.randomUUID();
+  await db.execute(
+    `INSERT INTO highlights (id, article_id, block_index, start_offset, end_offset, text, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      id,
+      highlight.articleId,
+      highlight.blockIndex,
+      highlight.startOffset,
+      highlight.endOffset,
+      highlight.text,
+      Date.now(),
+    ],
+  );
+  return { id, ...highlight };
+}
+
+export async function addMessage(
+  chatId: string,
+  role: "user" | "assistant",
+  content: string,
+  highlightId: string | null = null,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "INSERT INTO messages (id, chat_id, highlight_id, role, content, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+    [crypto.randomUUID(), chatId, highlightId, role, content, Date.now()],
+  );
+}
+
+export async function listMessages(chatId: string): Promise<StoredMessage[]> {
+  const db = await getDb();
+  const rows = await db.select<
+    {
+      id: string;
+      role: "user" | "assistant";
+      content: string;
+      h_id: string | null;
+      article_id: string | null;
+      block_index: number | null;
+      start_offset: number | null;
+      end_offset: number | null;
+      h_text: string | null;
+    }[]
+  >(
+    `SELECT m.id, m.role, m.content, h.id AS h_id, h.article_id, h.block_index,
+            h.start_offset, h.end_offset, h.text AS h_text
+     FROM messages m LEFT JOIN highlights h ON h.id = m.highlight_id
+     WHERE m.chat_id = $1 ORDER BY m.created_at, m.rowid`,
+    [chatId],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    role: r.role,
+    content: r.content,
+    highlight: r.h_id
+      ? {
+          id: r.h_id,
+          articleId: r.article_id!,
+          blockIndex: r.block_index!,
+          startOffset: r.start_offset!,
+          endOffset: r.end_offset!,
+          text: r.h_text!,
+        }
+      : null,
+  }));
 }

@@ -3,11 +3,10 @@
 //! stdin/stdout, requests matched to responses by id, everything else
 //! treated as a notification and routed by method name.
 //!
-//! This is hand rolled rather than built on a third party ACP crate so
-//! the wire format is fully within our control and testable against a
-//! mock agent (see `scripts/mock-acp-agent.mjs` and the spike test in
-//! `tests/acp_spike.rs`) without needing a real Codex install in CI or
-//! in this dev sandbox.
+//! This is hand rolled rather than built on a third party ACP crate: the
+//! subset of ACP this app needs is small, and it stays testable against a
+//! mock agent (see `scripts/mock-acp-agent.mjs` and `agent/tests.rs`)
+//! without a real Codex install in CI.
 
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -25,8 +24,10 @@ type PendingRequests = Arc<Mutex<HashMap<i64, oneshot::Sender<Result<Value, Stri
 
 #[derive(Debug, Deserialize)]
 struct IncomingMessage {
+    // A `Value` rather than `i64` so requests *from* the agent can be
+    // answered with whatever id type it chose.
     #[serde(default)]
-    id: Option<i64>,
+    id: Option<Value>,
     #[serde(default)]
     method: Option<String>,
     #[serde(default)]
@@ -39,15 +40,17 @@ struct IncomingMessage {
 
 pub struct RpcClient {
     child: Mutex<Child>,
-    stdin: Mutex<ChildStdin>,
+    stdin: Arc<Mutex<ChildStdin>>,
     next_id: AtomicI64,
     pending: PendingRequests,
 }
 
 impl RpcClient {
     /// Spawns `command` and starts reading its stdout in the background.
-    /// Every notification (a message with a `method` but no `id`) is
-    /// forwarded on `notifications` as `(method, params)`.
+    /// Every notification, and every request the agent makes of us (a
+    /// message with a `method`), is forwarded on `notifications` as
+    /// `(method, params)`. Requests are also answered here, see
+    /// [`reply_to_agent_request`].
     pub fn spawn(mut command: Command, notifications: NotificationSender) -> std::io::Result<Self> {
         command
             .stdin(Stdio::piped())
@@ -65,13 +68,19 @@ impl RpcClient {
         let stderr = child.stderr.take().expect("stderr was piped");
 
         let pending: PendingRequests = Arc::new(Mutex::new(HashMap::new()));
+        let stdin = Arc::new(Mutex::new(stdin));
 
-        spawn_reader(stdout, Arc::clone(&pending), notifications);
+        spawn_reader(
+            stdout,
+            Arc::clone(&pending),
+            notifications,
+            Arc::clone(&stdin),
+        );
         spawn_stderr_logger(stderr);
 
         Ok(RpcClient {
             child: Mutex::new(child),
-            stdin: Mutex::new(stdin),
+            stdin,
             next_id: AtomicI64::new(1),
             pending,
         })
@@ -122,6 +131,7 @@ fn spawn_reader(
     stdout: tokio::process::ChildStdout,
     pending: PendingRequests,
     notifications: NotificationSender,
+    stdin: Arc<Mutex<ChildStdin>>,
 ) {
     tokio::spawn(async move {
         let mut lines = BufReader::new(stdout).lines();
@@ -143,16 +153,32 @@ fn spawn_reader(
             match (message.id, message.method) {
                 (Some(id), None) => {
                     // A response to one of our requests.
+                    let Some(id) = id.as_i64() else { continue };
                     if let Some(sender) = pending.lock().await.remove(&id) {
                         let result = if let Some(err) = message.error {
-                            Err(err.to_string())
+                            Err(err
+                                .get("message")
+                                .and_then(Value::as_str)
+                                .map(str::to_string)
+                                .unwrap_or_else(|| err.to_string()))
                         } else {
                             Ok(message.result.unwrap_or(Value::Null))
                         };
                         let _ = sender.send(result);
                     }
                 }
-                (_, Some(method)) => {
+                (Some(id), Some(method)) => {
+                    // The agent is asking *us* for something. Always
+                    // answer, or the agent's turn hangs waiting on us.
+                    let reply = reply_to_agent_request(&method, id);
+                    let _ = notifications.send((method, message.params));
+                    let mut line = serde_json::to_vec(&reply).expect("Value always serializes");
+                    line.push(b'\n');
+                    let mut stdin = stdin.lock().await;
+                    let _ = stdin.write_all(&line).await;
+                    let _ = stdin.flush().await;
+                }
+                (None, Some(method)) => {
                     let _ = notifications.send((method, message.params));
                 }
                 _ => {}
@@ -166,6 +192,26 @@ fn spawn_reader(
             let _ = sender.send(Err("agent process exited".to_string()));
         }
     });
+}
+
+/// Answers a request from the agent. This is where the M4 safety rule
+/// "default deny" lives: permission requests are always cancelled, and
+/// since the client advertises no `fs`/`terminal` capabilities, anything
+/// else is "method not found".
+fn reply_to_agent_request(method: &str, id: Value) -> Value {
+    if method == "session/request_permission" {
+        json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": { "outcome": { "outcome": "cancelled" } },
+        })
+    } else {
+        json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": { "code": -32601, "message": format!("method not supported: {method}") },
+        })
+    }
 }
 
 fn spawn_stderr_logger(stderr: tokio::process::ChildStderr) {

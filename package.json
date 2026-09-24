@@ -25,6 +25,10 @@
     "lucide-react": "^1.47.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "shiki": "^4.4.3",
     "tailwind-merge": "^3.7.0",
     "zustand": "^5.0.15"

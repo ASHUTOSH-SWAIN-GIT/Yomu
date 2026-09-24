@@ -24,3 +24,28 @@ export interface ArticleSummary {
   canonicalUrl: string;
   scrapedAt: number;
 }
+
+/** A passage the user asked the agent to explain. `blockIndex` and the
+ * offsets locate it inside `article.blocks[blockIndex]`'s text. */
+export interface Highlight {
+  id: string;
+  articleId: string;
+  blockIndex: number;
+  startOffset: number;
+  endOffset: number;
+  text: string;
+}
+
+export interface Chat {
+  id: string;
+  articleId: string;
+  acpSessionId: string | null;
+}
+
+/** `highlight` is set on the message that started an explain. */
+export interface StoredMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  highlight: Highlight | null;
+}
