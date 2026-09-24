@@ -56,7 +56,21 @@ Original outline:
 
 - Migration v2 in `src-tauri/src/db.rs`: FTS5 index over article text and messages; search UI across both. Tags/collections, read/archive state, saved scroll position, markdown export (article plus explanations), delete confirmation, sidebar rows as real buttons.
 
-### Theme 4 outline
+### Theme 4: Onboarding and trust
+
+**Status: implemented, except the screen reader pass.** Verified: 53 frontend tests (also run in CI now) plus 35 Rust tests, with a mutation check showing the tests fail when the code is broken; a release build launched and ran under the new CSP (scripts, IPC to Rust and the update check all worked, seen in the app log).
+
+Done:
+
+- **Frontend tests (vitest):** prompt building, error classification, article text, Markdown export, search-query safety, tag and image helpers, setup steps, and the chat store (explain, streaming, stop, retry, resume with fallback, regenerate, stale loads). Added as `npm test` to the CI frontend job.
+- **Setup checklist** replaces the old "not installed" panel: Node, Codex CLI and ChatGPT sign-in as separate steps with copyable fix commands, sign-in only offered once Codex exists, and an automatic re-check when the window regains focus.
+- **Bug found and fixed:** `codex login status` prints to stderr; the old check read only stdout and worked by accident.
+- **CSP** set (was `null`): scripts only from the app itself, no inline scripts, no framing, IPC allowed, images allowed from https/http/data. A looser `devCsp` keeps Vite hot reload working.
+- **Block remote images** toggle in the header (off by default), click-to-load per image, and `no-referrer` on images always.
+
+Not done / unverified: screen reader run; styles, fonts and images under the CSP were not visually confirmed (no screen capture permission here), so glance at the release build once; Windows/Linux `PATH` and setup commands (the commands shown are macOS/npm oriented, `brew install node` will not suit Windows).
+
+Original outline:
 
 - First-run wizard with fix-it steps (Node, Codex, login). Real CSP (script-src self; img-src https/data; ipc connect) and a setting to block remote images. Vitest for `src/lib/prompt.ts`, `chat-errors.ts`, `chat-store.ts` (mock `@/lib/commands`), added to CI. Screen reader pass. First real run of `release.yml`, Windows `PATH` check.
 

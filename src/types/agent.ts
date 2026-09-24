@@ -6,7 +6,14 @@
  * one deliberate exception.
  */
 
-export type AgentStatus = "missing" | "logged_out" | "ready";
+/** Mirrors `Diagnosis` in `src-tauri/src/agent/status.rs`. */
+export interface Diagnosis {
+  /** Node.js version, when Node and `npx` both work. */
+  node: string | null;
+  /** Codex CLI version, when `codex` is on PATH. */
+  codex: string | null;
+  loggedIn: boolean;
+}
 
 export type AgentEvent =
   | { kind: "token"; session_id: string; text: string }

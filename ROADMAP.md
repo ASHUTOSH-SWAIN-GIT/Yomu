@@ -196,7 +196,7 @@ M4 was first built against a mock with a guessed protocol. That is now corrected
 - Codex sessions default to an auto-approve mode. The harness now calls `session/set_mode` → `read-only` on every new or resumed session and fails the session if that fails.
 - **Sandbox reality**: `read-only` still allows writes _inside the session's cwd_. That cwd is always a fresh empty temp dir, so nothing outside is reachable, but "no file writes at all" is not literally true. The explain prompt also tells the agent not to use tools.
 - Permission requests from the agent are always answered "cancelled" (`agent/rpc.rs`).
-- Login check (`codex login status`) works: prints "Logged in using ChatGPT".
+- Login check (`codex login status`) works: it prints "Logged in using ChatGPT" to **stderr** (not stdout) and exits 0; `agent/status.rs` reads both.
 - The mock agent (`scripts/mock-acp-agent.mjs`) now speaks the real shapes so CI still needs no Codex. Real run: `cargo test real_codex -- --ignored --nocapture`.
 - GUI launches have a minimal `PATH`; `env::inherit_shell_path` (M6) merges the login shell's `PATH` at startup. Unit tested, **not yet tried from a Finder-launched bundle**.
 

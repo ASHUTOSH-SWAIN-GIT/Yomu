@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/stores/ui-store";
 import { logError } from "@/lib/log";
+import { SetupChecklist } from "@/components/chat/setup-checklist";
 import { Markdown } from "@/components/chat/markdown";
 import { useAgentStore } from "@/stores/agent-store";
 import { useChatStore, type ChatMessage } from "@/stores/chat-store";
@@ -43,47 +44,19 @@ export function ChatPanel() {
         </Button>
       </div>
 
-      {status === "ready" ? <ChatBody /> : <Onboarding status={status} />}
+      {status === "ready" ? (
+        <ChatBody />
+      ) : status === "checking" ? (
+        <div className="text-muted-foreground flex flex-1 items-center justify-center">
+          <Loader2
+            className="size-4 animate-spin"
+            aria-label="Checking setup"
+          />
+        </div>
+      ) : (
+        <SetupChecklist />
+      )}
     </aside>
-  );
-}
-
-function Onboarding({
-  status,
-}: {
-  status: "checking" | "missing" | "logged_out";
-}) {
-  const login = useAgentStore((s) => s.login);
-  const refreshStatus = useAgentStore((s) => s.refreshStatus);
-
-  return (
-    <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm">
-      {status === "checking" && <Loader2 className="size-4 animate-spin" />}
-      {status === "missing" && (
-        <>
-          <p>Codex CLI isn't installed.</p>
-          <p className="text-xs">
-            Install it, then check again — Yomu uses your ChatGPT subscription
-            through it, no API key needed.
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void refreshStatus()}
-          >
-            Check again
-          </Button>
-        </>
-      )}
-      {status === "logged_out" && (
-        <>
-          <p>Codex is installed but not signed in.</p>
-          <Button size="sm" onClick={() => void login()}>
-            Sign in with ChatGPT
-          </Button>
-        </>
-      )}
-    </div>
   );
 }
 

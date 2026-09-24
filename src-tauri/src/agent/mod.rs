@@ -7,4 +7,4 @@ mod tests;
 
 pub use events::AgentEvent;
 pub use harness::AgentHarness;
-pub use status::{detect, login, AgentStatus};
+pub use status::{diagnose, login, Diagnosis};

@@ -6,7 +6,7 @@ mod scraper;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use agent::{AgentHarness, AgentStatus};
+use agent::{AgentHarness, Diagnosis};
 use scraper::ScrapedArticle;
 use tauri::Emitter;
 use tokio::sync::mpsc;
@@ -26,9 +26,10 @@ fn canonicalize_url(url: String) -> Result<String, String> {
     scraper::canonical_url(&url).map_err(|e| e.to_string())
 }
 
+/// What's installed and whether Codex is signed in, for the setup checklist.
 #[tauri::command]
-async fn agent_status() -> AgentStatus {
-    agent::detect().await
+async fn agent_diagnose() -> Diagnosis {
+    agent::diagnose().await
 }
 
 #[tauri::command]
@@ -137,7 +138,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scrape_url,
             canonicalize_url,
-            agent_status,
+            agent_diagnose,
             agent_login,
             agent_new_session,
             agent_resume_session,

@@ -1,23 +1,33 @@
 import { create } from "zustand";
-import { agentLogin, agentStatus, agentWarm } from "@/lib/commands";
+import { agentDiagnose, agentLogin, agentWarm } from "@/lib/commands";
 import { logError } from "@/lib/log";
-import type { AgentStatus } from "@/types/agent";
+import { isReady } from "@/lib/setup";
+import type { Diagnosis } from "@/types/agent";
 
 interface AgentStore {
-  status: AgentStatus | "checking";
+  /** "setup" means something in the checklist (see lib/setup.ts) is missing. */
+  status: "checking" | "setup" | "ready";
+  diagnosis: Diagnosis | null;
   refreshStatus: () => Promise<void>;
   login: () => Promise<void>;
 }
 
 export const useAgentStore = create<AgentStore>((set, get) => ({
   status: "checking",
+  diagnosis: null,
 
   async refreshStatus() {
-    const status = await agentStatus();
-    set({ status });
-    // Spin the adapter up now so the first Explain doesn't wait for it.
-    if (status === "ready") {
-      agentWarm().catch((err) => logError("agent warm-up failed", err));
+    try {
+      const diagnosis = await agentDiagnose();
+      const ready = isReady(diagnosis);
+      set({ diagnosis, status: ready ? "ready" : "setup" });
+      // Spin the adapter up now so the first Explain doesn't wait for it.
+      if (ready) {
+        agentWarm().catch((err) => logError("agent warm-up failed", err));
+      }
+    } catch (err) {
+      logError("agent diagnosis failed", err);
+      set({ status: "setup" });
     }
   },
 

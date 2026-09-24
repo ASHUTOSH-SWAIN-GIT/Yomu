@@ -36,7 +36,7 @@ npm run tauri dev
 Handy commands:
 
 ```bash
-npm run lint && npm run typecheck   # frontend checks
+npm run lint && npm run typecheck && npm test   # frontend checks
 cd src-tauri && cargo test          # Rust tests (uses a mock agent, no Codex needed)
 cargo test real_codex -- --ignored --nocapture   # optional: real Codex, uses plan quota
 ```

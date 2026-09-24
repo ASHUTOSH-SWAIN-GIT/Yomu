@@ -4,6 +4,7 @@ import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { ReaderView } from "@/components/layout/reader-view";
 import { ChatPanel } from "@/components/layout/chat-panel";
 import { UpdateBanner } from "@/components/layout/update-banner";
+import { ImagePrivacyToggle } from "@/components/layout/image-privacy-toggle";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useUiStore } from "@/stores/ui-store";
 import { useThemeEffect } from "@/hooks/use-theme";
@@ -30,6 +31,7 @@ export function AppShell() {
               <PanelRightOpen className="size-4" />
             </Button>
           )}
+          <ImagePrivacyToggle />
           <ThemeToggle />
         </div>
       </header>

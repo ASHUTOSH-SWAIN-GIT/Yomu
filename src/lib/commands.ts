@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ScrapedArticle } from "@/types/article";
-import type { AgentStatus } from "@/types/agent";
+import type { Diagnosis } from "@/types/agent";
 
 /**
  * Thin wrappers around Tauri commands (`src-tauri/src/lib.rs`). Keep all
@@ -16,8 +16,9 @@ export async function canonicalizeUrl(url: string): Promise<string> {
   return invoke<string>("canonicalize_url", { url });
 }
 
-export async function agentStatus(): Promise<AgentStatus> {
-  return invoke<AgentStatus>("agent_status");
+/** What's installed (Node, Codex) and whether Codex is signed in. */
+export async function agentDiagnose(): Promise<Diagnosis> {
+  return invoke<Diagnosis>("agent_diagnose");
 }
 
 /** Kicks off `codex login`; the caller re-polls agentStatus afterwards. */
