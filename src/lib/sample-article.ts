@@ -16,6 +16,7 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
   author: null,
   site: "Yomu",
   scrapedAt: Date.now(),
+  publishedAt: null,
   blocks: [
     {
       type: "paragraph",
@@ -116,6 +117,7 @@ export async function openSampleArticle(): Promise<void> {
   const saved = await upsertArticle({
     ...SAMPLE_ARTICLE,
     scrapedAt: Date.now(),
+    publishedAt: null,
   });
   await useLibraryStore.getState().refresh();
   await useTabsStore.getState().openArticle(saved.id);

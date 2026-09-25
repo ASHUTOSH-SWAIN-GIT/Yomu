@@ -113,7 +113,11 @@ function Article({
           >
             {article.site || new URL(article.url).hostname}
           </a>
-          <span>Saved {formatRelativeTime(article.scrapedAt)}</span>
+          {article.publishedAt ? (
+            <span>Published {formatRelativeTime(article.publishedAt)}</span>
+          ) : (
+            <span>Saved {formatRelativeTime(article.scrapedAt)}</span>
+          )}
           <span>{minutes} min read</span>
         </div>
         <ArticleTools article={article} />

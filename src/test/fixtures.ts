@@ -19,6 +19,7 @@ export function makeArticle(
     site: "example.dev",
     blocks,
     scrapedAt: 0,
+    publishedAt: null,
     saved: true,
     progress: 0,
     archived: false,

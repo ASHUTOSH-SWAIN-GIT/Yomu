@@ -262,6 +262,16 @@ Status: backend verified against real Codex (streaming, resume with context). Th
 
 ---
 
+## M8: Smarter agent + robust scraper
+
+Plan in [docs/agent-context-plan.md](./docs/agent-context-plan.md).
+
+- [x] Track B: JSON-LD metadata, encoding detection, paywall detection, retry, Markdown/llms.txt shortcuts (see docs/agent-context-plan.md for verification detail)
+- [ ] Track A1–A4: prompt context refactor, memory of past explanations, cross-article knowledge, personalization
+- [ ] Track A0/A5: verify real web-fetch permission shape, then controlled browsing
+
+---
+
 ## Post v1 (not scheduled)
 
 - Claude support once Anthropic approves subscription use in third party apps

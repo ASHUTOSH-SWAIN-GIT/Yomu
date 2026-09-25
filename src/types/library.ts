@@ -11,6 +11,7 @@ export interface StoredArticle {
   site: string;
   blocks: Block[];
   scrapedAt: number;
+  publishedAt: number | null;
   saved: boolean;
   /** How far down the article the reader got, 0 to 1. */
   progress: number;
@@ -26,6 +27,7 @@ export interface ArticleSummary {
   site: string;
   canonicalUrl: string;
   scrapedAt: number;
+  publishedAt: number | null;
   progress: number;
   archived: boolean;
   tags: string[];

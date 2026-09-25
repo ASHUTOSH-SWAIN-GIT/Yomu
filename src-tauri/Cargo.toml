@@ -43,6 +43,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 sha2 = "0.10"
 base64 = "0.22"
+chrono = "0.4.45"
+encoding_rs = "0.8.42"
+pulldown-cmark = "0.13.4"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

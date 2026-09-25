@@ -68,6 +68,12 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_3,
         },
+        Migration {
+            version: 4,
+            description: "article published date",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_4,
+        },
     ]
 }
 
@@ -135,4 +141,10 @@ pub const MIGRATION_3: &str = r#"
         file TEXT NOT NULL,
         PRIMARY KEY (article_id, url)
     );
+"#;
+
+/// When the article says it was published (from JSON-LD, see
+/// scraper/jsonld.rs), separate from `scraped_at` (when *we* fetched it).
+pub const MIGRATION_4: &str = r#"
+    ALTER TABLE articles ADD COLUMN published_at INTEGER;
 "#;

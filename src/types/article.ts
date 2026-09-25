@@ -36,4 +36,7 @@ export interface ScrapedArticle {
   site: string;
   blocks: Block[];
   scrapedAt: number;
+  /** When the article says it was published (JSON-LD), separate from
+   * `scrapedAt` (when we fetched it). Null when the page has no such data. */
+  publishedAt: number | null;
 }

@@ -1,9 +1,12 @@
 mod blocks;
 mod fetch;
 mod images;
+mod jsonld;
 mod lang_detect;
+mod markdown_source;
 mod meta;
 mod normalize;
+mod paywall;
 mod render;
 mod rules;
 
@@ -27,6 +30,8 @@ pub enum ScrapeError {
     ExtractionFailed,
     #[error("the site blocked automated access (a bot check); try opening it in your browser")]
     Blocked,
+    #[error("this article is behind a paywall; only the preview is available")]
+    Paywalled,
     #[error("could not render this page: {0}")]
     Render(String),
 }
@@ -38,6 +43,8 @@ pub enum ScrapeError {
 #[serde(rename_all = "camelCase")]
 pub struct ScrapedArticle {
     pub url: String,
+    /// From schema.org JSON-LD when present (see jsonld.rs); unix millis.
+    pub published_at: Option<u64>,
     pub canonical_url: String,
     pub title: String,
     pub author: Option<String>,
@@ -91,17 +98,36 @@ pub async fn scrape(
     app: Option<&tauri::AppHandle>,
 ) -> Result<ScrapedArticle, ScrapeError> {
     let canonical = normalize::canonicalize(raw_url)?;
-
     let client = fetch::build_client()?;
-    let plain = match fetch::fetch_html(&client, canonical.as_str()).await {
-        Ok(fetched) => extract(&fetched.html, &fetched.final_url, &canonical),
-        Err(e) => Err(e),
+
+    // Many docs sites publish raw Markdown alongside their rendered HTML;
+    // fetching that directly is faster and more faithful when available.
+    if let Some(article) = markdown_source::try_fetch(&client, &canonical).await {
+        return Ok(article);
+    }
+
+    let fetched = fetch::fetch_html(&client, canonical.as_str()).await;
+    let (plain, plain_html) = match fetched {
+        Ok(f) => (extract(&f.html, &f.final_url, &canonical), Some(f.html)),
+        Err(e) => (Err(e), None),
     };
 
     let thin = match &plain {
         Ok(article) => word_count(&article.blocks) < MIN_WORDS,
         Err(_) => true,
     };
+
+    // A confident paywall match on a thin result is conclusive: rendering
+    // the page in a browser can't reveal content the server withheld, so
+    // there is no point paying for that fallback.
+    if thin
+        && plain_html
+            .as_deref()
+            .is_some_and(paywall::looks_like_paywall)
+    {
+        return Err(ScrapeError::Paywalled);
+    }
+
     let Some(app) = app.filter(|_| thin) else {
         return plain;
     };
@@ -109,6 +135,7 @@ pub async fn scrape(
     log::info!("plain fetch of {canonical} was thin or failed; trying a rendered page");
     let rendered = match render::render_html(app, canonical.as_str()).await {
         Ok(html) if render::looks_like_bot_check(&html) => Err(ScrapeError::Blocked),
+        Ok(html) if paywall::looks_like_paywall(&html) => Err(ScrapeError::Paywalled),
         Ok(html) => extract(&html, canonical.as_str(), &canonical),
         Err(e) => Err(e),
     };
@@ -122,11 +149,11 @@ pub async fn scrape(
         (Ok(p), Err(_)) => Ok(p),
         (Err(_), Ok(r)) => Ok(r),
         // Both failed: the rendered error usually says more (e.g. a bot
-        // check) than a bare HTTP status.
+        // check or paywall) than a bare HTTP status.
         (Err(plain_err), Err(render_err)) => {
             log::warn!("scrape of {canonical} failed: {plain_err}; rendered: {render_err}");
             Err(match render_err {
-                ScrapeError::Blocked => ScrapeError::Blocked,
+                ScrapeError::Blocked | ScrapeError::Paywalled => render_err,
                 _ => plain_err,
             })
         }
@@ -177,12 +204,23 @@ fn extract(
     }
     drop_repeated_title(&mut blocks, &title);
 
+    // JSON-LD is more often accurate than guessed meta tags; only fall back
+    // to those when a page has no (or incomplete) structured data.
+    let structured = jsonld::extract(&original_document);
+    let author = structured
+        .author
+        .or_else(|| meta::extract_author(&original_document));
+    let site = structured
+        .site_name
+        .unwrap_or_else(|| meta::extract_site_name(&original_document, &host));
+
     Ok(ScrapedArticle {
         url: final_url.to_string(),
         canonical_url: canonical.to_string(),
         title,
-        author: meta::extract_author(&original_document),
-        site: meta::extract_site_name(&original_document, &host),
+        author,
+        site,
+        published_at: structured.published_at,
         blocks,
         scraped_at: now_millis(),
     })
@@ -198,7 +236,7 @@ fn drop_repeated_title(blocks: &mut Vec<Block>, title: &str) {
     }
 }
 
-fn now_millis() -> u64 {
+pub(super) fn now_millis() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
@@ -299,5 +337,67 @@ mod timing {
                 Err(e) => println!("{:>6} ms  ERROR {e}  {url}", start.elapsed().as_millis()),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod jsonld_real_pages {
+    #[tokio::test]
+    #[ignore]
+    async fn real_pages_jsonld() {
+        for url in [
+            "https://dev.to/wiseai/i-built-a-version-bump-tool-in-rust-that-is-10000x-faster-than-its-python-counterparts-i6b",
+            "https://medium.com/data-science-collective/ai-hallucination-is-nothing-but-a-plausible-prediction-gone-wrong-10d0b6a33209",
+            "https://kubernetes.io/docs/concepts/workloads/pods/",
+            "https://react.dev/learn/thinking-in-react",
+        ] {
+            match super::scrape(url, None).await {
+                Ok(a) => println!(
+                    "{url}\n   author={:?} site={:?} published_at={:?}",
+                    a.author, a.site, a.published_at
+                ),
+                Err(e) => println!("{url}\n   ERROR {e}"),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod markdown_real_pages {
+    #[tokio::test]
+    #[ignore]
+    async fn real_pages_markdown_shortcut() {
+        for url in [
+            "https://github.com/rust-lang/rust/blob/master/README.md",
+            "https://github.com/tokio-rs/tokio",
+            "https://mintlify.com/docs/quickstart",
+            "https://vitejs.dev/guide/",
+            "https://kubernetes.io/docs/concepts/workloads/pods/",
+        ] {
+            let start = std::time::Instant::now();
+            match super::scrape(url, None).await {
+                Ok(a) => println!(
+                    "{:>6} ms  {:>4} blocks  {url}\n   title={:?}",
+                    start.elapsed().as_millis(),
+                    a.blocks.len(),
+                    a.title
+                ),
+                Err(e) => println!("{:>6} ms  ERROR {e}  {url}", start.elapsed().as_millis()),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod markdown_frontmatter_check {
+    #[tokio::test]
+    #[ignore]
+    async fn no_frontmatter_leaks_into_the_article() {
+        let article = super::scrape("https://vitejs.dev/guide/", None)
+            .await
+            .unwrap();
+        let json = serde_json::to_string(&article.blocks).unwrap();
+        assert!(!json.contains("url: /guide"), "frontmatter leaked: {json}");
+        println!("first block: {:?}", article.blocks.first());
     }
 }

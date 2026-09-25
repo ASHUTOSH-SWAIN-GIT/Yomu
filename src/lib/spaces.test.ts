@@ -18,6 +18,7 @@ const art = (id: string, tags: string[], archived = false): ArticleSummary => ({
   site: "x.dev",
   canonicalUrl: `https://x.dev/${id}`,
   scrapedAt: 0,
+  publishedAt: null,
   progress: 0,
   archived,
   tags,

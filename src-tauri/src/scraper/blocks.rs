@@ -283,7 +283,7 @@ fn table_block(table: ElementRef) -> Option<Block> {
     Some(Block::Table { header, rows })
 }
 
-fn trim_trailing_newlines(mut spans: Vec<Span>) -> Vec<Span> {
+pub(super) fn trim_trailing_newlines(mut spans: Vec<Span>) -> Vec<Span> {
     while let Some(last) = spans.last_mut() {
         let trimmed = last.text.trim_end_matches('\n').len();
         last.text.truncate(trimmed);
@@ -369,7 +369,7 @@ fn collect_spans_inner(
 
 /// Collapses consecutive spans that share the same formatting, which keeps
 /// output tidy when the source HTML wraps text in extra inline elements.
-fn merge_adjacent(spans: Vec<Span>) -> Vec<Span> {
+pub(super) fn merge_adjacent(spans: Vec<Span>) -> Vec<Span> {
     let mut merged: Vec<Span> = Vec::with_capacity(spans.len());
     for span in spans {
         if let Some(last) = merged.last_mut() {

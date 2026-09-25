@@ -33,6 +33,7 @@ interface ArticleRow {
   site: string | null;
   blocks_json: string;
   scraped_at: number;
+  published_at: number | null;
   saved: number;
   progress: number;
   archived: number;
@@ -48,6 +49,7 @@ function rowToStoredArticle(row: ArticleRow): StoredArticle {
     site: row.site ?? "",
     blocks: JSON.parse(row.blocks_json) as Block[],
     scrapedAt: row.scraped_at,
+    publishedAt: row.published_at,
     saved: row.saved === 1,
     progress: row.progress,
     archived: row.archived === 1,
@@ -66,12 +68,13 @@ export async function listArticles(): Promise<ArticleSummary[]> {
       | "author"
       | "site"
       | "scraped_at"
+      | "published_at"
       | "progress"
       | "archived"
     > & { tags: string | null })[]
   >(
     `SELECT a.id, a.url, a.canonical_url, a.title, a.author, a.site, a.scraped_at,
-            a.progress, a.archived,
+            a.published_at, a.progress, a.archived,
             (SELECT group_concat(tag, char(31)) FROM article_tags t WHERE t.article_id = a.id) AS tags
      FROM articles a ORDER BY a.scraped_at DESC`,
   );
@@ -82,6 +85,7 @@ export async function listArticles(): Promise<ArticleSummary[]> {
     site: row.site ?? "",
     canonicalUrl: row.canonical_url,
     scrapedAt: row.scraped_at,
+    publishedAt: row.published_at,
     progress: row.progress,
     archived: row.archived === 1,
     tags: row.tags ? row.tags.split("\u001f").sort() : [],
@@ -124,8 +128,8 @@ export async function upsertArticle(
   const blocksJson = JSON.stringify(article.blocks);
 
   await db.execute(
-    `INSERT INTO articles (id, url, canonical_url, title, author, site, blocks_json, scraped_at, saved, text_content)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9)
+    `INSERT INTO articles (id, url, canonical_url, title, author, site, blocks_json, scraped_at, published_at, saved, text_content)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10)
      ON CONFLICT(canonical_url) DO UPDATE SET
        url = excluded.url,
        title = excluded.title,
@@ -133,7 +137,8 @@ export async function upsertArticle(
        site = excluded.site,
        blocks_json = excluded.blocks_json,
        text_content = excluded.text_content,
-       scraped_at = excluded.scraped_at`,
+       scraped_at = excluded.scraped_at,
+       published_at = excluded.published_at`,
     [
       id,
       article.url,
@@ -143,6 +148,7 @@ export async function upsertArticle(
       article.site,
       blocksJson,
       article.scrapedAt,
+      article.publishedAt,
       articleText(article.blocks),
     ],
   );
@@ -156,6 +162,7 @@ export async function upsertArticle(
     site: article.site,
     blocks: article.blocks,
     scrapedAt: article.scrapedAt,
+    publishedAt: article.publishedAt,
     saved: true,
     // Re-fetching keeps the reading position and archive state.
     progress: existing?.progress ?? 0,
