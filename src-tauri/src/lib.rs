@@ -65,6 +65,11 @@ async fn agent_login() -> Result<(), String> {
     agent::login().await
 }
 
+/// Shared parent of every agent session's temp working directory.
+fn sessions_root() -> std::path::PathBuf {
+    std::env::temp_dir().join("yomu-agent-sessions")
+}
+
 /// Creates a new, empty temp directory to use as an agent's working
 /// directory — never a user project (ROADMAP.md M4 Safety).
 async fn fresh_temp_dir() -> Result<std::path::PathBuf, String> {
@@ -76,7 +81,7 @@ async fn fresh_temp_dir() -> Result<std::path::PathBuf, String> {
             .map(|d| d.as_nanos())
             .unwrap_or(0)
     );
-    let cwd = std::env::temp_dir().join(dir_name);
+    let cwd = sessions_root().join(dir_name);
     tokio::fs::create_dir_all(&cwd)
         .await
         .map_err(|e| format!("could not create a temp working directory: {e}"))?;
@@ -105,6 +110,19 @@ async fn agent_resume_session(
 #[tauri::command]
 async fn agent_warm(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<(), String> {
     harness.warm().await
+}
+
+/// ROADMAP.md A5 browsing toggle (Aa menu, default on — see `run()`).
+/// Backed by an OS-level sandbox flip, not a permission classifier: see
+/// `agent/sandbox.rs` for why. The frontend calls this on startup with the
+/// persisted setting and again whenever the user flips it.
+#[tauri::command]
+async fn agent_set_network_allowed(
+    allowed: bool,
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<(), String> {
+    harness.set_network_allowed(allowed).await;
+    Ok(())
 }
 
 #[tauri::command]
@@ -138,7 +156,10 @@ pub fn run() {
     env::inherit_shell_path();
 
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<agent::AgentEvent>();
-    let harness = Arc::new(AgentHarness::new(event_tx));
+    // ROADMAP.md A5: browsing defaults on until the frontend's persisted
+    // Aa-menu setting (not yet built) overrides it via
+    // `agent_set_network_allowed` on startup.
+    let harness = Arc::new(AgentHarness::new(event_tx, true));
     let harness_for_exit = Arc::clone(&harness);
 
     tauri::Builder::default()
@@ -184,7 +205,8 @@ pub fn run() {
             agent_resume_session,
             agent_warm,
             agent_cancel,
-            agent_prompt
+            agent_prompt,
+            agent_set_network_allowed
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

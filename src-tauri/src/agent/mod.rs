@@ -1,6 +1,8 @@
 mod events;
 mod harness;
 mod rpc;
+#[cfg(target_os = "macos")]
+mod sandbox;
 mod status;
 #[cfg(test)]
 mod tests;
