@@ -267,7 +267,7 @@ Status: backend verified against real Codex (streaming, resume with context). Th
 Plan in [docs/agent-context-plan.md](./docs/agent-context-plan.md).
 
 - [x] Track B: JSON-LD metadata, encoding detection, paywall detection, retry, Markdown/llms.txt shortcuts (see docs/agent-context-plan.md for verification detail)
-- [ ] Track A1–A4: prompt context refactor, memory of past explanations, cross-article knowledge, personalization
+- [x] Track A1–A4: prompt context refactor, memory of past explanations, cross-article knowledge, personalization (see docs/agent-context-plan.md for verification detail)
 - [ ] Track A0/A5: verify real web-fetch permission shape, then controlled browsing
 
 ---

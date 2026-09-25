@@ -15,11 +15,18 @@ import {
   getChatForArticle,
   listHighlights,
   listMessages,
+  relatedArticles as findRelatedArticles,
   setChatSession,
 } from "@/lib/db";
+import { priorExplanations as findPriorExplanations } from "@/lib/exchanges";
+import { explainPrefInstructions } from "@/lib/explain-prefs";
 import { logError } from "@/lib/log";
 import { imageQuote, parseImageQuote } from "@/lib/images";
-import { buildPrompt, buildSummaryPrompt } from "@/lib/prompt";
+import {
+  buildPrompt,
+  buildSummaryPrompt,
+  type PromptOptions,
+} from "@/lib/prompt";
 import { useAgentStore } from "@/stores/agent-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -79,22 +86,37 @@ interface PromptSpec {
   text: string;
   imageUrl?: string;
 }
-type PromptBuilder = (freshSession: boolean) => PromptSpec;
+type PromptBuilder = (
+  freshSession: boolean,
+  fullContextAlreadySent: boolean,
+) => PromptSpec;
 
 /** Prompt about a highlight; an image highlight also attaches the image. */
 function specFor(
   article: StoredArticle,
   highlight: Highlight,
-  question?: string,
-  kind: "followup" | "question" = "followup",
+  options: PromptOptions = {},
 ): PromptSpec {
   return {
-    text: buildPrompt(article, highlight, question, kind),
+    // Skill level / code-example preference (A4) applies to every explain
+    // prompt, so it lives here rather than at each call site.
+    text: buildPrompt(article, highlight, {
+      ...options,
+      personalizationNotes: explainPrefInstructions(
+        useUiStore.getState().explainPrefs,
+      ),
+    }),
     imageUrl: parseImageQuote(highlight.text)?.src,
   };
 }
 let lastBuild: PromptBuilder | null = null;
 let lastHighlight: Highlight | null = null;
+// Sessions (by live ACP session id) that have already received the full
+// article body once this app run — lets buildPrompt skip resending it on a
+// later Explain/question in the same session, since the model already has
+// it. Never consulted for a long article, which always sends only the
+// passage's nearby blocks (see lib/prompt.ts).
+const fullContextSentFor = new Set<string>();
 
 export const useChatStore = create<ChatStore>((set, get) => {
   // Every session's events share one channel; only the open chat's
@@ -169,7 +191,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
     set({ streaming: true, error: null });
     try {
       const { sessionId, fresh } = await ensureSession(chat);
-      const { text, imageUrl } = build(fresh);
+      const alreadySent = fullContextSentFor.has(sessionId);
+      const { text, imageUrl } = build(fresh, alreadySent);
+      // Whatever kind of turn this is, the model now has the article body
+      // in its own session context (a plain Explain sends it via
+      // buildPrompt; summarize sends even more of it directly).
+      fullContextSentFor.add(sessionId);
       if (imageUrl) await agentPrompt(sessionId, text, imageUrl);
       else await agentPrompt(sessionId, text);
     } catch (err) {
@@ -194,6 +221,20 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
   async function chatFor(article: StoredArticle): Promise<Chat> {
     return get().chat ?? (await createChat(article.id));
+  }
+
+  /** Snippets from other saved articles touching on the same thing (A3).
+   * Never lets a search hiccup break the explain flow — worst case, the
+   * prompt just goes out without this extra context. Skipped for an image
+   * question: alt text isn't meaningful search input. */
+  async function relatedArticlesFor(articleId: string, text: string) {
+    if (parseImageQuote(text)) return [];
+    try {
+      return await findRelatedArticles(articleId, text);
+    } catch (err) {
+      logError("related articles lookup failed", err);
+      return [];
+    }
   }
 
   /** Saves a highlight and asks about it: an explanation when `question` is
@@ -229,8 +270,22 @@ export const useChatStore = create<ChatStore>((set, get) => {
         },
       ],
     }));
-    await runTurn(chat, () =>
-      specFor(article, highlight, question, "question"),
+    const related = await relatedArticlesFor(
+      article.id,
+      question ?? highlight.text,
+    );
+    await runTurn(chat, (fresh, alreadySent) =>
+      specFor(article, highlight, {
+        question,
+        kind: "question",
+        fullContextAlreadySent: alreadySent,
+        relatedArticles: related,
+        // A continuing session already has every earlier exchange verbatim;
+        // this is only for a session that had to be recreated.
+        priorExplanations: fresh
+          ? findPriorExplanations(get().messages, highlight.id)
+          : undefined,
+      }),
     );
   }
 
@@ -255,6 +310,10 @@ export const useChatStore = create<ChatStore>((set, get) => {
       });
       lastBuild = null;
       lastHighlight = null;
+      // A resumed session after switching articles gets the full context
+      // resent once, even if it technically had it before switching away —
+      // simpler and safer than tracking that across navigation.
+      fullContextSentFor.clear();
       if (!articleId) return;
 
       const highlights = await listHighlights(articleId);
@@ -303,8 +362,17 @@ export const useChatStore = create<ChatStore>((set, get) => {
       // A follow up normally rides on the live session's context. If the
       // session was lost (fresh), re-send the passage context with it.
       const highlight = lastHighlight;
-      await runTurn(chat, (fresh) =>
-        fresh && highlight ? specFor(article, highlight, text) : { text },
+      await runTurn(chat, (fresh, alreadySent) =>
+        fresh && highlight
+          ? specFor(article, highlight, {
+              question: text,
+              fullContextAlreadySent: alreadySent,
+              priorExplanations: findPriorExplanations(
+                get().messages,
+                highlight.id,
+              ),
+            })
+          : { text },
       );
     },
 
@@ -316,22 +384,38 @@ export const useChatStore = create<ChatStore>((set, get) => {
         return;
       }
       const highlight = highlights.find((h) => h.id === lastUser.highlightId);
+      const asked = lastUser.text !== EXPLAIN_LABEL;
+      const related = highlight
+        ? await relatedArticlesFor(
+            article.id,
+            asked ? lastUser.text : highlight.text,
+          )
+        : [];
 
       await deleteLastAssistantMessage(chat.id);
       set({ messages: messages.slice(0, -1) });
-      await runTurn(chat, (fresh) => {
+      await runTurn(chat, (fresh, alreadySent) => {
         if (highlight) {
-          const asked = lastUser.text !== EXPLAIN_LABEL;
-          return specFor(
-            article,
-            highlight,
-            asked ? lastUser.text : undefined,
-            "question",
-          );
+          return specFor(article, highlight, {
+            question: asked ? lastUser.text : undefined,
+            kind: "question",
+            fullContextAlreadySent: alreadySent,
+            relatedArticles: related,
+            priorExplanations: fresh
+              ? findPriorExplanations(get().messages, highlight.id)
+              : undefined,
+          });
         }
         if (lastUser.summary) return { text: buildSummaryPrompt(article) };
         return fresh && lastHighlight
-          ? specFor(article, lastHighlight, lastUser.text)
+          ? specFor(article, lastHighlight, {
+              question: lastUser.text,
+              fullContextAlreadySent: alreadySent,
+              priorExplanations: findPriorExplanations(
+                get().messages,
+                lastHighlight.id,
+              ),
+            })
           : { text: lastUser.text };
       });
     },

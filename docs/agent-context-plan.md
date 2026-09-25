@@ -18,6 +18,10 @@ Codex's `read-only` mode still asks permission before using the internet (confir
 
 ### A1. Prompt context refactor + grounding
 
+**Status: done.** `buildPrompt` now takes a `PromptOptions` object (`question`, `kind`, `fullContextAlreadySent`). Added: a table-of-contents line ("Section 2 of 3. All sections: ...", omitted for articles with fewer than 2 headings); per-session tracking (`fullContextSentFor` in `chat-store.ts`, keyed by live ACP session id, cleared on article switch) that skips resending the full article body on a second Explain in the same session — only applies when the article is short enough to send in full to begin with; a stronger grounding instruction ("quote exact phrases... rather than paraphrasing loosely"). 228 frontend tests pass (was 218), including a mutation check that both the prompt-level and store-level skip logic are actually exercised, not just present. Verified against real Codex: with the context omitted on turn 2 of a live session, it correctly still recalled the article's content from turn 1, confirming the skip is safe.
+
+### A1. Prompt context refactor + grounding (original plan)
+
 - `buildPrompt`/`buildSummaryPrompt` (`src/lib/prompt.ts`) move from positional optional args to one `PromptContext` options object (question, kind, plus the new fields below) — cleaner as the number of context sources grows. Update all call sites in `chat-store.ts` and `prompt.test.ts`.
 - Add table-of-contents awareness: list the article's headings so the model knows where the passage sits in the whole piece ("Section 3 of 7").
 - Stop re-sending the full article context on the second-and-later Explain within the same live ACP session — the model already has it from the first turn. `chat-store` tracks a per-session `contextSent` flag; `buildPrompt` gets a `fullContextAlreadySent` flag and sends only the immediate surrounding blocks when true. Cuts token/quota use noticeably on articles you explain several passages of.
@@ -25,13 +29,27 @@ Codex's `read-only` mode still asks permission before using the internet (confir
 
 ### A2. Memory of past explanations
 
+**Status: done.** New `priorExplanations()` in `lib/exchanges.ts` (plus a `firstSentence()` gisting helper in `lib/text.ts`), threaded through `chat-store.ts`'s `specFor` into `buildPrompt`'s options. Key refinement made while implementing: this only needed to fire when the ACP session was freshly (re)created (`fresh` from `ensureSession`) — a _continuing_ session already has every earlier exchange about other passages verbatim in its own history, so injecting a condensed summary there would be pure waste. Only the "session had to be recreated" case lacks that history, which is exactly when this now supplies a short "already explained elsewhere" list. 233 frontend tests pass (was 223 after A1), with a mutation check confirming both the exclude-self filter and the fresh-only gating are actually exercised.
+
+### A2. Memory of past explanations (original plan)
+
 `chat-store` builds a short "already covered in this article" list from its own `highlights`/`messages` state (excluding the current one) — quoted passage plus the first sentence of its answer — and passes it into `PromptContext` for a fresh "question"-kind prompt (not needed for in-session follow-ups, which already have it via ACP history). Lets the model say "as covered above" instead of repeating itself.
 
 ### A3. Cross-article knowledge (your library)
 
+**Status: done.** New `relatedArticles()` in `lib/db.ts`, wired through `chat-store.ts` into `buildPrompt`'s options, explicitly framed to the model as secondary ("only mention if genuinely relevant"). Restricted to other articles' _bodies_ (`kind = 'article'`), never their chat history, and always excludes the currently open article. Real bug found by testing against actual SQLite (not just mocks): the existing `toMatchQuery` requires every word to match, which is right for a short typed search but wrong here — the "query" is a whole highlighted passage or question, and requiring every one of its words to appear in another document almost never matched anything. Fixed with a new `toRelatedQuery()` that ORs the passage's more distinctive words instead (dropping short/filler words, capped at 12 terms), verified against a real in-memory SQLite database with real triggers before writing a single mocked unit test. Skipped for image questions (no useful search text) and never lets a search failure block the explain itself. 243 frontend tests pass (was 233 after A2), with a 3-way mutation check (OR-vs-AND semantics, the render guard, and the image skip) all confirmed to actually fail without the real code.
+
+### A3. Cross-article knowledge (your library) (original plan)
+
 New `relatedArticles(excludeArticleId, queryText, limit)` in `src/lib/db.ts`, reusing the existing FTS5 search (`searchLibrary`/`toMatchQuery` from M3) rather than building new retrieval. Before asking, `chat-store` looks up matches for the passage/question text, and passes the top 2–3 (title + snippet) into `PromptContext`, explicitly marked as optional/secondary so the model doesn't treat them as more authoritative than the open article.
 
 ### A4. Personalization
+
+**Status: done.** New `lib/explain-prefs.ts` (skill level: New/Balanced/Expert; code examples: Never/When helpful/Always), persisted the same way as reader prefs, with a small control added to the Aa menu (confirmed by screenshot to fit the panel width). Applied inside `specFor` itself in `chat-store.ts` — one place, so it reaches every explain/follow-up/regenerate prompt automatically rather than needing to be threaded into each call site by hand. `lib/prompt.ts` stays fully decoupled from what a "level" means: it only receives plain instruction sentences (`personalizationNotes`) to append, exactly as planned. 258 frontend tests pass (was 243 after A3), with a mutation check on both the instruction-mapping and the wiring into `specFor`.
+
+**Track A1–A4 status: all done.** This closes the non-safety-sensitive half of Track A. What remains is A0 (a real spike against Codex to see the actual shape of a web-fetch permission request) and A5 (wiring controlled browsing from what A0 finds) — deliberately last, since it's the one change that touches the sandbox's safety guarantee and needs verifying against the real thing before any code is written against a guess.
+
+### A4. Personalization (original plan)
 
 New persisted prefs in `stores/ui-store.ts` (same localStorage pattern as reader prefs): `explainLevel` ("new to this" / "balanced" / "experienced") and `codeExamples` ("always" / "when helpful" / "never"). A small control in the Aa menu (`reader-settings.tsx`). Read into `PromptContext` by the caller (kept out of `lib/prompt.ts` itself, which stays a pure, store-free function for testability).
 

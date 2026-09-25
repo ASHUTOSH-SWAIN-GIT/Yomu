@@ -41,6 +41,15 @@ export interface SearchHit {
   snippet: string;
 }
 
+/** Another saved article whose text matches a passage/question, for
+ * cross-article context in a prompt (see lib/db.ts's `relatedArticles`). */
+export interface RelatedArticle {
+  articleId: string;
+  title: string;
+  /** Plain text (match markers already stripped, unlike SearchHit). */
+  snippet: string;
+}
+
 /** A passage the user asked the agent to explain. `blockIndex` and the
  * offsets locate it inside `article.blocks[blockIndex]`'s text. */
 export interface Highlight {

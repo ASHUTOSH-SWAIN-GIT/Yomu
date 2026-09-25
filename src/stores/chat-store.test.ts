@@ -32,6 +32,7 @@ vi.mock("@/lib/db", () => ({
   getChatForArticle: vi.fn(),
   listHighlights: vi.fn(),
   listMessages: vi.fn(),
+  relatedArticles: vi.fn(),
   setChatSession: vi.fn(),
 }));
 
@@ -78,6 +79,7 @@ beforeEach(async () => {
   m(db.getChatForArticle).mockResolvedValue(null);
   m(db.listHighlights).mockResolvedValue([]);
   m(db.listMessages).mockResolvedValue([]);
+  m(db.relatedArticles).mockResolvedValue([]);
   m(commands.agentNewSession).mockResolvedValue("s1");
   m(commands.agentCancel).mockResolvedValue(undefined);
   await useChatStore.getState().loadForArticle(null);
@@ -113,6 +115,95 @@ describe("explain", () => {
       "assistant",
       "It means one owner.",
     );
+  });
+
+  it("sends full article context on the first explain, but skips it on a second explain in the same live session", async () => {
+    m(db.addHighlight)
+      .mockResolvedValueOnce(highlight)
+      .mockResolvedValueOnce({
+        ...highlight,
+        id: "h2",
+        blockIndex: 1,
+        text: "Second paragraph.",
+      });
+    agentReplies("first answer");
+    await useChatStore.getState().explain(article, selection);
+    const firstPrompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(firstPrompt).toContain("Article context:");
+
+    agentReplies("second answer");
+    await useChatStore.getState().explain(article, {
+      ...selection,
+      blockIndex: 1,
+      text: "Second paragraph.",
+    });
+    // Still the same session: no new session was opened for the second ask.
+    expect(commands.agentNewSession).toHaveBeenCalledTimes(1);
+    const secondPrompt = m(commands.agentPrompt).mock.calls[1][1];
+    expect(secondPrompt).not.toContain("Article context:");
+    // The passage and task are still present even without re-sent context.
+    expect(secondPrompt).toContain('"""\nSecond paragraph.\n"""');
+  });
+
+  it("includes related articles from the library, looked up by the passage text", async () => {
+    m(db.relatedArticles).mockResolvedValue([
+      {
+        articleId: "a2",
+        title: "Lifetimes Explained",
+        snippet: "closely tied to ownership",
+      },
+    ]);
+    agentReplies("answer");
+    await useChatStore.getState().explain(article, selection);
+
+    expect(db.relatedArticles).toHaveBeenCalledWith("a1", "Each value");
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).toContain("Lifetimes Explained");
+  });
+
+  it("applies the explain-level and code-example preferences to every prompt", async () => {
+    const { useUiStore } = await import("@/stores/ui-store");
+    useUiStore
+      .getState()
+      .setExplainPrefs({ level: "beginner", codeExamples: "always" });
+    try {
+      agentReplies("answer");
+      await useChatStore.getState().explain(article, selection);
+      const prompt = m(commands.agentPrompt).mock.calls[0][1];
+      expect(prompt).toContain("The developer is new to this topic");
+      expect(prompt).toContain("Always include a short code example.");
+    } finally {
+      useUiStore
+        .getState()
+        .setExplainPrefs({ level: "balanced", codeExamples: "helpful" });
+    }
+  });
+
+  it("adds no personalization notes for the default preferences", async () => {
+    agentReplies("answer");
+    await useChatStore.getState().explain(article, selection);
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).not.toContain("The developer is new to this topic");
+    expect(prompt).not.toContain("Always include a short code example");
+  });
+
+  it("never sends an image's src/alt to the related-articles search", async () => {
+    m(db.addHighlight).mockResolvedValue({
+      ...highlight,
+      text: "![a diagram](https://x.dev/d.png)",
+    });
+    agentReplies("x");
+    await useChatStore.getState().explain(article, selection);
+    expect(db.relatedArticles).not.toHaveBeenCalled();
+  });
+
+  it("still sends the explanation even if the related-articles search fails", async () => {
+    m(db.relatedArticles).mockRejectedValue(new Error("fts broke"));
+    agentReplies("answer");
+    await useChatStore.getState().explain(article, selection);
+    expect(useChatStore.getState().error).toBeNull();
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).not.toContain("other articles the developer has saved");
   });
 
   it("ignores events from other sessions", async () => {
@@ -456,6 +547,54 @@ describe("restoring a saved chat", () => {
     expect(m(commands.agentPrompt).mock.calls[0][1]).toContain(
       "Explain the selected passage",
     );
+  });
+
+  it("tells a freshly recreated session what was already explained elsewhere in the article", async () => {
+    const h2 = {
+      ...highlight,
+      id: "h2",
+      blockIndex: 1,
+      text: "Second paragraph.",
+    };
+    m(db.listHighlights).mockResolvedValue([highlight, h2]);
+    m(db.listMessages).mockResolvedValue([
+      { id: "m1", role: "user", content: "Each value", highlight },
+      {
+        id: "m2",
+        role: "assistant",
+        content: "Ownership means one owner.",
+        highlight: null,
+      },
+      { id: "m3", role: "user", content: "Second paragraph.", highlight: h2 },
+      {
+        id: "m4",
+        role: "assistant",
+        content: "This is the second block.",
+        highlight: null,
+      },
+    ]);
+    await useChatStore.getState().loadForArticle("a1");
+
+    m(db.addHighlight).mockResolvedValue(h2);
+    m(commands.agentResumeSession).mockRejectedValue(
+      new Error("session not found"),
+    );
+    agentReplies("third answer");
+    // Explaining h2 again (its own prior turn) should mention only h1, not itself.
+    await useChatStore.getState().explain(article, h2);
+
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).toContain("Already explained elsewhere in this article:");
+    expect(prompt).toContain('"Each value" — Ownership means one owner.');
+    expect(prompt).not.toContain("This is the second block.");
+  });
+
+  it("does not mention prior explanations when the session resumes successfully", async () => {
+    m(commands.agentResumeSession).mockResolvedValue(undefined);
+    agentReplies("answer");
+    await useChatStore.getState().send(article, "why?");
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).toBe("why?"); // plain text: no context, no prior-explanations section at all
   });
 
   it("ignores a stale load when the user switched articles", async () => {

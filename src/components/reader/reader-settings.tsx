@@ -6,6 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Segmented } from "@/components/ui/segmented";
+import type { CodeExamplePref, ExplainLevel } from "@/lib/explain-prefs";
 import { useUiStore } from "@/stores/ui-store";
 import type { Theme } from "@/lib/appearance";
 
@@ -21,6 +22,8 @@ export function ReaderSettings() {
   const blockImages = useUiStore((s) => s.blockRemoteImages);
   const setBlockImages = useUiStore((s) => s.setBlockRemoteImages);
   const setFocusMode = useUiStore((s) => s.setFocusMode);
+  const explainPrefs = useUiStore((s) => s.explainPrefs);
+  const setExplainPrefs = useUiStore((s) => s.setExplainPrefs);
 
   return (
     <Popover>
@@ -91,6 +94,33 @@ export function ReaderSettings() {
             ]}
           />
         </Row>
+
+        <Row label="Explain like I'm">
+          <Segmented<ExplainLevel>
+            label="Explanation level"
+            value={explainPrefs.level}
+            onChange={(level) => setExplainPrefs({ level })}
+            options={[
+              { value: "beginner", label: "New" },
+              { value: "balanced", label: "Balanced" },
+              { value: "expert", label: "Expert" },
+            ]}
+          />
+        </Row>
+        <Row label="Code examples">
+          <Segmented<CodeExamplePref>
+            label="Code examples"
+            value={explainPrefs.codeExamples}
+            onChange={(codeExamples) => setExplainPrefs({ codeExamples })}
+            options={[
+              { value: "never", label: "Never" },
+              { value: "helpful", label: "When helpful" },
+              { value: "always", label: "Always" },
+            ]}
+          />
+        </Row>
+
+        <div className="border-border -mx-4 border-t" />
 
         <div className="flex items-center justify-between gap-3">
           <span className="text-muted-foreground text-xs">

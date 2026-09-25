@@ -77,4 +77,37 @@ describe("ui-store persistence", () => {
     store.getState().setFocusMode(true);
     expect(store.getState().focusMode).toBe(true);
   });
+
+  it("restores and saves explain preferences, merging partial updates", async () => {
+    const data = stubStorage({
+      "yomu-explain-prefs": JSON.stringify({
+        level: "expert",
+        codeExamples: "never",
+      }),
+    });
+    const store = await freshStore();
+    expect(store.getState().explainPrefs).toEqual({
+      level: "expert",
+      codeExamples: "never",
+    });
+
+    store.getState().setExplainPrefs({ level: "beginner" });
+    expect(store.getState().explainPrefs).toEqual({
+      level: "beginner",
+      codeExamples: "never",
+    });
+    expect(JSON.parse(data["yomu-explain-prefs"])).toEqual({
+      level: "beginner",
+      codeExamples: "never",
+    });
+  });
+
+  it("defaults explain preferences to balanced/helpful with no storage", async () => {
+    stubStorage();
+    const store = await freshStore();
+    expect(store.getState().explainPrefs).toEqual({
+      level: "balanced",
+      codeExamples: "helpful",
+    });
+  });
 });

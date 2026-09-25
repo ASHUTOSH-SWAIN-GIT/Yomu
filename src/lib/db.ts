@@ -6,6 +6,7 @@ import type {
   ArticleSummary,
   Chat,
   Highlight,
+  RelatedArticle,
   SearchHit,
   StoredArticle,
   StoredMessage,
@@ -375,6 +376,122 @@ export async function searchLibrary(input: string): Promise<SearchHit[]> {
     });
   }
   return hits;
+}
+
+/** Match markers from an FTS5 snippet (see toMatchQuery/searchLibrary),
+ * for a caller (a prompt) that wants plain text rather than the UI's
+ * bold-the-matches rendering. */
+function stripMatchMarkers(snippet: string): string {
+  return snippet.split("\u0001").join("").split("\u0002").join("");
+}
+
+// Short/filler words that would dilute an OR query across many unrelated
+// documents — not a full stopword list, just cheap noise reduction.
+const NOISE_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "to",
+  "of",
+  "in",
+  "on",
+  "for",
+  "with",
+  "as",
+  "by",
+  "at",
+  "from",
+  "that",
+  "this",
+  "these",
+  "those",
+  "it",
+  "its",
+  "you",
+  "your",
+  "can",
+  "not",
+  "no",
+  "if",
+  "when",
+  "then",
+  "so",
+  "do",
+  "does",
+  "did",
+  "have",
+  "has",
+  "had",
+  "will",
+  "would",
+  "could",
+  "should",
+  "there",
+  "here",
+]);
+
+/**
+ * An FTS5 query matching ANY of a passage's more distinctive words, unlike
+ * `toMatchQuery`'s "every word must match." `toMatchQuery` suits a short,
+ * precise search someone typed; here the "query" is a whole highlighted
+ * passage or question, where requiring every word to appear in another
+ * document would almost never match anything. Deduplicated, short/filler
+ * words dropped, capped so a long passage doesn't build an unwieldy query.
+ */
+export function toRelatedQuery(text: string, maxTerms = 12): string | null {
+  const tokens = text.match(/[\p{L}\p{N}_]+/gu) ?? [];
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const token of tokens) {
+    const key = token.toLowerCase();
+    if (key.length < 4 || NOISE_WORDS.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    terms.push(`"${token}"*`);
+    if (terms.length >= maxTerms) break;
+  }
+  return terms.length > 0 ? terms.join(" OR ") : null;
+}
+
+/** Other saved articles whose text matches `queryText`, for cross-article
+ * context in a prompt (see lib/prompt.ts's `relatedArticles` option).
+ * Reuses the same full-text index and safe-query builder as
+ * `searchLibrary`, restricted to article bodies (not chat messages — a
+ * stranger article's old Q&A isn't relevant context here) and excluding
+ * the article currently open. */
+export async function relatedArticles(
+  excludeArticleId: string,
+  queryText: string,
+  limit = 3,
+): Promise<RelatedArticle[]> {
+  const match = toRelatedQuery(queryText);
+  if (!match) return [];
+  const db = await getDb();
+  const rows = await db.select<
+    { article_id: string; title: string | null; snip: string }[]
+  >(
+    `SELECT si.article_id, a.title,
+            snippet(search_index, 3, char(1), char(2), '…', 16) AS snip
+     FROM search_index si
+     JOIN articles a ON a.id = si.article_id
+     WHERE search_index MATCH $1 AND si.kind = 'article' AND si.article_id != $2
+     ORDER BY rank
+     LIMIT $3`,
+    [match, excludeArticleId, limit],
+  );
+  return rows.map((row) => ({
+    articleId: row.article_id,
+    title: row.title ?? "Untitled",
+    snippet: stripMatchMarkers(row.snip),
+  }));
 }
 
 export async function setArticleProgress(

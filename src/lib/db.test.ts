@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/plugin-sql", () => ({ default: { load: vi.fn() } }));
 
-import { normalizeTag, toMatchQuery } from "@/lib/db";
+import { normalizeTag, toMatchQuery, toRelatedQuery } from "@/lib/db";
 
 describe("toMatchQuery", () => {
   it("quotes each word as a prefix match, all required", () => {
@@ -23,6 +23,31 @@ describe("toMatchQuery", () => {
   it("returns null when there is nothing searchable", () => {
     expect(toMatchQuery("  ")).toBeNull();
     expect(toMatchQuery('"*()')).toBeNull();
+  });
+});
+
+describe("toRelatedQuery", () => {
+  it("ORs distinctive words instead of requiring every word (unlike toMatchQuery)", () => {
+    const q = toRelatedQuery("Ownership and borrowing in Rust");
+    expect(q).toContain(" OR ");
+    expect(q).toBe('"Ownership"* OR "borrowing"* OR "Rust"*');
+  });
+
+  it("drops short and filler words, and de-duplicates", () => {
+    const q = toRelatedQuery("the value is the value and it is owned");
+    expect(q).toBe('"value"* OR "owned"*');
+  });
+
+  it("caps how many terms it uses for a very long passage", () => {
+    const words = Array.from({ length: 30 }, (_, i) => `word${i}`).join(" ");
+    const q = toRelatedQuery(words, 5);
+    expect(q?.split(" OR ")).toHaveLength(5);
+  });
+
+  it("is safe against FTS syntax and returns null for nothing searchable", () => {
+    expect(toRelatedQuery('OR NEAR(a b) "quoted"')).not.toContain("NEAR(");
+    expect(toRelatedQuery("a an is the")).toBeNull();
+    expect(toRelatedQuery("   ")).toBeNull();
   });
 });
 

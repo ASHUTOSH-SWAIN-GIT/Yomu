@@ -8,6 +8,12 @@ import {
   type ReaderPrefs,
   type Theme,
 } from "@/lib/appearance";
+import {
+  DEFAULT_EXPLAIN_PREFS,
+  EXPLAIN_PREFS_KEY,
+  parseExplainPrefs,
+  type ExplainPrefs,
+} from "@/lib/explain-prefs";
 import { readStorage as read, writeStorage as write } from "@/lib/storage";
 
 export type { Theme } from "@/lib/appearance";
@@ -39,6 +45,10 @@ interface UiState {
   /** The Codex setup checklist dialog. */
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
+  /** Skill level and code-example preference, applied to every explain
+   * prompt (see lib/explain-prefs.ts). */
+  explainPrefs: ExplainPrefs;
+  setExplainPrefs: (patch: Partial<ExplainPrefs>) => void;
 }
 
 const BLOCK_IMAGES_KEY = "yomu-block-images";
@@ -83,4 +93,14 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAnswerFocus: (answerFocus) => set({ answerFocus }),
   setupOpen: false,
   setSetupOpen: (setupOpen) => set({ setupOpen }),
+  explainPrefs: parseExplainPrefs(read(EXPLAIN_PREFS_KEY)),
+  setExplainPrefs: (patch) => {
+    const explainPrefs = {
+      ...DEFAULT_EXPLAIN_PREFS,
+      ...get().explainPrefs,
+      ...patch,
+    };
+    write(EXPLAIN_PREFS_KEY, JSON.stringify(explainPrefs));
+    set({ explainPrefs });
+  },
 }));
