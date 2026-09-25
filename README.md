@@ -68,7 +68,7 @@ Pushing a tag like `v0.1.0` runs `.github/workflows/release.yml`: it builds macO
 One time setup, in the repo's Settings > Secrets:
 
 - `TAURI_SIGNING_PRIVATE_KEY`: contents of the updater private key (generated with `npx tauri signer generate`; the matching public key is already in `tauri.conf.json`). **Keep it safe. Losing it means installed apps can never be updated.** `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is only needed if the key has a password.
-- Optional macOS signing and notarization: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`. Without them the app is unsigned and macOS Gatekeeper warns on first open.
+- Optional macOS signing and notarization (also uncomment the `APPLE_*` lines in `release.yml`, they are off because empty secrets break the build): `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`. Without them the app is unsigned and macOS Gatekeeper warns on first open.
 - Windows code signing is not configured yet; unsigned builds trigger SmartScreen warnings.
 
 Local build: `TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/yomu-updater.key)" npm run tauri build` (the key is required because updater artifacts are enabled).
