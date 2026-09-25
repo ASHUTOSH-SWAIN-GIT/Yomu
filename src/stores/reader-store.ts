@@ -23,6 +23,8 @@ interface ReaderStore {
   /** Re-fetches an open article and replaces its saved content (same id,
    * so its chat is kept). Upgrades articles saved by an older scraper. */
   rescrape: (article: StoredArticle) => Promise<void>;
+  /** Back to the empty state (a new tab, or the open article was closed). */
+  reset: () => void;
   /** Opens an already saved article directly from the library, by id. */
   openArticle: (id: string) => Promise<void>;
 }
@@ -71,6 +73,10 @@ export const useReaderStore = create<ReaderStore>((set) => ({
         },
       });
     }
+  },
+
+  reset() {
+    set({ state: { status: "empty" } });
   },
 
   async openArticle(id) {

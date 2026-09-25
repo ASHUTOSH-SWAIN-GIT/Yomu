@@ -15,12 +15,14 @@ export function MathBlock({ tex }: { tex: string }) {
   }, [tex]);
 
   if (!html) {
-    return <pre className="text-muted-foreground my-4 text-sm">{tex}</pre>;
+    return (
+      <pre className="text-muted-foreground my-[0.9em] text-sm">{tex}</pre>
+    );
   }
 
   return (
     <div
-      className="my-4 overflow-x-auto"
+      className="my-[0.9em] overflow-x-auto"
       // Safe: `html` is KaTeX's own render of the tex string, not raw
       // article markup.
       dangerouslySetInnerHTML={{ __html: html }}

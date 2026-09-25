@@ -45,7 +45,7 @@ export function ImageBlock({
   // Wait for the cache index so a cached image never touches the network.
   if (!loaded) {
     return (
-      <figure className="my-4" aria-busy="true">
+      <figure className="my-[1em]" aria-busy="true">
         <div className="bg-muted h-40 animate-pulse rounded-lg" />
       </figure>
     );
@@ -53,7 +53,7 @@ export function ImageBlock({
 
   if (!isLocal && blockRemote && !allowed && isRemoteImage(src)) {
     return (
-      <figure className="my-4">
+      <figure className="my-[1em]">
         <button
           type="button"
           onClick={() => setAllowed(true)}
@@ -68,7 +68,7 @@ export function ImageBlock({
 
   if (failed) {
     return (
-      <figure className="my-4">
+      <figure className="my-[1em]">
         <div className="border-input text-muted-foreground flex items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-sm">
           <ImageOff className="size-4" aria-hidden />
           <span>Image unavailable{alt ? `: ${alt}` : ""}</span>
@@ -78,7 +78,7 @@ export function ImageBlock({
   }
 
   return (
-    <figure className="group relative my-4">
+    <figure className="group relative my-[1em]">
       <img
         src={src}
         onError={() => (isLocal ? setLocalBroken(true) : setFailed(true))}
@@ -86,7 +86,7 @@ export function ImageBlock({
         loading="lazy"
         // Don't tell the image host which article you're reading.
         referrerPolicy="no-referrer"
-        className="border-border mx-auto max-w-full rounded-lg border"
+        className="border-border mx-auto max-w-full rounded-md border"
       />
       {article && !isSvgUrl(remote) && (
         <Button
@@ -105,7 +105,7 @@ export function ImageBlock({
         </Button>
       )}
       {alt && (
-        <figcaption className="text-muted-foreground mt-2 text-center text-xs">
+        <figcaption className="text-muted-foreground mt-2 text-center font-sans text-[0.8125rem]">
           {alt}
         </figcaption>
       )}

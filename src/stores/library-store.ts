@@ -6,28 +6,17 @@ import {
   listArticles,
   listUsedImageFiles,
   removeArticleTag,
-  searchLibrary,
   setArticleArchived,
 } from "@/lib/db";
 import { pruneImages } from "@/lib/commands";
 import { logError } from "@/lib/log";
-import type { ArticleSummary, SearchHit } from "@/types/library";
-
-export type LibraryView = "active" | "archived";
+import type { ArticleSummary } from "@/types/library";
 
 interface LibraryStore {
   articles: ArticleSummary[];
   loaded: boolean;
-  view: LibraryView;
-  /** Only show articles with this tag. */
-  tagFilter: string | null;
-  /** Full-text hits for the current query; null when not searching. */
-  hits: SearchHit[] | null;
   refresh: () => Promise<void>;
   remove: (id: string) => Promise<void>;
-  setView: (view: LibraryView) => void;
-  setTagFilter: (tag: string | null) => void;
-  search: (query: string) => Promise<void>;
   setArchived: (id: string, archived: boolean) => Promise<void>;
   addTag: (id: string, tag: string) => Promise<void>;
   removeTag: (id: string, tag: string) => Promise<void>;
@@ -36,15 +25,9 @@ interface LibraryStore {
 }
 
 let backfilled = false;
-// Guards against a slow, older search overwriting a newer one.
-let searchSeq = 0;
-
 export const useLibraryStore = create<LibraryStore>((set, get) => ({
   articles: [],
   loaded: false,
-  view: "active",
-  tagFilter: null,
-  hits: null,
 
   async refresh() {
     if (!backfilled) {
@@ -69,24 +52,6 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
     // Refetch rather than filter locally, so the list stays correct even
     // if something else changed the table in the meantime.
     await get().refresh();
-  },
-
-  setView: (view) => set({ view, tagFilter: null }),
-  setTagFilter: (tagFilter) => set({ tagFilter }),
-
-  async search(query) {
-    const seq = ++searchSeq;
-    if (!query.trim()) {
-      set({ hits: null });
-      return;
-    }
-    try {
-      const hits = await searchLibrary(query);
-      if (seq === searchSeq) set({ hits });
-    } catch (err) {
-      logError("search failed", err);
-      if (seq === searchSeq) set({ hits: [] });
-    }
   },
 
   async setArchived(id, archived) {

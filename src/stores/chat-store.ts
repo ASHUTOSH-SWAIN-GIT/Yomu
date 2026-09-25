@@ -36,6 +36,7 @@ export interface ChatMessage {
 }
 
 const SUMMARY_LABEL = "Summarize this article";
+const EXPLAIN_LABEL = "Explain this";
 
 export type Selection = Omit<Highlight, "id" | "articleId">;
 
@@ -51,6 +52,12 @@ interface ChatStore {
   error: ChatError | null;
   loadForArticle: (articleId: string | null) => Promise<void>;
   explain: (article: StoredArticle, selection: Selection) => Promise<void>;
+  /** Asks the user's own question about a passage (an explanation if empty). */
+  askAbout: (
+    article: StoredArticle,
+    selection: Selection,
+    question: string,
+  ) => Promise<void>;
   send: (article: StoredArticle, text: string) => Promise<void>;
   retry: () => Promise<void>;
   /** Asks for a fresh answer to the last question, replacing the last reply. */
@@ -79,9 +86,10 @@ function specFor(
   article: StoredArticle,
   highlight: Highlight,
   question?: string,
+  kind: "followup" | "question" = "followup",
 ): PromptSpec {
   return {
-    text: buildPrompt(article, highlight, question),
+    text: buildPrompt(article, highlight, question, kind),
     imageUrl: parseImageQuote(highlight.text)?.src,
   };
 }
@@ -188,6 +196,44 @@ export const useChatStore = create<ChatStore>((set, get) => {
     return get().chat ?? (await createChat(article.id));
   }
 
+  /** Saves a highlight and asks about it: an explanation when `question` is
+   * absent, otherwise the user's own question about that passage. */
+  async function startOnHighlight(
+    article: StoredArticle,
+    selection: Selection,
+    question?: string,
+  ) {
+    if (get().streaming) return;
+    useUiStore.getState().setAnswerOpen(true);
+    useUiStore.getState().setAnswerFocus(null);
+
+    const chat = await chatFor(article);
+    const highlight = await addHighlight({
+      ...selection,
+      articleId: article.id,
+    });
+    lastHighlight = highlight;
+    // The message content is the question, or the passage itself for a plain
+    // explanation (restore shows that case as "Explain this").
+    await addMessage(chat.id, "user", question ?? highlight.text, highlight.id);
+    set((s) => ({
+      chat,
+      highlights: [...s.highlights, highlight],
+      messages: [
+        ...s.messages,
+        {
+          role: "user",
+          text: question ?? EXPLAIN_LABEL,
+          quote: highlight.text,
+          highlightId: highlight.id,
+        },
+      ],
+    }));
+    await runTurn(chat, () =>
+      specFor(article, highlight, question, "question"),
+    );
+  }
+
   return {
     articleId: null,
     chat: null,
@@ -226,7 +272,11 @@ export const useChatStore = create<ChatStore>((set, get) => {
         chat,
         messages: stored.map((m) => ({
           role: m.role,
-          text: m.content,
+          // A plain explanation stores the passage itself as its content.
+          text:
+            m.highlight && m.content === m.highlight.text
+              ? EXPLAIN_LABEL
+              : m.content,
           quote: m.highlight?.text,
           highlightId: m.highlight?.id,
           summary: m.role === "user" && m.content === SUMMARY_LABEL,
@@ -235,30 +285,13 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     async explain(article, selection) {
-      if (get().streaming) return;
-      useUiStore.getState().setChatPanelOpen(true);
+      await startOnHighlight(article, selection);
+    },
 
-      const chat = await chatFor(article);
-      const highlight = await addHighlight({
-        ...selection,
-        articleId: article.id,
-      });
-      lastHighlight = highlight;
-      await addMessage(chat.id, "user", highlight.text, highlight.id);
-      set((s) => ({
-        chat,
-        highlights: [...s.highlights, highlight],
-        messages: [
-          ...s.messages,
-          {
-            role: "user",
-            text: "Explain this",
-            quote: highlight.text,
-            highlightId: highlight.id,
-          },
-        ],
-      }));
-      await runTurn(chat, () => specFor(article, highlight));
+    async askAbout(article, selection, question) {
+      const text = question.trim();
+      if (!text) return startOnHighlight(article, selection);
+      await startOnHighlight(article, selection, text);
     },
 
     async send(article, text) {
@@ -287,7 +320,15 @@ export const useChatStore = create<ChatStore>((set, get) => {
       await deleteLastAssistantMessage(chat.id);
       set({ messages: messages.slice(0, -1) });
       await runTurn(chat, (fresh) => {
-        if (highlight) return specFor(article, highlight);
+        if (highlight) {
+          const asked = lastUser.text !== EXPLAIN_LABEL;
+          return specFor(
+            article,
+            highlight,
+            asked ? lastUser.text : undefined,
+            "question",
+          );
+        }
         if (lastUser.summary) return { text: buildSummaryPrompt(article) };
         return fresh && lastHighlight
           ? specFor(article, lastHighlight, lastUser.text)

@@ -129,6 +129,89 @@ describe("explain", () => {
   });
 });
 
+describe("askAbout", () => {
+  it("asks the user's own question about the selected passage", async () => {
+    agentReplies("Because of RAII.");
+    await useChatStore
+      .getState()
+      .askAbout(article, selection, "  why is it dropped?  ");
+
+    const [sessionId, prompt] = m(commands.agentPrompt).mock.calls[0];
+    expect(sessionId).toBe("s1");
+    expect(prompt).toContain(
+      "The developer asks about this passage:\nwhy is it dropped?",
+    );
+    expect(prompt).toContain("Each value");
+    expect(prompt).not.toContain("follow-up question");
+
+    const s = useChatStore.getState();
+    expect(s.messages[0]).toMatchObject({
+      role: "user",
+      text: "why is it dropped?",
+      quote: "Each value",
+    });
+    // The question (not just the passage) is what gets saved.
+    expect(db.addMessage).toHaveBeenCalledWith(
+      "c1",
+      "user",
+      "why is it dropped?",
+      "h1",
+    );
+  });
+
+  it("falls back to a plain explanation when the question is empty", async () => {
+    agentReplies("x");
+    await useChatStore.getState().askAbout(article, selection, "   ");
+    expect(m(commands.agentPrompt).mock.calls[0][1]).toContain(
+      "Explain the selected passage",
+    );
+    expect(useChatStore.getState().messages[0].text).toBe("Explain this");
+  });
+
+  it("opens the answer sheet", async () => {
+    const { useUiStore } = await import("@/stores/ui-store");
+    useUiStore.getState().setAnswerOpen(false);
+    agentReplies("x");
+    await useChatStore.getState().askAbout(article, selection, "why?");
+    expect(useUiStore.getState().answerOpen).toBe(true);
+  });
+
+  it("regenerating an asked question re-asks the same question", async () => {
+    agentReplies("first");
+    await useChatStore
+      .getState()
+      .askAbout(article, selection, "why is it dropped?");
+    agentReplies("second");
+    await useChatStore.getState().regenerate(article);
+    const prompts = m(commands.agentPrompt).mock.calls.map((c) => c[1]);
+    expect(prompts[1]).toContain("why is it dropped?");
+    expect(prompts[1]).not.toContain("Explain the selected passage");
+  });
+
+  it("restores an asked question as the question, not as 'Explain this'", async () => {
+    m(db.getChatForArticle).mockResolvedValue({
+      id: "c1",
+      articleId: "a1",
+      acpSessionId: "old",
+    });
+    m(db.listHighlights).mockResolvedValue([highlight]);
+    m(db.listMessages).mockResolvedValue([
+      { id: "m1", role: "user", content: "why is it dropped?", highlight },
+      {
+        id: "m2",
+        role: "assistant",
+        content: "Because of RAII.",
+        highlight: null,
+      },
+    ]);
+    await useChatStore.getState().loadForArticle("a1");
+    expect(useChatStore.getState().messages.map((x) => x.text)).toEqual([
+      "why is it dropped?",
+      "Because of RAII.",
+    ]);
+  });
+});
+
 describe("explainImage", () => {
   const image = {
     blockIndex: 1,
@@ -325,7 +408,7 @@ describe("restoring a saved chat", () => {
   it("loads messages and highlights", () => {
     const s = useChatStore.getState();
     expect(s.messages.map((x) => x.text)).toEqual([
-      "Each value",
+      "Explain this",
       "Earlier answer",
     ]);
     expect(s.messages[0].highlightId).toBe("h1");
@@ -368,7 +451,7 @@ describe("restoring a saved chat", () => {
 
     expect(db.deleteLastAssistantMessage).toHaveBeenCalledWith("c1");
     const texts = useChatStore.getState().messages.map((x) => x.text);
-    expect(texts).toEqual(["Each value", "better answer"]);
+    expect(texts).toEqual(["Explain this", "better answer"]);
     // The explain prompt is rebuilt from the saved highlight.
     expect(m(commands.agentPrompt).mock.calls[0][1]).toContain(
       "Explain the selected passage",

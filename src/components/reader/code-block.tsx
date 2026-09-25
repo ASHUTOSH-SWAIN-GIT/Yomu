@@ -23,7 +23,7 @@ export function CodeBlock({
   if (!html) {
     // Unstyled fallback while Shiki loads, so layout doesn't jump.
     return (
-      <pre className="border-border bg-muted/40 my-4 overflow-x-auto rounded-lg border p-4 text-[13px] leading-6">
+      <pre className="border-border bg-muted my-[0.9em] overflow-x-auto rounded-md border p-4 font-mono text-[0.8125rem] leading-6">
         <code>{content}</code>
       </pre>
     );
@@ -31,7 +31,7 @@ export function CodeBlock({
 
   return (
     <div
-      className="border-border my-4 overflow-x-auto rounded-lg border text-[13px] leading-6 [&_pre]:m-0 [&_pre]:p-4"
+      className="border-border my-[0.9em] overflow-x-auto rounded-md border font-mono text-[0.8125rem] leading-6 [&_pre]:m-0 [&_pre]:p-4"
       // Safe: `html` comes from our own Shiki render, not from the
       // scraped page. Article text inside is escaped by Shiki itself.
       dangerouslySetInnerHTML={{ __html: html }}

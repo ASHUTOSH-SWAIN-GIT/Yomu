@@ -1,46 +1,119 @@
-import { PanelRightOpen } from "lucide-react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LibrarySidebar } from "@/components/layout/library-sidebar";
+import { AskBar } from "@/components/chat/ask-bar";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { ReaderView } from "@/components/layout/reader-view";
-import { ChatPanel } from "@/components/layout/chat-panel";
-import { UpdateBanner } from "@/components/layout/update-banner";
-import { ImagePrivacyToggle } from "@/components/layout/image-privacy-toggle";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { useUiStore } from "@/stores/ui-store";
+import { SetupDialog } from "@/components/layout/setup-dialog";
+import { SpacesSidebar } from "@/components/layout/spaces-sidebar";
+import { TabStrip } from "@/components/layout/tab-strip";
+import { useSpaceAccent } from "@/hooks/use-space-accent";
 import { useThemeEffect } from "@/hooks/use-theme";
+import { openLinkFromClipboard } from "@/lib/open-link";
+import { shortcutFor } from "@/lib/shortcuts";
+import { useAgentStore } from "@/stores/agent-store";
+import { useChatStore } from "@/stores/chat-store";
+import { useLibraryStore } from "@/stores/library-store";
+import { useSpacesStore } from "@/stores/spaces-store";
+import { useTabsStore } from "@/stores/tabs-store";
+import { useUiStore } from "@/stores/ui-store";
 
+/**
+ * The window: spaces sidebar, tab strip, the article "sheet" with the Ask
+ * bar floating over it, and the overlays (command palette, setup). The
+ * background is the frame colour; the sheet is the surface you read on.
+ */
 export function AppShell() {
   useThemeEffect();
-  const chatPanelOpen = useUiStore((s) => s.chatPanelOpen);
-  const setChatPanelOpen = useUiStore((s) => s.setChatPanelOpen);
+  useSpaceAccent();
+  const focusMode = useUiStore((s) => s.focusMode);
+  const setFocusMode = useUiStore((s) => s.setFocusMode);
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const articles = useLibraryStore((s) => s.articles);
+  const refreshLibrary = useLibraryStore((s) => s.refresh);
+  const refreshAgent = useAgentStore((s) => s.refreshStatus);
+  const syncSlots = useSpacesStore((s) => s.syncSlots);
+
+  // Startup: load the library, restore last session's tabs, check Codex.
+  useEffect(() => {
+    void (async () => {
+      await refreshLibrary();
+      const ids = new Set(useLibraryStore.getState().articles.map((a) => a.id));
+      await useTabsStore.getState().restore(ids);
+    })();
+    void refreshAgent();
+  }, [refreshLibrary, refreshAgent]);
+
+  // Every space (tag) keeps a stable colour.
+  useEffect(() => {
+    syncSlots([...new Set(articles.flatMap((a) => a.tags))]);
+  }, [articles, syncSlots]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const ui = useUiStore.getState();
+      const tabs = useTabsStore.getState();
+
+      if (e.key === "Escape" && ui.focusMode) return ui.setFocusMode(false);
+
+      const command = shortcutFor(e);
+      if (!command) return;
+      e.preventDefault();
+
+      if (command === "palette") ui.setPaletteOpen(!ui.paletteOpen);
+      else if (command === "new-tab") void tabs.newTab();
+      else if (command === "close-tab") void tabs.close(tabs.activeId);
+      else if (command === "toggle-sidebar") ui.setSidebarOpen(!ui.sidebarOpen);
+      else if (command === "toggle-answer") {
+        if (useChatStore.getState().messages.length > 0)
+          ui.setAnswerOpen(!ui.answerOpen);
+      } else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
+      else if (command === "paste-link") void openLinkFromClipboard();
+      else if (command.startsWith("tab-")) {
+        const tab = tabs.tabs[Number(command.slice(4)) - 1];
+        if (tab) void tabs.activate(tab.id);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
-    <div className="bg-background text-foreground flex h-screen w-screen flex-col">
-      <header className="border-border flex h-10 shrink-0 items-center justify-between border-b px-3">
-        <span className="text-sm font-semibold tracking-tight">Yomu</span>
-        <div className="flex items-center gap-2">
-          <UpdateBanner />
-          {!chatPanelOpen && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              aria-label="Open explain panel"
-              onClick={() => setChatPanelOpen(true)}
-            >
-              <PanelRightOpen className="size-4" />
-            </Button>
-          )}
-          <ImagePrivacyToggle />
-          <ThemeToggle />
-        </div>
-      </header>
+    <div className="bg-frame text-foreground flex h-screen w-screen">
+      {!focusMode && sidebarOpen && <SpacesSidebar />}
 
-      <div className="flex min-h-0 flex-1">
-        <LibrarySidebar />
-        <ReaderView />
-        {chatPanelOpen && <ChatPanel />}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {!focusMode && <TabStrip />}
+        {/* The sheet: where you read. The Ask bar floats over its bottom. */}
+        <div
+          className={
+            focusMode
+              ? "bg-background relative min-h-0 flex-1 overflow-hidden"
+              : "bg-background relative min-h-0 flex-1 overflow-hidden rounded-tl-[14px] shadow-[-1px_-1px_0_var(--border)]"
+          }
+        >
+          <ReaderView />
+          <AskBar />
+        </div>
       </div>
+
+      <CommandPalette />
+      <SetupDialog />
+
+      {focusMode && (
+        // A thin hover zone along the top edge reveals the way out; it is
+        // also reachable by keyboard (Tab) and Escape always works.
+        <div className="group fixed inset-x-0 top-0 z-40 flex h-12 justify-center">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2 gap-2 opacity-0 shadow-md transition-opacity duration-[var(--dur)] group-hover:opacity-100 focus-visible:opacity-100"
+            onClick={() => setFocusMode(false)}
+          >
+            Exit focus mode
+            <kbd className="text-muted-foreground text-[0.6875rem]">Esc</kbd>
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

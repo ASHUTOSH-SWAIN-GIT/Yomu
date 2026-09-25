@@ -20,6 +20,8 @@ export function BlockRenderer({
       {blocks.map((block, i) => (
         // The index is what highlights are anchored to (see
         // hooks/use-text-selection.ts).
+        // Margins inside a block do NOT collapse with its neighbours (content-visibility
+        // isolates it), so each block owns half of the gap it wants.
         // content-visibility skips layout/paint of off-screen blocks, which
         // keeps very long docs pages smooth.
         <div

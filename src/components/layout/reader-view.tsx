@@ -1,105 +1,57 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type RefObject,
-} from "react";
-import { LinkIcon, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useRef, type RefObject } from "react";
 import { BlockRenderer } from "@/components/reader/block-renderer";
 import { ArticleTools } from "@/components/reader/article-tools";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
-import { ExplainButton } from "@/components/reader/explain-button";
 import { useHighlights } from "@/hooks/use-highlights";
+import { Welcome } from "@/components/layout/welcome";
 import { useTextSelection } from "@/hooks/use-text-selection";
 import { useUiStore } from "@/stores/ui-store";
+import { useScrollProgress } from "@/hooks/use-scroll-progress";
+import { formatRelativeTime } from "@/lib/format";
+import { readingMinutes } from "@/lib/reading";
 import { useChatStore } from "@/stores/chat-store";
-import { useReaderStore, type ReaderState } from "@/stores/reader-store";
+import { useReaderStore } from "@/stores/reader-store";
 import type { StoredArticle } from "@/types/library";
 
 export function ReaderView() {
   const state = useReaderStore((s) => s.state);
-  const openUrl = useReaderStore((s) => s.openUrl);
-  const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLElement>(null);
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    const url = input.trim();
-    if (!url) return;
-    void openUrl(url);
-  }
-
   return (
-    <main
-      ref={scrollRef}
-      className="flex h-full flex-1 flex-col overflow-y-auto"
-    >
+    <main ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
       {state.status === "ready" ? (
-        <Article article={state.article} scrollRef={scrollRef} />
+        <>
+          <ProgressLine scrollRef={scrollRef} articleId={state.article.id} />
+          <Article article={state.article} scrollRef={scrollRef} />
+        </>
       ) : (
-        <EmptyState
-          input={input}
-          onInputChange={setInput}
-          onSubmit={handleSubmit}
-          state={state}
-        />
+        <Welcome />
       )}
     </main>
   );
 }
 
-function EmptyState({
-  input,
-  onInputChange,
-  onSubmit,
-  state,
+/** A 2px line at the top of the reading area showing how far through the
+ * article you are. Decorative to sighted users, exposed as a progressbar. */
+function ProgressLine({
+  scrollRef,
+  articleId,
 }: {
-  input: string;
-  onInputChange: (value: string) => void;
-  onSubmit: (e: FormEvent) => void;
-  state: ReaderState;
+  scrollRef: RefObject<HTMLElement | null>;
+  articleId: string;
 }) {
+  const progress = useScrollProgress(scrollRef, articleId);
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-      <div className="bg-muted flex size-12 items-center justify-center rounded-full">
-        <LinkIcon className="text-muted-foreground size-5" />
-      </div>
-      <h1 className="text-foreground text-lg font-medium">
-        Paste a link to start reading
-      </h1>
-      <p className="text-muted-foreground max-w-sm text-sm">
-        Docs, engineering blogs, and free articles render here as a clean,
-        distraction free reader.
-      </p>
-      <form
-        onSubmit={onSubmit}
-        className="mt-2 flex w-full max-w-sm items-center gap-2"
-      >
-        <input
-          type="url"
-          value={input}
-          onChange={(e) => onInputChange(e.target.value)}
-          placeholder="https://..."
-          aria-label="Article URL"
-          disabled={state.status === "loading"}
-          className="border-input bg-background focus-visible:ring-ring/50 h-9 flex-1 rounded-md border px-3 text-sm outline-none focus-visible:ring-2 disabled:opacity-60"
-        />
-        <Button size="sm" type="submit" disabled={state.status === "loading"}>
-          {state.status === "loading" ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            "Open"
-          )}
-        </Button>
-      </form>
-      {state.status === "error" && (
-        <p className="bg-destructive/10 text-destructive max-w-sm rounded-md px-3 py-2 text-sm">
-          {state.message}
-        </p>
-      )}
+    <div className="sticky top-0 z-10 h-0.5 w-full shrink-0">
+      <div
+        role="progressbar"
+        aria-label="Reading progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+        className="bg-space h-full transition-[width] duration-[var(--dur-fast)] ease-out"
+        style={{ width: `${progress * 100}%` }}
+      />
     </div>
   );
 }
@@ -113,73 +65,60 @@ function Article({
 }) {
   const ref = useRef<HTMLElement>(null);
   useReadingProgress(scrollRef, article.id, article.progress);
-  const [anchor, clear] = useTextSelection(ref);
-  const streaming = useChatStore((s) => s.streaming);
-  const explain = useChatStore((s) => s.explain);
+  useTextSelection(ref);
   const highlights = useChatStore((s) => s.highlights);
-  const setChatPanelOpen = useUiStore((s) => s.setChatPanelOpen);
+  const setAnswerOpen = useUiStore((s) => s.setAnswerOpen);
+  const setAnswerFocus = useUiStore((s) => s.setAnswerFocus);
 
-  // Clicking a shaded passage jumps to its explanation in the chat.
+  // Clicking a marked passage shows its answer above the Ask bar.
   const showExplanation = useCallback(
     (highlightId: string) => {
-      setChatPanelOpen(true);
-      // Wait a frame in case the panel was collapsed and is mounting.
-      requestAnimationFrame(() =>
-        document
-          .getElementById(`highlight-${highlightId}`)
-          ?.scrollIntoView({ block: "center", behavior: "smooth" }),
-      );
+      setAnswerFocus(highlightId);
+      setAnswerOpen(true);
     },
-    [setChatPanelOpen],
+    [setAnswerFocus, setAnswerOpen],
   );
   useHighlights(ref, highlights, showExplanation);
 
-  function handleExplain() {
-    if (!anchor) return;
-    void explain(article, anchor.selection);
-    window.getSelection()?.removeAllRanges();
-    clear();
-  }
-
-  // Keyboard path for Explain: select with Shift+arrows, then Cmd/Ctrl+E.
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e" && anchor) {
-        e.preventDefault();
-        handleExplain();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  const minutes = readingMinutes(article.blocks);
 
   return (
-    <article ref={ref} className="mx-auto w-full max-w-2xl px-6 py-10">
-      <header className="border-border mb-6 border-b pb-6">
-        <h1 className="text-foreground text-2xl font-semibold">
+    <article
+      ref={ref}
+      // The reading preferences (typeface, size, width) are CSS variables set
+      // from the Aa menu; `max-w` is in ch of *this* element's font.
+      style={{
+        fontFamily: "var(--reader-font)",
+        fontSize: "var(--reader-size)",
+        lineHeight: "var(--reader-leading)",
+      }}
+      className="mx-auto w-full max-w-[var(--reader-measure)] px-6 pt-14 pb-56"
+    >
+      <header className="mb-[1.2em]">
+        <h1 className="text-foreground font-sans text-[2.3em] leading-[1.06] font-extrabold tracking-[-0.035em] text-balance">
           {article.title}
         </h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          {[article.author, article.site].filter(Boolean).join(" · ")}
-        </p>
-        <a
-          href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground mt-1 block truncate text-xs underline-offset-2 hover:underline"
-        >
-          {article.url}
-        </a>
+        <div className="text-muted-foreground mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-1 font-sans text-[0.8125rem] leading-normal">
+          {article.author && (
+            <span className="text-foreground font-medium">
+              {article.author}
+            </span>
+          )}
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={article.url}
+            className="text-foreground decoration-muted-foreground hover:decoration-foreground underline underline-offset-2"
+          >
+            {article.site || new URL(article.url).hostname}
+          </a>
+          <span>Saved {formatRelativeTime(article.scrapedAt)}</span>
+          <span>{minutes} min read</span>
+        </div>
         <ArticleTools article={article} />
       </header>
       <BlockRenderer blocks={article.blocks} baseUrl={article.url} />
-      {anchor && (
-        <ExplainButton
-          anchor={anchor}
-          disabled={streaming}
-          onExplain={handleExplain}
-        />
-      )}
     </article>
   );
 }

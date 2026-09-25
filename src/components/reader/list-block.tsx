@@ -14,7 +14,7 @@ export function ListBlock({
 }) {
   const counters: number[] = [];
   return (
-    <ul className="my-3 space-y-1.5 text-[15px] leading-7" role="list">
+    <ul className="my-[0.7em] space-y-[0.4em]" role="list">
       {items.map((item, i) => {
         counters.length = item.depth + 1;
         counters[item.depth] = (counters[item.depth] ?? 0) + 1;

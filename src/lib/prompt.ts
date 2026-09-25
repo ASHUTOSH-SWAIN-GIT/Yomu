@@ -35,15 +35,19 @@ export function buildPrompt(
   article: StoredArticle,
   highlight: Highlight,
   question?: string,
+  /** "followup": a question in an ongoing conversation. "question": the
+   * first thing asked about a freshly selected passage. */
+  kind: "followup" | "question" = "followup",
 ): string {
   const image = parseImageQuote(highlight.text);
   const section = sectionHeading(article.blocks, highlight.blockIndex);
+  const framing = kind === "question" ? "asks" : "has a follow-up question";
   const task = image
     ? question
-      ? `The developer has a follow-up question about the attached image:\n${question}`
+      ? `The developer ${framing} about the attached image:\n${question}`
       : "Explain the attached image for a developer: say what it shows and how it relates to the surrounding text of the article. Be concise, and describe any labels, axes or code visible in it."
     : question
-      ? `The developer has a follow-up question about this passage:\n${question}`
+      ? `The developer ${framing} about this passage:\n${question}`
       : "Explain the selected passage for a developer: be concise, refer back to the article where relevant, and include a short code example only when it helps.";
 
   return [

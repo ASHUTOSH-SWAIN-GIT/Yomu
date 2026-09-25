@@ -1,17 +1,25 @@
 import type { JSX } from "react";
 
+// Sizes are in em, relative to the reader's chosen text size, so headings
+// scale with it. Margins are half-gaps: neighbours add (see block-renderer). Tight leading and slight negative tracking suit larger type.
 const SIZES: Record<number, string> = {
-  1: "text-3xl font-semibold mt-8 mb-4",
-  2: "text-2xl font-semibold mt-8 mb-3",
-  3: "text-xl font-semibold mt-6 mb-3",
-  4: "text-lg font-semibold mt-6 mb-2",
-  5: "text-base font-semibold mt-4 mb-2",
-  6: "text-sm font-semibold mt-4 mb-2",
+  1: "text-[1.75em] mt-[1.2em] mb-[0.1em]",
+  2: "text-[1.45em] mt-[1.4em] mb-[0.1em]",
+  3: "text-[1.2em] mt-[1.2em] mb-[0.1em]",
+  4: "text-[1.05em] mt-[1em] mb-[0.05em]",
+  5: "text-[1em] mt-[1em] mb-[0.05em]",
+  6: "text-[1em] mt-[1em] mb-[0.05em]",
 };
 
 export function HeadingBlock({ level, text }: { level: number; text: string }) {
   const Tag =
     `h${Math.min(Math.max(level, 1), 6)}` as keyof JSX.IntrinsicElements;
-  const className = SIZES[level] ?? SIZES[2];
-  return <Tag className={className}>{text}</Tag>;
+  const size = SIZES[level] ?? SIZES[2];
+  return (
+    <Tag
+      className={`${size} text-foreground leading-[1.25] font-semibold tracking-[-0.01em] text-balance`}
+    >
+      {text}
+    </Tag>
+  );
 }

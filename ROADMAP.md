@@ -13,7 +13,7 @@ Source: _Agent Native Technical Reader: Project Plan_ (Sep 23, 2026).
 - **Local first**: no backend server in v1. Scraping, storage, and agent calls all happen on the user's machine.
 - **Reader before agent**: the reader must work end to end before any agent code is written.
 - **Swappable agent layer**: everything goes through one `AgentHarness` interface so Claude or Gemini can plug in later.
-- **Content first design**: restrained UI, no gradients. References: Readwise Reader, Linear, Are.na.
+- **Distinctive, command-first design** (v2): the article stays calm and readable, but the chrome, navigation and Explain experience have a real point of view: bold colour and depth are welcome. References: Linear, Raycast, Arc, Notion, Craft. Replaces the earlier "restrained UI, no gradients" principle. See [docs/design-plan.md](./docs/design-plan.md).
 
 ## Core v1 loop
 
@@ -240,6 +240,25 @@ Status: backend verified against real Codex (streaming, resume with context). Th
 - [ ] Private beta with a handful of developers; collect feedback
 
 **Exit criteria**: signed builds on all three platforms; beta users complete the core loop without help.
+
+---
+
+## M7: Design v2
+
+**Goal**: the app looks and feels like a product with its own identity, not a template. Full plan in [docs/design-plan.md](./docs/design-plan.md) ("Redesign v2").
+
+- [x] Reading typography, tokens, themes (Page, Paper, Night), reader controls, focus mode (earlier design Phases 1–2)
+- [x] Explore three directions (Signal, Studio, Spaces) as real screens and choose one (done: Spaces chosen, with a one-colour-per-page rule)
+- [x] Design system v2: neutral tokens plus one live space colour (eight slot colours contrast-tested in every theme), Hanken Grotesk / Literata / Fraunces / Plex Mono
+- [x] Shell and navigation: spaces sidebar (from tags), tabs, command palette (⌘K), tested shortcut map
+- [x] Reader: space-coloured marks and progress line, restyled header
+- [x] Explain experience redesigned: Ask bar plus answer sheet (replaces the side chat); custom questions about a passage
+- [x] First run: welcome page, built-in tour article, setup dialog
+- [x] Identity: app icon and favicon, wordmark with live underline, macOS overlay title bar (config validated, **not yet seen in the native window**)
+- [x] Motion: pop and rise entrances only where an action needs explaining; reduced-motion respected
+- [ ] Quality pass: screenshots and contrast tests done; **keyboard-only walkthrough, screen reader, and native window check still to do**
+
+**Exit criteria**: you would show this app to someone without apologising for how it looks.
 
 ---
 

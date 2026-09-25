@@ -43,9 +43,23 @@ cargo test real_codex -- --ignored --nocapture   # optional: real Codex, uses pl
 
 ## Using it
 
-1. Paste a URL and press Open. Articles are saved to your library automatically.
-2. Select a passage, then press **Explain** (or `Cmd/Ctrl+E`).
-3. Ask follow ups in the panel. Chats are saved per article and resume after a restart.
+1. **New tab**: paste a link and press Open. Articles are saved to your library automatically. Press "Start with a two minute tour" on a fresh install for a short guided article.
+2. **Ask**: select any passage. A bar appears at the bottom with your selection: press Enter to have Codex explain it, or type your own question first. The answer rises above the bar, and the passage stays marked. Follow up with Simpler, Go deeper or Example, or type another question. Answers and chats are saved per article and resume after a restart.
+3. **Spaces and tabs**: put articles in spaces (they are tags underneath). The sidebar groups them, the page takes the colour of the space you are in, and you can keep several articles open as tabs.
+4. **Search everything**: Cmd/Ctrl+K searches article text and your questions and answers, and runs commands.
+
+| Shortcut         | Action                                         |
+| ---------------- | ---------------------------------------------- |
+| Cmd/Ctrl+K       | Search and commands                            |
+| Cmd/Ctrl+E       | Explain the selection (or jump to the Ask bar) |
+| Cmd/Ctrl+T, W    | New tab, close tab                             |
+| Cmd/Ctrl+1 to 9  | Switch tab                                     |
+| Cmd/Ctrl+B       | Show or hide the sidebar                       |
+| Cmd/Ctrl+J       | Show or hide the answer                        |
+| Cmd/Ctrl+.       | Focus mode (Esc leaves it)                     |
+| Cmd/Ctrl+Shift+V | Open the link on your clipboard in a new tab   |
+
+The **Aa** menu sets typeface, size, width and theme (Page, Paper, Night, or follow the system).
 
 ## Releasing
 

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  */
 export function ParagraphBlock({ spans }: { spans: Span[] }) {
   return (
-    <p className="text-foreground my-3 text-[15px] leading-7">
+    <p className="text-foreground my-[0.55em] text-pretty">
       {spans.map((span, i) => (
         <SpanText key={i} span={span} />
       ))}
@@ -21,7 +21,7 @@ export function SpanText({ span }: { span: Span }) {
     span.bold && "font-semibold",
     span.italic && "italic",
     span.code &&
-      "rounded bg-muted px-1 py-0.5 font-mono text-[0.85em] text-foreground",
+      "rounded bg-muted px-[0.3em] py-[0.08em] font-mono text-[0.85em] text-foreground",
   );
 
   const content = span.text.split("\n").map((line, i, arr) => (
@@ -38,7 +38,8 @@ export function SpanText({ span }: { span: Span }) {
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "text-foreground underline underline-offset-2",
+          // Links carry the accent so they are findable in a wall of prose.
+          "text-primary decoration-primary/35 hover:decoration-primary underline underline-offset-[0.2em]",
           className,
         )}
       >

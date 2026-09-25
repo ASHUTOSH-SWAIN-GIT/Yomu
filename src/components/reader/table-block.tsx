@@ -8,8 +8,8 @@ export function TableBlock({
   rows: string[][];
 }) {
   return (
-    <div className="border-border my-4 overflow-x-auto rounded-lg border">
-      <table className="w-full border-collapse text-left text-sm">
+    <div className="border-border my-[0.9em] overflow-x-auto rounded-md border font-sans">
+      <table className="w-full border-collapse text-left text-[0.8125rem] leading-snug">
         {header.length > 0 && (
           <thead className="bg-muted/50">
             <tr>

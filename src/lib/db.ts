@@ -1,6 +1,7 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { Block } from "@/types/article";
 import { articleText } from "@/lib/article-text";
+import { normalizeTag } from "@/lib/tags";
 import type {
   ArticleSummary,
   Chat,
@@ -391,9 +392,7 @@ export async function setArticleArchived(
   ]);
 }
 
-export function normalizeTag(raw: string): string {
-  return raw.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 32);
-}
+export { normalizeTag };
 
 export async function addArticleTag(id: string, raw: string): Promise<void> {
   const tag = normalizeTag(raw);

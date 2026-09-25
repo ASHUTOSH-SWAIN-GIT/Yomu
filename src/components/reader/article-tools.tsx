@@ -3,11 +3,16 @@ import {
   Archive,
   ArchiveRestore,
   Download,
-  Plus,
+  MoreHorizontal,
   RefreshCw,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { exportArticle } from "@/lib/export-markdown";
 import { logError } from "@/lib/log";
 import { useChatStore } from "@/stores/chat-store";
@@ -15,8 +20,9 @@ import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import type { StoredArticle } from "@/types/library";
 
-/** Tags, archive, export and re-fetch for the open article. Tags and
- * archive state come from the library store so the sidebar stays in step. */
+/** Tags inline under the byline; less frequent actions (re-fetch, archive,
+ * export) live in a "…" menu so the header stays quiet. Tags and archive
+ * state come from the library store so the sidebar stays in step. */
 export function ArticleTools({ article }: { article: StoredArticle }) {
   const summary = useLibraryStore((s) =>
     s.articles.find((a) => a.id === article.id),
@@ -28,6 +34,7 @@ export function ArticleTools({ article }: { article: StoredArticle }) {
   const messages = useChatStore((s) => s.messages);
   const [tagInput, setTagInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   const tags = summary?.tags ?? [];
   const archived = summary?.archived ?? article.archived;
@@ -40,81 +47,98 @@ export function ArticleTools({ article }: { article: StoredArticle }) {
   }
 
   async function handleExport() {
+    setOpen(false);
     try {
       const saved = await exportArticle(article, tags, messages);
-      setStatus(saved ? "Exported" : null);
+      setStatus(saved ? "Exported as Markdown" : null);
     } catch (err) {
       logError("export failed", err);
-      setStatus("Export failed");
+      setStatus("Export failed. Check the log for details.");
     }
-    setTimeout(() => setStatus(null), 2500);
+    setTimeout(() => setStatus(null), 3000);
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            className="border-input text-muted-foreground flex items-center gap-1 rounded-full border py-0.5 pr-1 pl-2 text-xs"
+    <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 font-sans text-[0.8125rem]">
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className="border-border text-muted-foreground flex items-center gap-1 rounded-full border py-0.5 pr-1 pl-2.5"
+        >
+          {tag}
+          <button
+            type="button"
+            aria-label={`Remove from ${tag}`}
+            onClick={() => void removeTag(article.id, tag)}
+            className="hover:text-foreground focus-visible:ring-ring/60 rounded-full outline-none focus-visible:ring-2"
           >
-            {tag}
-            <button
-              type="button"
-              aria-label={`Remove tag ${tag}`}
-              onClick={() => void removeTag(article.id, tag)}
-              className="hover:text-foreground focus-visible:ring-ring/50 rounded-full outline-none focus-visible:ring-2"
-            >
-              <X className="size-3" />
-            </button>
-          </span>
-        ))}
-        <form onSubmit={submitTag} className="flex items-center gap-1">
-          <Plus className="text-muted-foreground size-3" aria-hidden />
-          <input
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            placeholder="Add tag"
-            aria-label="Add tag"
-            maxLength={32}
-            className="placeholder:text-muted-foreground focus-visible:ring-ring/50 w-20 rounded bg-transparent text-xs outline-none focus-visible:ring-2"
-          />
-        </form>
-      </div>
+            <X className="size-3" />
+          </button>
+        </span>
+      ))}
+      <form onSubmit={submitTag}>
+        <input
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          placeholder={tags.length ? "Add space" : "Add to a space"}
+          aria-label="Add to a space"
+          maxLength={32}
+          className="placeholder:text-muted-foreground focus-visible:ring-ring/60 w-24 rounded bg-transparent px-1 py-0.5 outline-none focus-visible:ring-2"
+        />
+      </form>
 
-      <div className="text-muted-foreground flex flex-wrap items-center gap-1">
-        <ToolButton
-          icon={<RefreshCw className="size-3" />}
-          label="Re-fetch"
-          onClick={() => void rescrape(article)}
-        />
-        <ToolButton
-          icon={
-            archived ? (
-              <ArchiveRestore className="size-3" />
-            ) : (
-              <Archive className="size-3" />
-            )
-          }
-          label={archived ? "Unarchive" : "Archive"}
-          onClick={() => void setArchived(article.id, !archived)}
-        />
-        <ToolButton
-          icon={<Download className="size-3" />}
-          label="Export Markdown"
-          onClick={() => void handleExport()}
-        />
-        {status && (
-          <span role="status" className="text-xs">
-            {status}
-          </span>
-        )}
-      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground ml-auto size-7"
+            aria-label="Article actions"
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="flex w-56 flex-col gap-0.5 p-1.5">
+          <MenuItem
+            icon={<RefreshCw className="size-3.5" />}
+            label="Re-fetch article"
+            onClick={() => {
+              setOpen(false);
+              void rescrape(article);
+            }}
+          />
+          <MenuItem
+            icon={
+              archived ? (
+                <ArchiveRestore className="size-3.5" />
+              ) : (
+                <Archive className="size-3.5" />
+              )
+            }
+            label={archived ? "Move out of archive" : "Archive"}
+            onClick={() => {
+              setOpen(false);
+              void setArchived(article.id, !archived);
+            }}
+          />
+          <MenuItem
+            icon={<Download className="size-3.5" />}
+            label="Export as Markdown"
+            onClick={() => void handleExport()}
+          />
+        </PopoverContent>
+      </Popover>
+
+      {status && (
+        <span role="status" className="text-muted-foreground text-xs">
+          {status}
+        </span>
+      )}
     </div>
   );
 }
 
-function ToolButton({
+function MenuItem({
   icon,
   label,
   onClick,
@@ -124,14 +148,13 @@ function ToolButton({
   onClick: () => void;
 }) {
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="h-7 gap-1 px-2 text-xs"
+    <button
+      type="button"
       onClick={onClick}
+      className="hover:bg-accent focus-visible:bg-accent flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[0.8125rem] outline-none"
     >
-      {icon}
+      <span className="text-muted-foreground">{icon}</span>
       {label}
-    </Button>
+    </button>
   );
 }

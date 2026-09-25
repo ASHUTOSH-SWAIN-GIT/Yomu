@@ -114,6 +114,24 @@ describe("buildPrompt for an image", () => {
   });
 });
 
+describe("buildPrompt question kind", () => {
+  const article = makeArticle([p("Some text.")]);
+  const h = highlight(0, "Some text.");
+
+  it("frames the first question about a passage as a question, not a follow-up", () => {
+    const prompt = buildPrompt(article, h, "why?", "question");
+    expect(prompt).toContain("The developer asks about this passage:\nwhy?");
+    expect(prompt).not.toContain("follow-up");
+  });
+
+  it("does the same for an image", () => {
+    const image: Highlight = { ...h, text: "![d](https://x.dev/d.png)" };
+    expect(buildPrompt(article, image, "what is this?", "question")).toContain(
+      "asks about the attached image",
+    );
+  });
+});
+
 describe("buildSummaryPrompt", () => {
   it("truncates very long articles and says so", () => {
     const article = makeArticle([p("y".repeat(40000))]);
