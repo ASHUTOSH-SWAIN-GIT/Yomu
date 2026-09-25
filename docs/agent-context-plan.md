@@ -53,7 +53,7 @@ New `relatedArticles(excludeArticleId, queryText, limit)` in `src/lib/db.ts`, re
 
 New persisted prefs in `stores/ui-store.ts` (same localStorage pattern as reader prefs): `explainLevel` ("new to this" / "balanced" / "experienced") and `codeExamples` ("always" / "when helpful" / "never"). A small control in the Aa menu (`reader-settings.tsx`). Read into `PromptContext` by the caller (kept out of `lib/prompt.ts` itself, which stays a pure, store-free function for testability).
 
-### A5. Controlled web access (built from A0's findings)
+### A5. Controlled web access (**superseded**: A0 spike found Codex browses in read-only mode with no permission request, so no classifier or toggle was built; see ROADMAP.md M8)
 
 - `rpc.rs`: replace blanket denial with a classifier — auto-approve only permission requests A0 confirms are network/fetch, auto-deny everything else (file edit/delete/move, execute, and anything unrecognized — fail closed).
 - `harness.rs`: unchanged mode (`read-only`) — file writes and shell commands stay blocked exactly as today; only network fetch changes.

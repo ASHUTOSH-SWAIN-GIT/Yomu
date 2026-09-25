@@ -112,19 +112,6 @@ async fn agent_warm(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<(), 
     harness.warm().await
 }
 
-/// ROADMAP.md A5 browsing toggle (Aa menu, default on — see `run()`).
-/// Backed by an OS-level sandbox flip, not a permission classifier: see
-/// `agent/sandbox.rs` for why. The frontend calls this on startup with the
-/// persisted setting and again whenever the user flips it.
-#[tauri::command]
-async fn agent_set_network_allowed(
-    allowed: bool,
-    harness: tauri::State<'_, Arc<AgentHarness>>,
-) -> Result<(), String> {
-    harness.set_network_allowed(allowed).await;
-    Ok(())
-}
-
 #[tauri::command]
 async fn agent_cancel(
     session_id: String,
@@ -156,10 +143,7 @@ pub fn run() {
     env::inherit_shell_path();
 
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<agent::AgentEvent>();
-    // ROADMAP.md A5: browsing defaults on until the frontend's persisted
-    // Aa-menu setting (not yet built) overrides it via
-    // `agent_set_network_allowed` on startup.
-    let harness = Arc::new(AgentHarness::new(event_tx, true));
+    let harness = Arc::new(AgentHarness::new(event_tx));
     let harness_for_exit = Arc::clone(&harness);
 
     tauri::Builder::default()
@@ -205,8 +189,7 @@ pub fn run() {
             agent_resume_session,
             agent_warm,
             agent_cancel,
-            agent_prompt,
-            agent_set_network_allowed
+            agent_prompt
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -180,7 +180,7 @@ async fn cancel_stops_a_turn_early_but_still_finishes_it() {
 #[ignore]
 async fn real_codex_streams_and_resumes() {
     let (tx, mut events) = mpsc::unbounded_channel();
-    let harness = AgentHarness::new(tx, true);
+    let harness = AgentHarness::new(tx);
     let cwd = std::env::temp_dir().join("yomu-test-real-codex");
     tokio::fs::create_dir_all(&cwd).await.unwrap();
 

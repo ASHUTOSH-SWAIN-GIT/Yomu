@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde_json::{json, Value};
@@ -17,14 +16,17 @@ const AGENT_LABEL: &str = "@agentclientprotocol/codex-acp";
 
 /// Builds the command that starts the agent, OS-sandboxed on macOS
 /// (`agent/sandbox.rs`) so file writes are denied (bar npm/Codex state dirs)
-/// and network is gated by `allow_network` regardless of what Codex's own
+/// regardless of what Codex's own
 /// (unenforced -- see `sandbox.rs`'s doc comment) sandbox policy claims.
-fn default_command(allow_network: bool) -> Option<Command> {
+fn default_command() -> Option<Command> {
     #[cfg(target_os = "macos")]
     {
-        let profile = super::sandbox::profile(allow_network);
+        let profile = super::sandbox::profile();
         let mut command = Command::new("sandbox-exec");
+        // Node fails outright if its own working directory is unreadable, and
+        // the read lock covers home, so never inherit the app's cwd.
         command
+            .current_dir(std::env::temp_dir())
             .arg("-p")
             .arg(profile)
             .arg("--")
@@ -39,7 +41,6 @@ fn default_command(allow_network: bool) -> Option<Command> {
         // (AppContainer) equivalents are a known, documented gap -- Codex's
         // own declared sandbox isn't a substitute (see sandbox.rs's doc
         // comment for why). Runs unconfined until one is built.
-        let _ = allow_network;
         let mut command = Command::new("npx");
         command.args(["-y", "@agentclientprotocol/codex-acp@1.13.1"]);
         Some(command)
@@ -61,12 +62,8 @@ pub struct AgentHarness {
     // A factory rather than a fixed command so tests can point this at
     // `scripts/mock-acp-agent.mjs` instead of the real `codex-acp`
     // binary (see agent/tests.rs). `None` means "not available". Boxed
-    // (rather than a bare `fn`) so the real factory can close over
-    // `network_allowed`, which changes at runtime.
+    // (rather than a bare `fn`).
     command_factory: Box<dyn Fn() -> Option<Command> + Send + Sync>,
-    // Read by the real command factory on every (re)spawn; see
-    // `set_network_allowed`. Unused by the test factory.
-    network_allowed: Arc<AtomicBool>,
 }
 
 #[derive(Clone)]
@@ -76,18 +73,11 @@ struct Connection {
 }
 
 impl AgentHarness {
-    /// `network_allowed` is the A5 browsing toggle's initial value; flip it
-    /// later with `set_network_allowed`.
-    pub fn new(event_tx: mpsc::UnboundedSender<AgentEvent>, network_allowed: bool) -> Self {
-        let network_allowed = Arc::new(AtomicBool::new(network_allowed));
-        let factory_flag = Arc::clone(&network_allowed);
+    pub fn new(event_tx: mpsc::UnboundedSender<AgentEvent>) -> Self {
         Self {
             client: Mutex::new(None),
             event_tx,
-            command_factory: Box::new(move || {
-                default_command(factory_flag.load(Ordering::SeqCst))
-            }),
-            network_allowed,
+            command_factory: Box::new(default_command),
         }
     }
 
@@ -100,18 +90,7 @@ impl AgentHarness {
             client: Mutex::new(None),
             event_tx,
             command_factory: Box::new(command_factory),
-            network_allowed: Arc::new(AtomicBool::new(true)),
         }
-    }
-
-    /// Flips whether the agent subprocess may reach the network. Takes
-    /// effect on the next spawn: kills the current subprocess (if any) so
-    /// `connection()` respawns it under a freshly built sandbox profile.
-    /// ROADMAP.md A5: OS-enforced rather than an ACP permission classifier,
-    /// since Codex's own declared sandbox isn't enforced (see sandbox.rs).
-    pub async fn set_network_allowed(&self, allowed: bool) {
-        self.network_allowed.store(allowed, Ordering::SeqCst);
-        self.shutdown().await;
     }
 
     /// Returns the current connection, starting (or restarting, if the

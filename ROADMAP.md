@@ -171,7 +171,8 @@ Resolve these first. Record each outcome in `docs/decisions/` as a short ADR.
 
 ### Safety
 
-- [x] Read only sandbox: no file writes, no shell commands are ever issued by the harness itself
+- [x] Read only sandbox: Codex's own read-only mode is not enforced (verified), so writes are blocked by a macOS Seatbelt profile (`agent/sandbox.rs`): only `~/.npm` and `~/.codex` are writable, the session temp dir is not. Network stays on, with no toggle (Codex needs it to work; verified it breaks with network off).
+- [x] Read lock (macOS): the home folder is unreadable to the agent except `~/.npm`, `~/.codex`, `~/.npmrc` and a Node install inside home (e.g. nvm); `/Volumes` too. Verified with real Codex (starts, streams, browses). The agent process now always starts from the temp dir, because Node crashes if its cwd is unreadable. Always on, no user toggle yet. **Linux and Windows have no confinement at all yet.**
 - [x] Temp working directory, never user projects (`agent_new_session` always creates a fresh temp dir)
 - [x] Permission requests surfaced in UI, default deny (no code path grants one)
 
@@ -268,7 +269,7 @@ Plan in [docs/agent-context-plan.md](./docs/agent-context-plan.md).
 
 - [x] Track B: JSON-LD metadata, encoding detection, paywall detection, retry, Markdown/llms.txt shortcuts (see docs/agent-context-plan.md for verification detail)
 - [x] Track A1–A4: prompt context refactor, memory of past explanations, cross-article knowledge, personalization (see docs/agent-context-plan.md for verification detail)
-- [ ] Track A0/A5: verify real web-fetch permission shape, then controlled browsing
+- [x] Track A0/A5: spike (2026-09-26) showed Codex's web search runs on OpenAI's side and asks for no permission in read-only mode, so browsing already works and no permission classifier or network toggle is needed. Network stays on (Codex breaks without it); the toggle code was removed.
 
 ---
 

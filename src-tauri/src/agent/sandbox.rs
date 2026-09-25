@@ -11,18 +11,21 @@
 //! So Yomu's own guarantee can't depend on the vendor's -- this wraps the
 //! whole subprocess in a real `sandbox-exec` (Seatbelt) profile instead.
 //!
-//! Reads are left unrestricted: Node/npx need broad read access (their own
-//! binaries, npm's cache, dotfiles for config probing) just to function,
-//! and locking that down precisely is a much larger, riskier undertaking
-//! than confining writes. The residual risk that leaves (a prompt-injected
-//! instruction could still *read* something sensitive) is exactly why
-//! network is denied by default too -- see `profile`'s `allow_network`.
+//! Reads: everything outside the user's home folder stays readable (system
+//! libraries, Node, `/tmp`), but the home folder itself is locked down --
+//! Documents, Desktop, `~/.ssh`, browser data and the rest -- except the few
+//! places Node/npx and Codex need to run (`~/.npm`, `~/.codex`, `~/.npmrc`,
+//! and the Node install if it lives in home, e.g. nvm). Without this a
+//! prompt-injected article could make the agent read personal files and
+//! send them out over the (necessarily open) network. Verified against real
+//! Codex: it starts, streams and browses with this profile.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Builds a Seatbelt profile (fed to `sandbox-exec -p`) that:
 /// - allows the process to run at all (exec, fork, standard OS plumbing);
-/// - allows unrestricted reads;
+/// - allows reads outside the home folder, and inside it only the places
+///   Node/Codex need (see the module docs);
 /// - denies writes everywhere -- including the session's cwd, since Yomu
 ///   only reads/explains and never needs the agent to write files -- except
 ///   the user's npm cache (`npx` needs to write there to fetch/cache the
@@ -30,22 +33,59 @@ use std::path::Path;
 ///   session/auth sqlite db -- confirmed necessary: without it Codex fails
 ///   outright with "failed to initialize sqlite state runtime", not a
 ///   security-relevant write target, same category as the npm cache);
-/// - allows outbound network only if `allow_network` is true.
-pub fn profile(allow_network: bool) -> String {
+/// - allows outbound network (Codex can't run without it).
+pub fn profile() -> String {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let path = std::env::var("PATH").unwrap_or_default();
+    build(home.as_deref(), &node_roots(home.as_deref(), &path))
+}
+
+/// The Node installs on `PATH` that live inside `home` (e.g. nvm's
+/// `~/.nvm/versions/node/vX`): the parent of each `bin` dir holding `node`
+/// or `npx`. Installs outside home (Homebrew, system) are already readable.
+fn node_roots(home: Option<&Path>, path: &str) -> Vec<PathBuf> {
+    let Some(home) = home else { return Vec::new() };
+    std::env::split_paths(path)
+        .filter(|dir| dir.starts_with(home))
+        .filter(|dir| dir.join("node").exists() || dir.join("npx").exists())
+        .filter_map(|dir| dir.parent().map(Path::to_path_buf))
+        .collect()
+}
+
+fn build(home: Option<&Path>, node_roots: &[PathBuf]) -> String {
     let mut writable = Vec::new();
-    if let Some(home) = std::env::var_os("HOME") {
-        writable.push(escape(&Path::new(&home).join(".npm").to_string_lossy()));
-        writable.push(escape(&Path::new(&home).join(".codex").to_string_lossy()));
+    let mut read_lock = String::new();
+    if let Some(home) = home {
+        let sub = |name: &str| escape(&home.join(name).to_string_lossy());
+        writable.push(sub(".npm"));
+        writable.push(sub(".codex"));
+
+        read_lock.push_str(&format!(
+            "(deny file-read-data (subpath \"{}\"))\n",
+            escape(&home.to_string_lossy())
+        ));
+        for name in [".npm", ".codex"] {
+            read_lock.push_str(&format!(
+                "(allow file-read-data (subpath \"{}\"))\n",
+                sub(name)
+            ));
+        }
+        read_lock.push_str(&format!(
+            "(allow file-read-data (literal \"{}\"))\n",
+            sub(".npmrc")
+        ));
+        for root in node_roots {
+            read_lock.push_str(&format!(
+                "(allow file-read-data (subpath \"{}\"))\n",
+                escape(&root.to_string_lossy())
+            ));
+        }
     }
+    read_lock.push_str("(deny file-read-data (subpath \"/Volumes\"))\n");
     let write_rules: String = writable
         .iter()
         .map(|p| format!("(allow file-write* (subpath \"{p}\"))\n"))
         .collect();
-    let network_rule = if allow_network {
-        "(allow network*)\n"
-    } else {
-        ""
-    };
 
     format!(
         "(version 1)\n\
@@ -57,11 +97,12 @@ pub fn profile(allow_network: bool) -> String {
          (allow mach-lookup)\n\
          (allow system-socket)\n\
          (allow file-read*)\n\
+         {read_lock}\
          (allow file-write-data (literal \"/dev/null\"))\n\
          (allow file-write-data (literal \"/dev/tty\"))\n\
          (allow file-ioctl (literal \"/dev/tty\"))\n\
          {write_rules}\
-         {network_rule}"
+         (allow network*)\n"
     )
 }
 
@@ -74,20 +115,61 @@ fn escape(s: &str) -> String {
 mod tests {
     use super::*;
 
+    fn built() -> String {
+        build(
+            Some(Path::new("/Users/me")),
+            &[PathBuf::from("/Users/me/.nvm/v24")],
+        )
+    }
+
     #[test]
     fn confines_writes_to_npm_and_codex_dirs_only() {
-        let p = profile(true);
+        let p = built();
         assert!(p.contains("(deny default)"));
-        assert!(!p.contains("yomu-agent-sessions"));
-        assert!(p.contains("/.npm\""));
-        assert!(p.contains("/.codex\""));
+        assert!(p.contains("(allow file-write* (subpath \"/Users/me/.npm\"))"));
+        assert!(p.contains("(allow file-write* (subpath \"/Users/me/.codex\"))"));
+        assert!(!p.contains("file-write* (subpath \"/Users/me\")"));
         assert!(p.contains("(allow network*)"));
     }
 
     #[test]
-    fn denies_network_when_not_allowed() {
-        let p = profile(false);
-        assert!(!p.contains("network"));
+    fn locks_home_reads_except_what_node_and_codex_need() {
+        let p = built();
+        let deny = p
+            .find("(deny file-read-data (subpath \"/Users/me\"))")
+            .unwrap();
+        let allow_npm = p
+            .find("(allow file-read-data (subpath \"/Users/me/.npm\"))")
+            .unwrap();
+        let allow_node = p
+            .find("(allow file-read-data (subpath \"/Users/me/.nvm/v24\"))")
+            .unwrap();
+        assert!(
+            deny < allow_npm && deny < allow_node,
+            "exceptions must come after the deny"
+        );
+        assert!(p.contains("(allow file-read-data (subpath \"/Users/me/.codex\"))"));
+        assert!(p.contains("(allow file-read-data (literal \"/Users/me/.npmrc\"))"));
+        assert!(p.contains("(deny file-read-data (subpath \"/Volumes\"))"));
     }
 
+    #[test]
+    fn finds_only_node_installs_inside_home() {
+        let tmp = std::env::temp_dir().join("yomu-node-roots-test");
+        let bin = tmp.join("home/.nvm/v1/bin");
+        let other = tmp.join("home/.local/bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        std::fs::write(bin.join("node"), "").unwrap();
+        let path = format!("{}:{}:/usr/bin", bin.display(), other.display());
+        let roots = node_roots(Some(&tmp.join("home")), &path);
+        assert_eq!(roots, vec![tmp.join("home/.nvm/v1")]);
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn escapes_quotes_and_backslashes_in_paths() {
+        let p = build(Some(Path::new(r#"/Users/we"ird"#)), &[]);
+        assert!(p.contains(r#"we\"ird"#));
+    }
 }
