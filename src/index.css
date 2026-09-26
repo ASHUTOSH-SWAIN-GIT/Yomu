@@ -3,61 +3,56 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens, "Spaces" direction (docs/design-plan.md, Redesign v2).
+ * Design tokens: pure black and white (dark only for now).
  *
- * The rule: ONE COLOUR PER PAGE. Surfaces, text, borders, buttons, links and
- * code are neutral; the only colour on screen is the accent of the space
- * you are in (`--space`). Spaces come from tags; each has a slot colour
- * (--sp-0..7), and untagged articles live in the Inbox (--sp-inbox).
- * `data-space` on <html> picks which one `--space` is (see hooks/use-space-accent.ts).
+ * Black is #000, text is #fff, and every other value is a grey between them.
+ * Surfaces are separated by hairlines, not by lighter panels. The one bold
+ * gesture is the reversal: selected text turns black on white, and passages
+ * you have asked about keep a white underline. No hue anywhere except red
+ * for errors.
  *
- * Token names follow shadcn so existing components keep working.
- * Three themes: Page (light), Paper (warmer, for long sessions) and Night.
+ * Token names follow shadcn so existing components keep working. The
+ * `--sp-*` space slots stay (spaces-store assigns them) but are all white.
  */
 :root {
-  --radius: 0.75rem;
+  --radius: 0.5rem;
 
-  /* Page */
-  --background: #ffffff;
-  --foreground: #14151a;
-  --muted: #f4f4f7;
-  --muted-foreground: #62656f;
-  --card: #ffffff;
-  --card-foreground: #14151a;
-  --popover: #ffffff;
-  --popover-foreground: #14151a;
-  --border: #e4e4ea;
-  /* Control edges (inputs, outlined buttons): >= 3:1 against the surface. */
-  --input: #868997;
-  --primary: #14151a;
-  --primary-foreground: #ffffff;
-  --secondary: #f0f0f4;
-  --secondary-foreground: #14151a;
-  --accent: #eeeef3;
-  --accent-foreground: #14151a;
-  --destructive: #b42318;
-  --destructive-foreground: #ffffff;
-  /* Sidebar and tab strip: a whisper of the space colour over this base. */
-  --frame-base: #efeff3;
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted: #0e0e0e;
+  --muted-foreground: #8f8f8f;
+  --card: #000000;
+  --card-foreground: #ffffff;
+  --popover: #0a0a0a;
+  --popover-foreground: #ffffff;
+  --border: #262626;
+  /* Control edges (inputs, outlined buttons): >= 3:1 against black. */
+  --input: #5c5c5c;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #141414;
+  --secondary-foreground: #ffffff;
+  --accent: #171717;
+  --accent-foreground: #ffffff;
+  --destructive: #ff6b6b;
+  --destructive-foreground: #000000;
+  --frame-base: #000000;
 
-  /* Space colours, each >= 3:1 on --background (tests/contrast). */
-  --sp-0: #e0561f; /* rust */
-  --sp-1: #2563eb; /* blue */
-  --sp-2: #7c3aed; /* violet */
-  --sp-3: #0f8a4f; /* green */
-  --sp-4: #d61f69; /* pink */
-  --sp-5: #0b7f86; /* teal */
-  --sp-6: #c8371d; /* vermilion */
-  --sp-7: #a86b00; /* gold */
-  --sp-inbox: #64748b; /* slate */
+  --sp-0: #ffffff;
+  --sp-1: #ffffff;
+  --sp-2: #ffffff;
+  --sp-3: #ffffff;
+  --sp-4: #ffffff;
+  --sp-5: #ffffff;
+  --sp-6: #ffffff;
+  --sp-7: #ffffff;
+  --sp-inbox: #ffffff;
   --space: var(--sp-inbox);
-  --frame: color-mix(in srgb, var(--space) 5%, var(--frame-base));
-  --ring: var(--space);
-  --mark-fill: color-mix(in srgb, var(--space) 24%, transparent);
-  --selection: color-mix(in srgb, var(--space) 22%, transparent);
+  --frame: var(--frame-base);
+  --ring: #ffffff;
+  --mark-fill: rgb(255 255 255 / 0.1);
 
-  --shadow-float:
-    0 2px 6px rgb(20 21 26 / 0.06), 0 24px 70px rgb(20 21 26 / 0.22);
+  --shadow-float: 0 0 0 1px var(--border), 0 24px 60px rgb(0 0 0 / 0.9);
 
   /* Motion: only where it explains a change. */
   --dur-fast: 120ms;
@@ -67,95 +62,14 @@
 
   /* Reading preferences (set by the Aa menu, see stores/ui-store.ts). */
   --reader-font: var(--font-serif);
-  --reader-size: 1.125rem;
-  --reader-leading: 1.7;
-  --reader-measure: 66ch;
-}
-
-/* Paper: a low-saturation reading tone. */
-.paper {
-  --background: #f3f1ea;
-  --foreground: #23221f;
-  --muted: #e9e6dd;
-  --muted-foreground: #5f5d55;
-  --card: #f3f1ea;
-  --card-foreground: #23221f;
-  --popover: #f8f6f0;
-  --popover-foreground: #23221f;
-  --border: #dcd9ce;
-  --input: #7f7c72;
-  --primary: #23221f;
-  --primary-foreground: #f8f6f0;
-  --secondary: #e9e6dd;
-  --secondary-foreground: #23221f;
-  --accent: #e4e1d7;
-  --accent-foreground: #23221f;
-  --frame-base: #e6e3d9;
-}
-
-/* Night: lifted space colours so they stay readable on dark. */
-.dark {
-  --background: #181920;
-  --foreground: #f0f0f4;
-  --muted: #20212a;
-  --muted-foreground: #a0a3b0;
-  --card: #181920;
-  --card-foreground: #f0f0f4;
-  --popover: #1e1f27;
-  --popover-foreground: #f0f0f4;
-  --border: #2a2c36;
-  --input: #6e7180;
-  --primary: #f0f0f4;
-  --primary-foreground: #14151a;
-  --secondary: #23242d;
-  --secondary-foreground: #f0f0f4;
-  --accent: #262833;
-  --accent-foreground: #f0f0f4;
-  --destructive: #f97066;
-  --destructive-foreground: #14151a;
-  --frame-base: #101116;
-  --sp-0: #ff8a5c;
-  --sp-1: #6ea0ff;
-  --sp-2: #a78bfa;
-  --sp-3: #4ade80;
-  --sp-4: #ff7ab0;
-  --sp-5: #2dd4bf;
-  --sp-6: #ff7a70;
-  --sp-7: #f5b83d;
-  --sp-inbox: #94a3b8;
-  --frame: color-mix(in srgb, var(--space) 6%, var(--frame-base));
-  --shadow-float: 0 2px 6px rgb(0 0 0 / 0.4), 0 24px 70px rgb(0 0 0 / 0.5);
+  --reader-size: 1.0625rem;
+  --reader-leading: 1.72;
+  --reader-measure: 64ch;
 }
 
 /* macOS overlay title bar: room for the window buttons above the sidebar. */
 :root.platform-mac {
   --titlebar-h: 30px;
-}
-
-/* Which colour `--space` is: set from the current space, never by hand. */
-:root[data-space="0"] {
-  --space: var(--sp-0);
-}
-:root[data-space="1"] {
-  --space: var(--sp-1);
-}
-:root[data-space="2"] {
-  --space: var(--sp-2);
-}
-:root[data-space="3"] {
-  --space: var(--sp-3);
-}
-:root[data-space="4"] {
-  --space: var(--sp-4);
-}
-:root[data-space="5"] {
-  --space: var(--sp-5);
-}
-:root[data-space="6"] {
-  --space: var(--sp-6);
-}
-:root[data-space="7"] {
-  --space: var(--sp-7);
 }
 
 /* Reader preferences, applied as data attributes on <html>. */
@@ -164,19 +78,19 @@
   --reader-leading: 1.65;
 }
 :root[data-reader-size="s"] {
-  --reader-size: 1rem;
+  --reader-size: 0.9375rem;
 }
 :root[data-reader-size="l"] {
-  --reader-size: 1.25rem;
+  --reader-size: 1.1875rem;
 }
 :root[data-reader-size="xl"] {
-  --reader-size: 1.4rem;
+  --reader-size: 1.3125rem;
 }
 :root[data-reader-measure="narrow"] {
   --reader-measure: 54ch;
 }
 :root[data-reader-measure="wide"] {
-  --reader-measure: 78ch;
+  --reader-measure: 74ch;
 }
 
 @theme inline {
@@ -216,7 +130,7 @@
     "Segoe UI", sans-serif;
   --font-serif:
     "Literata Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+  --font-display: var(--font-serif);
   --font-mono:
     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -226,41 +140,40 @@
     @apply border-border outline-ring/50;
   }
   html {
-    color-scheme: light;
-  }
-  html.dark {
     color-scheme: dark;
   }
   body {
     @apply bg-frame text-foreground font-sans antialiased;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     line-height: 1.5;
+    font-feature-settings: "ss01", "cv11";
   }
+  /* The reversal: selected text is printed black on white. */
   ::selection {
-    background-color: var(--selection);
+    background-color: #ffffff;
+    color: #000000;
+  }
+  :focus-visible {
+    outline-color: #ffffff;
   }
   a {
     text-underline-offset: 0.18em;
   }
 }
 
-/* Code: neutral, with only the space colour for strings (one colour per
-   page). Shiki supplies token structure; we recolour it (see highlighter.ts
-   for the light/dark theme variables). */
+/* Code: Shiki's dark theme, drained to greys so token contrast survives
+   without any hue. */
 .shiki {
   background-color: var(--muted) !important;
+  filter: grayscale(1);
   font-family: var(--font-mono);
 }
 .shiki,
 .shiki span {
-  color: var(--shiki-light);
+  color: var(--shiki-dark);
 }
 .shiki span {
   background-color: transparent !important;
-}
-:root.dark .shiki,
-:root.dark .shiki span {
-  color: var(--shiki-dark);
 }
 
 /* Passages the user has asked the agent about (hooks/use-highlights): a wash
@@ -269,8 +182,8 @@
 ::highlight(yomu) {
   background-color: var(--mark-fill);
   text-decoration: underline;
-  text-decoration-color: var(--space);
-  text-decoration-thickness: 2px;
+  text-decoration-color: #ffffff;
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
 

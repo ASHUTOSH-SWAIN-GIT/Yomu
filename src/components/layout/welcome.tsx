@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Link as LinkIcon, Loader2 } from "lucide-react";
+import { Link as LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/format";
 import {
@@ -42,22 +42,23 @@ export function Welcome() {
     if (url && !loading) void openUrl(url);
   }
 
+  const heading = active === INBOX ? "Inbox" : displaySpaceName(active);
+
   return (
-    <div className="mx-auto w-full max-w-[47.5rem] px-6 pt-[clamp(3rem,14vh,7rem)] pb-40">
-      <h1 className="font-display text-[clamp(2.5rem,6vw,4.25rem)] leading-[1.02] font-semibold tracking-[-0.035em] text-balance">
-        What&rsquo;s next in{" "}
-        <span className="text-space">
-          {active === INBOX ? "your Inbox" : displaySpaceName(active)}
-        </span>
-        ?
+    <div className="mx-auto w-full max-w-[36rem] px-6 pt-[clamp(4rem,22vh,11rem)] pb-40">
+      <p className="text-muted-foreground font-serif text-[0.8125rem] italic">
+        読む, to read
+      </p>
+      <h1 className="mt-1 text-[1.375rem] leading-tight font-medium tracking-[-0.015em]">
+        What will you read next?
       </h1>
 
       <form
         onSubmit={submit}
-        className="bg-muted ring-foreground/90 focus-within:ring-space mt-7 flex h-[60px] items-center gap-3 rounded-2xl pr-2.5 pl-5 ring-2"
+        className="border-input focus-within:border-foreground mt-6 flex h-11 items-center gap-2.5 rounded-lg border pr-1.5 pl-3 transition-colors"
       >
         <LinkIcon
-          className="text-muted-foreground size-[1.125rem] shrink-0"
+          className="text-muted-foreground size-3.5 shrink-0"
           aria-hidden
         />
         <input
@@ -66,36 +67,31 @@ export function Welcome() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={loading}
-          placeholder="Paste a link to open it"
+          placeholder="Paste a link"
           aria-label="Article URL"
-          className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[1.0625rem] outline-none"
+          className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
         />
         <Button
           type="submit"
+          size="sm"
           disabled={loading || !input.trim()}
-          className="h-10 rounded-xl px-4"
+          className="h-8 rounded-md px-3 text-[0.75rem]"
         >
-          {loading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <>
-              Open <ArrowRight className="size-4" />
-            </>
-          )}
+          {loading ? <Loader2 className="size-3.5 animate-spin" /> : "Open"}
         </Button>
       </form>
       {state.status === "error" && (
         <p
           role="alert"
-          className="bg-destructive/10 text-destructive mt-3 rounded-xl px-4 py-3 text-[0.9375rem]"
+          className="border-destructive/40 text-destructive mt-3 rounded-lg border px-3 py-2.5 text-[0.75rem]"
         >
           {state.message}
         </p>
       )}
 
-      {spaces.length > 0 && (
-        <div className="mt-9 grid grid-cols-3 gap-3">
-          {spaces.slice(0, 3).map((space) => {
+      {spaces.length > 1 && (
+        <div className="mt-8 flex flex-wrap gap-1.5" aria-label="Spaces">
+          {spaces.map((space) => {
             const on = space.id === active;
             return (
               <button
@@ -104,15 +100,15 @@ export function Welcome() {
                 onClick={() => setActive(space.id)}
                 aria-pressed={on}
                 className={cn(
-                  "bg-muted focus-visible:ring-ring/60 flex h-28 flex-col justify-between rounded-[20px] p-4 text-left outline-none focus-visible:ring-2",
-                  on && "ring-space ring-2",
+                  "focus-visible:ring-ring/60 flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[0.75rem] outline-none focus-visible:ring-1",
+                  on
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-input",
                 )}
               >
-                <span className="text-[1.125rem] font-extrabold tracking-[-0.02em]">
-                  {space.name}
-                </span>
-                <span className="text-muted-foreground text-[0.8125rem] font-semibold">
-                  {space.count} {space.count === 1 ? "article" : "articles"}
+                {space.name}
+                <span className={on ? "opacity-60" : "opacity-70"}>
+                  {space.count}
                 </span>
               </button>
             );
@@ -121,24 +117,25 @@ export function Welcome() {
       )}
 
       {recent.length > 0 && (
-        <section className="mt-8" aria-label="Continue reading">
-          <h2 className="text-muted-foreground mb-1.5 text-[0.75rem] font-bold">
-            Continue reading
+        <section className="mt-10" aria-labelledby="continue-heading">
+          <h2
+            id="continue-heading"
+            className="text-muted-foreground mb-2 text-[0.75rem]"
+          >
+            Continue reading in {heading}
           </h2>
-          <ul>
+          <ul className="border-border border-t">
             {recent.map((a) => (
               <li key={a.id} className="border-border border-b">
                 <button
                   type="button"
                   onClick={() => void openArticle(a.id)}
-                  className="hover:bg-muted/60 focus-visible:ring-ring/60 flex h-11 w-full items-center gap-3 rounded-lg px-1 text-left outline-none focus-visible:ring-2"
+                  className="group focus-visible:ring-ring/60 flex h-10 w-full items-center gap-3 text-left outline-none focus-visible:ring-1"
                 >
-                  <i
-                    aria-hidden
-                    className="bg-border size-2.5 shrink-0 rounded-[3px]"
-                  />
-                  <span className="truncate">{a.title}</span>
-                  <span className="text-muted-foreground ml-auto shrink-0 text-[0.8125rem]">
+                  <span className="group-hover:text-foreground truncate text-[0.8125rem] text-white/85">
+                    {a.title}
+                  </span>
+                  <span className="text-muted-foreground ml-auto shrink-0 text-[0.6875rem] tabular-nums">
                     {a.progress > 0 && `${Math.round(a.progress * 100)}%  `}
                     {formatRelativeTime(a.scrapedAt)}
                   </span>
@@ -150,25 +147,25 @@ export function Welcome() {
       )}
 
       {articles.length === 0 ? (
-        <div className="mt-8 max-w-lg">
-          <p className="text-muted-foreground text-[0.9375rem] leading-relaxed">
-            Paste a link and it opens as a clean page. Select any passage and
-            ask your local Codex agent about it.
+        <div className="mt-10">
+          <p className="text-muted-foreground max-w-[26rem] text-[0.8125rem] leading-relaxed">
+            Paste a link and it opens as a clean page. Select any passage to ask
+            your local Codex about it.
           </p>
           <Button
             variant="outline"
-            className="mt-4"
+            size="sm"
+            className="mt-4 h-8 text-[0.75rem]"
             onClick={() => void openSampleArticle()}
           >
-            Start with a two minute tour
-            <ArrowRight className="size-4" />
+            Take the two minute tour
           </Button>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => void openSampleArticle()}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mt-6 rounded text-[0.8125rem] underline underline-offset-4 outline-none focus-visible:ring-2"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mt-6 rounded text-[0.75rem] underline underline-offset-4 outline-none focus-visible:ring-1"
         >
           Open the tour again
         </button>

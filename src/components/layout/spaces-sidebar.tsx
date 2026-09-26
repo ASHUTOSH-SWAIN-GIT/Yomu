@@ -58,7 +58,7 @@ export function SpacesSidebar() {
   return (
     <aside
       aria-label="Spaces"
-      className="bg-frame flex h-full w-64 shrink-0 flex-col px-3 pt-3.5 pb-3"
+      className="bg-frame border-border flex h-full w-60 shrink-0 flex-col border-r px-2.5 pt-3 pb-2.5"
     >
       {/* Room for the macOS window controls when the title bar is an overlay. */}
       <div data-tauri-drag-region className="h-[var(--titlebar-h,0px)]" />
@@ -69,16 +69,16 @@ export function SpacesSidebar() {
       <button
         type="button"
         onClick={() => setPaletteOpen(true)}
-        className="bg-background/60 text-muted-foreground hover:bg-background focus-visible:ring-ring/60 mb-4 flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left transition-colors outline-none focus-visible:ring-2"
+        className="border-border text-muted-foreground hover:text-foreground hover:border-input focus-visible:ring-ring/60 mb-5 flex h-8 items-center gap-2 rounded-md border px-2.5 text-left text-[0.75rem] transition-colors outline-none focus-visible:ring-1"
       >
-        <Search className="size-4" aria-hidden />
+        <Search className="size-3.5" aria-hidden />
         <span className="flex-1">Search</span>
-        <kbd className="border-border bg-muted rounded-md border px-1.5 text-[0.6875rem] font-semibold">
+        <kbd className="text-muted-foreground font-sans text-[0.6875rem]">
           {MOD}K
         </kbd>
       </button>
 
-      <div className="text-muted-foreground flex items-center justify-between px-2 py-1.5 text-[0.75rem] font-semibold">
+      <div className="text-muted-foreground flex items-center justify-between px-2 py-1 text-[0.6875rem]">
         Spaces
         <button
           type="button"
@@ -86,7 +86,7 @@ export function SpacesSidebar() {
           onClick={() => setCreating((v) => !v)}
           className="hover:text-foreground focus-visible:ring-ring/60 rounded p-0.5 outline-none focus-visible:ring-2"
         >
-          <Plus className="size-4" />
+          <Plus className="size-3.5" />
         </button>
       </div>
 
@@ -122,15 +122,15 @@ export function SpacesSidebar() {
                   setShowArchive(false);
                 }}
                 className={cn(
-                  "focus-visible:ring-ring/60 flex h-[34px] w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left font-semibold outline-none focus-visible:ring-2",
+                  "focus-visible:ring-ring/60 flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[0.8125rem] outline-none focus-visible:ring-1",
                   isActive
-                    ? "bg-background shadow-[0_1px_2px_rgb(20_21_26/0.08)]"
-                    : "hover:bg-background/50",
+                    ? "bg-secondary text-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <SpaceMark active={isActive} />
                 <span className="flex-1 truncate">{space.name}</span>
-                <span className="text-muted-foreground text-[0.8125rem] font-medium">
+                <span className="text-muted-foreground text-[0.6875rem] tabular-nums">
                   {space.count}
                 </span>
               </button>
@@ -161,15 +161,15 @@ export function SpacesSidebar() {
               aria-current={showArchive ? "true" : undefined}
               onClick={() => setShowArchive((v) => !v)}
               className={cn(
-                "focus-visible:ring-ring/60 flex h-[34px] w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left font-semibold outline-none focus-visible:ring-2",
+                "focus-visible:ring-ring/60 flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[0.8125rem] outline-none focus-visible:ring-1",
                 showArchive
-                  ? "bg-background shadow-[0_1px_2px_rgb(20_21_26/0.08)]"
-                  : "text-muted-foreground hover:bg-background/50",
+                  ? "bg-secondary text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Archive className="size-3.5" aria-hidden />
               <span className="flex-1">Archive</span>
-              <span className="text-muted-foreground text-[0.8125rem] font-medium">
+              <span className="text-muted-foreground text-[0.6875rem] tabular-nums">
                 {archived.length}
               </span>
             </button>
@@ -192,15 +192,15 @@ export function SpacesSidebar() {
       <button
         type="button"
         onClick={() => setSetupOpen(true)}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mt-2 flex items-center gap-2 rounded-lg px-2 py-2 text-[0.8125rem] outline-none focus-visible:ring-2"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 border-border mt-2 flex items-center gap-2 border-t px-2 pt-2.5 pb-1 text-[0.75rem] outline-none focus-visible:ring-1"
       >
         <span
           aria-hidden
           className={cn(
-            "size-2 rounded-full",
+            "size-1.5 rounded-full",
             agentStatus === "ready"
-              ? "bg-emerald-500"
-              : "bg-muted-foreground/50",
+              ? "bg-foreground"
+              : "ring-muted-foreground ring-1",
           )}
         />
         {agentStatus === "ready"
@@ -216,14 +216,14 @@ export function SpacesSidebar() {
 
 const MOD = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl+";
 
-/** The colour square: only the active space shows its colour. */
+/** Filled square for the space you are in, an outline for the rest. */
 function SpaceMark({ active }: { active: boolean }) {
   return (
     <span
       aria-hidden
       className={cn(
-        "size-3 shrink-0 rounded-[4px]",
-        active ? "bg-space" : "ring-muted-foreground/45 ring-2 ring-inset",
+        "size-2 shrink-0 rounded-[2px]",
+        active ? "bg-foreground" : "ring-muted-foreground/60 ring-1 ring-inset",
       )}
     />
   );
@@ -276,9 +276,9 @@ function ArticleList({
   emptyText: string;
 }) {
   return (
-    <ul className="border-space/35 mt-0.5 mb-2 ml-[1.35rem] border-l-2 pl-2.5">
+    <ul className="border-border mt-1 mb-2 ml-[0.72rem] border-l pl-3">
       {items.length === 0 && (
-        <li className="text-muted-foreground py-2 text-[0.8125rem]">
+        <li className="text-muted-foreground py-1.5 text-[0.75rem]">
           {emptyText}
         </li>
       )}
@@ -320,19 +320,12 @@ function ArticleList({
                   aria-current={current ? "true" : undefined}
                   title={article.title}
                   className={cn(
-                    "focus-visible:ring-ring/60 flex h-[30px] w-full items-center gap-2 rounded-md pr-1 text-left text-[0.8125rem] outline-none group-focus-within:pr-14 group-hover:pr-14 focus-visible:ring-2",
+                    "focus-visible:ring-ring/60 flex h-7 w-full items-center gap-2 rounded-md pr-1 text-left text-[0.75rem] outline-none group-focus-within:pr-14 group-hover:pr-14 focus-visible:ring-2",
                     current
-                      ? "text-foreground font-semibold"
+                      ? "text-foreground font-medium"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <i
-                    aria-hidden
-                    className={cn(
-                      "size-1.5 shrink-0 rounded-full",
-                      current ? "bg-space" : "bg-border",
-                    )}
-                  />
                   <span className="truncate">{article.title}</span>
                   {percent > 0 && percent < 95 && (
                     <span className="text-muted-foreground/80 ml-auto text-[0.6875rem] tabular-nums group-focus-within:hidden group-hover:hidden">

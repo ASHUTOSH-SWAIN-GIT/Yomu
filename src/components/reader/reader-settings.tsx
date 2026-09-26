@@ -8,15 +8,12 @@ import {
 import { Segmented } from "@/components/ui/segmented";
 import type { CodeExamplePref, ExplainLevel } from "@/lib/explain-prefs";
 import { useUiStore } from "@/stores/ui-store";
-import type { Theme } from "@/lib/appearance";
 
 const MOD = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl+";
 
 /** The "Aa" menu: how the article is set (typeface, size, width), the theme,
  * and view options. Everything is remembered between sessions. */
 export function ReaderSettings() {
-  const theme = useUiStore((s) => s.theme);
-  const setTheme = useUiStore((s) => s.setTheme);
   const reader = useUiStore((s) => s.reader);
   const setReader = useUiStore((s) => s.setReader);
   const blockImages = useUiStore((s) => s.blockRemoteImages);
@@ -80,20 +77,6 @@ export function ReaderSettings() {
         </Row>
 
         <div className="border-border -mx-4 border-t" />
-
-        <Row label="Theme">
-          <Segmented<Theme>
-            label="Theme"
-            value={theme}
-            onChange={setTheme}
-            options={[
-              { value: "light", label: "Page" },
-              { value: "paper", label: "Paper" },
-              { value: "dark", label: "Night" },
-              { value: "system", label: "Auto" },
-            ]}
-          />
-        </Row>
 
         <Row label="Explain like I'm">
           <Segmented<ExplainLevel>

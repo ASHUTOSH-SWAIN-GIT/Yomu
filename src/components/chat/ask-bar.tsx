@@ -117,14 +117,11 @@ export function AskBar() {
         <form
           onSubmit={onSubmit}
           aria-label="Ask about this article"
-          className="rise-in pointer-events-auto flex w-[min(42.5rem,100%)] items-center gap-2.5 rounded-[20px] bg-[#16171c]/95 p-2 pl-3.5 text-white shadow-[var(--shadow-float)] ring-1 ring-white/10 backdrop-blur-xl"
+          className="rise-in pointer-events-auto flex w-[min(42.5rem,100%)] items-center gap-2.5 rounded-xl bg-black p-1.5 pl-3 text-white shadow-[var(--shadow-float)] ring-1 ring-white/25"
         >
           {quote && (
-            <span className="flex h-8 max-w-[14rem] shrink-0 items-center gap-2 rounded-[9px] bg-white/10 px-2.5 text-[0.78rem]">
-              <i
-                aria-hidden
-                className="bg-space size-2 shrink-0 rounded-[3px]"
-              />
+            <span className="flex h-7 max-w-[14rem] shrink-0 items-center gap-2 rounded-md border border-white/20 px-2 font-serif text-[0.75rem] italic">
+              <i aria-hidden className="hidden" />
               <span className="truncate">“{quote}”</span>
             </span>
           )}
@@ -150,13 +147,13 @@ export function AskBar() {
                   ? "Ask about the selected passage"
                   : "Ask a follow-up"
               }
-              className="min-w-0 flex-1 bg-transparent text-[0.9375rem] text-white outline-none placeholder:text-white/55 disabled:opacity-60"
+              className="min-w-0 flex-1 bg-transparent text-[0.8125rem] text-white outline-none placeholder:text-white/50 disabled:opacity-60"
             />
           ) : (
             <button
               type="button"
               onClick={() => setSetupOpen(true)}
-              className="min-w-0 flex-1 truncate text-left text-[0.9375rem] text-white/80 underline decoration-white/30 underline-offset-4 outline-none hover:decoration-white focus-visible:ring-2 focus-visible:ring-white/60"
+              className="min-w-0 flex-1 truncate text-left text-[0.8125rem] text-white/80 underline decoration-white/30 underline-offset-4 outline-none hover:decoration-white focus-visible:ring-2 focus-visible:ring-white/60"
             >
               Set up Explain to ask questions
             </button>
@@ -170,7 +167,7 @@ export function AskBar() {
                     key={q.label}
                     type="button"
                     onClick={() => run(q.prompt)}
-                    className="h-7 rounded-lg bg-white/10 px-2.5 text-xs font-semibold transition-colors outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/60"
+                    className="h-7 rounded-md border border-white/20 px-2.5 text-[0.75rem] transition-colors outline-none hover:border-white/60 focus-visible:ring-2 focus-visible:ring-white/60"
                   >
                     {q.label}
                   </button>
@@ -183,7 +180,7 @@ export function AskBar() {
             <button
               type="button"
               onClick={() => void stop()}
-              className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-xl bg-white/15 px-3.5 text-sm font-bold outline-none hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-white/60"
+              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/30 px-3 text-[0.75rem] font-medium outline-none hover:border-white focus-visible:ring-2 focus-visible:ring-white/60"
             >
               <Square className="size-3" aria-hidden /> Stop
             </button>
@@ -191,21 +188,21 @@ export function AskBar() {
             <button
               type="submit"
               disabled={!ready || (!hasSelection && !text.trim())}
-              className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-xl bg-white px-3.5 text-sm font-bold text-[#14151a] outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-40"
+              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 text-[0.75rem] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-40"
             >
               {hasSelection && !text.trim() ? "Explain" : "Ask"}
-              <kbd className="rounded bg-black/10 px-1 text-[0.6875rem] font-semibold">
+              <kbd className="px-0.5 font-sans text-[0.6875rem] opacity-60">
                 {MOD}↵
               </kbd>
             </button>
           )}
         </form>
       ) : (
-        <div className="text-muted-foreground bg-background/90 border-border pointer-events-auto flex items-center gap-3 rounded-full border px-4 py-2 text-[0.8125rem] shadow-sm backdrop-blur">
+        <div className="text-muted-foreground bg-background border-border pointer-events-auto flex items-center gap-3 rounded-lg border px-3 py-1.5 text-[0.75rem]">
           <span className="flex items-center gap-2">
             <Sparkles className="size-3.5" aria-hidden />
             Select any passage to ask about it
-            <kbd className="border-border bg-muted rounded-md border px-1.5 text-[0.6875rem] font-semibold">
+            <kbd className="text-foreground font-sans text-[0.6875rem]">
               {MOD}E
             </kbd>
           </span>
@@ -274,10 +271,10 @@ function AnswerSheet() {
   return (
     <section
       aria-label="Answer"
-      className="rise-in bg-popover text-popover-foreground border-border pointer-events-auto flex max-h-[min(24rem,46vh)] w-[min(42.5rem,100%)] flex-col rounded-[22px] border shadow-[var(--shadow-float)]"
+      className="rise-in bg-popover text-popover-foreground border-border pointer-events-auto flex max-h-[min(26rem,50vh)] w-[min(42.5rem,100%)] flex-col rounded-xl border shadow-[var(--shadow-float)]"
     >
-      <header className="flex shrink-0 items-center gap-2.5 px-5 pt-4 pb-2 font-bold">
-        <i aria-hidden className="bg-space size-2.5 rounded-[3px]" />
+      <header className="flex shrink-0 items-center gap-2.5 px-4 pt-3 pb-2 text-[0.75rem] font-medium">
+        <i aria-hidden className="bg-foreground size-1.5 rounded-full" />
         {title}
         <span className="ml-auto flex items-center gap-1 font-medium">
           {exchanges.length > 1 && (
@@ -303,7 +300,7 @@ function AnswerSheet() {
       </header>
 
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-5 pb-2"
+        className="min-h-0 flex-1 overflow-y-auto px-4 pb-2"
         role="log"
         aria-live="polite"
       >
@@ -320,7 +317,7 @@ function AnswerSheet() {
                   className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 w-full rounded text-left text-[0.8125rem] outline-none focus-visible:ring-2"
                 >
                   {e.question.quote && (
-                    <span className="border-space/60 mb-1 line-clamp-2 block border-l-[3px] pl-2.5 font-serif italic">
+                    <span className="border-border mb-1 line-clamp-2 block border-l pl-2.5 font-serif italic">
                       {parseImageQuote(e.question.quote)?.alt ||
                         e.question.quote}
                     </span>
@@ -333,7 +330,7 @@ function AnswerSheet() {
         ) : (
           <>
             {current.question.quote && (
-              <blockquote className="border-space text-muted-foreground mb-3 line-clamp-3 border-l-[3px] pl-3 font-serif text-[0.85rem] italic">
+              <blockquote className="border-foreground text-muted-foreground mb-3 line-clamp-3 border-l pl-3 font-serif text-[0.8125rem] italic">
                 {parseImageQuote(current.question.quote)?.alt ||
                   current.question.quote}
               </blockquote>
@@ -341,11 +338,11 @@ function AnswerSheet() {
             {!current.question.summary &&
               current.question.text !== "Explain this" &&
               !parseImageQuote(current.question.quote ?? "") && (
-                <p className="mb-2 text-[0.9375rem] font-semibold">
+                <p className="mb-2 text-[0.8125rem] font-medium">
                   {current.question.text}
                 </p>
               )}
-            <div className="font-serif text-[1rem] leading-[1.65]">
+            <div className="font-serif text-[0.9375rem] leading-[1.7]">
               {answer?.text ? (
                 <Markdown>{answer.text}</Markdown>
               ) : streaming && latest ? (
@@ -367,7 +364,7 @@ function AnswerSheet() {
         )}
 
         {error && latest && (
-          <div className="bg-destructive/10 text-destructive mt-3 flex flex-col gap-2 rounded-xl px-3.5 py-3 text-[0.8125rem]">
+          <div className="border-destructive/40 text-destructive mt-3 flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-[0.75rem]">
             <p>{error.message}</p>
             {error.kind !== "logged_out" && (
               <Button
@@ -385,7 +382,7 @@ function AnswerSheet() {
       </div>
 
       {!history && answer?.text && (
-        <footer className="flex shrink-0 items-center gap-2 px-5 pt-1 pb-3.5">
+        <footer className="border-border flex shrink-0 items-center gap-2 border-t px-4 pt-2 pb-2.5">
           <SheetButton onClick={() => void copy()}>
             {copied ? (
               <Check className="size-3.5" />

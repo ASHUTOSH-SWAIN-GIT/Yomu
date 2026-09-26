@@ -42,14 +42,14 @@ function ProgressLine({
 }) {
   const progress = useScrollProgress(scrollRef, articleId);
   return (
-    <div className="sticky top-0 z-10 h-0.5 w-full shrink-0">
+    <div className="sticky top-0 z-10 h-px w-full shrink-0">
       <div
         role="progressbar"
         aria-label="Reading progress"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(progress * 100)}
-        className="bg-space h-full transition-[width] duration-[var(--dur-fast)] ease-out"
+        className="bg-foreground h-px transition-[width] duration-[var(--dur-fast)] ease-out"
         style={{ width: `${progress * 100}%` }}
       />
     </div>
@@ -92,17 +92,15 @@ function Article({
         fontSize: "var(--reader-size)",
         lineHeight: "var(--reader-leading)",
       }}
-      className="mx-auto w-full max-w-[var(--reader-measure)] px-6 pt-14 pb-56"
+      className="mx-auto w-full max-w-[var(--reader-measure)] px-6 pt-16 pb-56"
     >
-      <header className="mb-[1.2em]">
-        <h1 className="text-foreground font-sans text-[2.3em] leading-[1.06] font-extrabold tracking-[-0.035em] text-balance">
+      <header className="border-border mb-[1.6em] border-b pb-[1.2em]">
+        <h1 className="text-foreground text-[1.6em] leading-[1.2] font-medium tracking-[-0.015em] text-balance">
           {article.title}
         </h1>
-        <div className="text-muted-foreground mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-1 font-sans text-[0.8125rem] leading-normal">
+        <div className="text-muted-foreground mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-sans text-[0.75rem] leading-normal">
           {article.author && (
-            <span className="text-foreground font-medium">
-              {article.author}
-            </span>
+            <span className="text-foreground">{article.author}</span>
           )}
           <a
             href={article.url}

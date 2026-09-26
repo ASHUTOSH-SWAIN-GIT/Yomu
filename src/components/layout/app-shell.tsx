@@ -88,7 +88,7 @@ export function AppShell() {
           className={
             focusMode
               ? "bg-background relative min-h-0 flex-1 overflow-hidden"
-              : "bg-background relative min-h-0 flex-1 overflow-hidden rounded-tl-[14px] shadow-[-1px_-1px_0_var(--border)]"
+              : "bg-background relative min-h-0 flex-1 overflow-hidden"
           }
         >
           <ReaderView />

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 // Reads the real design tokens from index.css, so changing a colour there
-// re-checks accessibility for every theme (WCAG 2.x contrast ratios).
+// re-checks accessibility for the theme (WCAG 2.x contrast ratios).
 
 const css = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 
@@ -19,11 +19,7 @@ function tokensIn(selector: string): Record<string, string> {
 }
 
 const base = tokensIn(":root");
-const themes: Record<string, Record<string, string>> = {
-  page: base,
-  paper: { ...base, ...tokensIn(".paper") },
-  night: { ...base, ...tokensIn(".dark") },
-};
+const themes: Record<string, Record<string, string>> = { black: base };
 
 function luminance(hex: string): number {
   const channel = (i: number) => {

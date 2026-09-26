@@ -6,14 +6,12 @@ export function Wordmark({ className = "" }: { className?: string }) {
     <div className={`flex items-center gap-2.5 ${className}`}>
       <div
         aria-hidden
-        className="bg-foreground text-background relative grid size-7 place-items-center rounded-[9px] text-[0.875rem] font-bold"
+        className="bg-foreground text-background relative grid size-6 place-items-center rounded-[6px] text-[0.75rem] font-bold"
       >
         読
-        {/* The annotation underline, in the current space's colour: the app
-            icon's mark, alive. */}
-        <span className="bg-space absolute bottom-[3px] h-[2px] w-3.5 rounded-full" />
+        <span className="bg-background absolute bottom-[3px] h-px w-3" />
       </div>
-      <span className="font-display text-[1.25rem] leading-none font-semibold tracking-[-0.02em]">
+      <span className="text-[0.875rem] leading-none font-semibold tracking-[-0.01em]">
         Yomu
       </span>
     </div>

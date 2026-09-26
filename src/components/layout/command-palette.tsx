@@ -6,13 +6,10 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   MessageSquare,
-  MoonStar,
   PanelLeft,
   Plus,
   Search,
   Sparkles,
-  SunMedium,
-  Type,
 } from "lucide-react";
 import { searchLibrary } from "@/lib/db";
 import { logError } from "@/lib/log";
@@ -63,7 +60,7 @@ export function CommandPalette() {
       shouldFilter={false}
       loop
       overlayClassName="fixed inset-0 z-50 bg-black/35 backdrop-blur-[3px]"
-      contentClassName="pop-in fixed top-[13vh] left-1/2 z-50 w-[min(44rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[20px] border border-white/10 bg-[#16171c]/95 text-white shadow-[var(--shadow-float)] backdrop-blur-2xl outline-none"
+      contentClassName="pop-in fixed top-[13vh] left-1/2 z-50 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-xl border border-white/20 bg-black text-white shadow-[var(--shadow-float)] outline-none"
     >
       {/* Mounted only while open, so the query and results reset on close. */}
       <PaletteBody close={() => setOpen(false)} />
@@ -167,30 +164,6 @@ function PaletteBody({ close }: { close: () => void }) {
       run: () => ui().setAnswerOpen(!ui().answerOpen),
     },
     {
-      id: "t-light",
-      label: "Theme: Page",
-      icon: <SunMedium />,
-      run: () => ui().setTheme("light"),
-    },
-    {
-      id: "t-paper",
-      label: "Theme: Paper",
-      icon: <Type />,
-      run: () => ui().setTheme("paper"),
-    },
-    {
-      id: "t-dark",
-      label: "Theme: Night",
-      icon: <MoonStar />,
-      run: () => ui().setTheme("dark"),
-    },
-    {
-      id: "t-auto",
-      label: "Theme: Match system",
-      icon: <SunMedium />,
-      run: () => ui().setTheme("system"),
-    },
-    {
       id: "images",
       label: ui().blockRemoteImages
         ? "Load remote images"
@@ -228,23 +201,18 @@ function PaletteBody({ close }: { close: () => void }) {
 
   return (
     <>
-      <div className="flex h-[62px] items-center gap-3 border-b border-white/10 px-5">
-        <Search
-          className="size-[1.125rem] shrink-0 text-white/55"
-          aria-hidden
-        />
+      <div className="flex h-11 items-center gap-2.5 border-b border-white/15 px-3.5">
+        <Search className="size-3.5 shrink-0 text-white/55" aria-hidden />
         <Command.Input
           value={query}
           onValueChange={setQuery}
           placeholder="Search articles, chats and commands…"
-          className="flex-1 bg-transparent text-[1.0625rem] text-white outline-none placeholder:text-white/45"
+          className="flex-1 bg-transparent text-[0.8125rem] text-white outline-none placeholder:text-white/45"
         />
-        <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[0.6875rem] font-semibold text-white/70">
-          esc
-        </kbd>
+        <kbd className="font-sans text-[0.6875rem] text-white/50">esc</kbd>
       </div>
 
-      <Command.List className="max-h-[min(26rem,55vh)] overflow-y-auto p-2">
+      <Command.List className="max-h-[min(22rem,55vh)] overflow-y-auto p-1.5">
         <Command.Empty className="px-4 py-8 text-center text-sm text-white/55">
           Nothing found. Try fewer words.
         </Command.Empty>
@@ -259,7 +227,9 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(a.id)}
               >
                 <span className="truncate">{a.title}</span>
-                <span className="ml-auto text-xs text-white/50">{a.site}</span>
+                <span className="ml-auto text-[0.6875rem] text-white/45">
+                  {a.site}
+                </span>
               </Row>
             ))}
           </Group>
@@ -275,7 +245,9 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(a.id)}
               >
                 <span className="truncate">{a.title}</span>
-                <span className="ml-auto text-xs text-white/50">{a.site}</span>
+                <span className="ml-auto text-[0.6875rem] text-white/45">
+                  {a.site}
+                </span>
               </Row>
             ))}
           </Group>
@@ -294,7 +266,7 @@ function PaletteBody({ close }: { close: () => void }) {
                   <span className="block truncate">
                     {byId.get(h.articleId)?.title}
                   </span>
-                  <span className="block truncate text-xs text-white/55">
+                  <span className="block truncate text-[0.6875rem] text-white/50">
                     <Snippet text={h.snippet} />
                   </span>
                 </span>
@@ -313,7 +285,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(h.articleId)}
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-xs text-white/55">
+                  <span className="block truncate text-[0.6875rem] text-white/50">
                     <Snippet text={h.snippet} />
                   </span>
                   <span className="block truncate">
@@ -344,7 +316,9 @@ function PaletteBody({ close }: { close: () => void }) {
                 }}
               >
                 <span>{s.id === INBOX ? "Inbox" : displaySpaceName(s.id)}</span>
-                <span className="ml-auto text-xs text-white/50">{s.count}</span>
+                <span className="ml-auto text-[0.6875rem] text-white/45">
+                  {s.count}
+                </span>
               </Row>
             ))}
           </Group>
@@ -364,7 +338,7 @@ function PaletteBody({ close }: { close: () => void }) {
               >
                 <span>{a.label}</span>
                 {a.shortcut && (
-                  <kbd className="ml-auto rounded-md bg-white/10 px-1.5 py-0.5 text-[0.6875rem] font-semibold text-white/70">
+                  <kbd className="ml-auto font-sans text-[0.6875rem] text-white/45">
                     {a.shortcut}
                   </kbd>
                 )}
@@ -374,7 +348,7 @@ function PaletteBody({ close }: { close: () => void }) {
         )}
       </Command.List>
 
-      <div className="flex gap-4 border-t border-white/10 px-5 py-2.5 text-xs text-white/50">
+      <div className="flex gap-4 border-t border-white/15 px-3.5 py-2 text-[0.6875rem] text-white/45">
         <span>↑↓ move</span>
         <span>↵ open</span>
         <span>esc close</span>
@@ -392,7 +366,7 @@ function Group({
 }) {
   return (
     <Command.Group className="pb-1">
-      <div className="px-3 pt-2 pb-1 text-xs font-semibold text-white/50">
+      <div className="px-2.5 pt-2 pb-1 text-[0.6875rem] text-white/45">
         {label}
       </div>
       {children}
@@ -416,9 +390,9 @@ function Row({
       value={value}
       onSelect={onSelect}
       className={cn(
-        "relative flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[0.9375rem] text-white/90 outline-none",
-        "data-[selected=true]:before:bg-space data-[selected=true]:bg-white/10 data-[selected=true]:before:absolute data-[selected=true]:before:top-2.5 data-[selected=true]:before:bottom-2.5 data-[selected=true]:before:left-0 data-[selected=true]:before:w-[3px] data-[selected=true]:before:rounded-full",
-        "[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-white/55",
+        "relative flex min-h-8 cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[0.8125rem] text-white/80 outline-none",
+        "data-[selected=true]:bg-white data-[selected=true]:text-black data-[selected=true]:[&_kbd]:text-black/50 data-[selected=true]:[&>svg]:text-black",
+        "[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-white/50",
       )}
     >
       {icon}
@@ -438,9 +412,7 @@ function Snippet({ text }: { text: string }) {
         const [match, after] = chunk.split(MATCH_END);
         return (
           <span key={i}>
-            <mark className="bg-space/45 rounded-[3px] px-0.5 text-white">
-              {match}
-            </mark>
+            <mark className="bg-white px-0.5 text-black">{match}</mark>
             {after}
           </span>
         );
