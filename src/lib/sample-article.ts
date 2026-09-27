@@ -39,7 +39,7 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
         },
         { text: "why does this matter?", italic: true },
         {
-          text: ". The answer rises above the bar, and the passage stays marked in the text so you can find it again.",
+          text: ". The answer is written in the margin beside the passage, numbered, and the passage stays marked so you can find it again. In a narrow window it rises above the bar instead.",
         },
       ],
     },
@@ -56,11 +56,17 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
           depth: 0,
         },
         {
-          spans: [{ text: "Copy the answer, or regenerate it if it missed." }],
+          spans: [
+            {
+              text: "Copy a note, regenerate it if it missed, or ask a follow-up.",
+            },
+          ],
           depth: 0,
         },
         {
-          spans: [{ text: "Click a marked passage to see its answer again." }],
+          spans: [
+            { text: "Click a marked passage to bring its note forward." },
+          ],
           depth: 0,
         },
       ],
@@ -70,7 +76,7 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
       type: "paragraph",
       spans: [
         {
-          text: "Group articles into spaces, such as Rust or Web. Each space has its own colour, and the page wears only the colour of the space you are in. Open several articles at once as tabs, and press ",
+          text: "Group articles into spaces, such as Rust or Web, from the library. Press ",
         },
         { text: "Cmd+K", code: true },
         {
@@ -93,7 +99,7 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
         { text: "The " },
         { text: "Aa", code: true },
         {
-          text: " menu changes the typeface, size, width and theme. Focus mode (",
+          text: " menu changes the typeface, size and width. Focus mode (",
         },
         { text: "Cmd+.", code: true },
         {
@@ -105,7 +111,7 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
       type: "paragraph",
       spans: [
         {
-          text: "That is the whole tour. Paste a link in a new tab and read something you actually want to understand.",
+          text: "That is the whole tour. Go back to the library, paste a link and read something you actually want to understand.",
         },
       ],
     },

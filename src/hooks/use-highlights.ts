@@ -5,7 +5,7 @@ const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 
 /** Builds a Range over `[start, end)` characters of a block's text, using
  * the same text-node measure as use-text-selection.ts. */
-function rangeInBlock(
+export function rangeInBlock(
   block: HTMLElement,
   start: number,
   end: number,

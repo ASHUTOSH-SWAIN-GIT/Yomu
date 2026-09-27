@@ -57,6 +57,7 @@ export function AskBar() {
   const stop = useChatStore((s) => s.stop);
   const summarize = useChatStore((s) => s.summarize);
   const answerOpen = useUiStore((s) => s.answerOpen);
+  const notesInMargin = useUiStore((s) => s.notesInMargin);
   const setAnswerOpen = useUiStore((s) => s.setAnswerOpen);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const agentStatus = useAgentStore((s) => s.status);
@@ -64,7 +65,10 @@ export function AskBar() {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const ready = agentStatus === "ready";
-  const sheetVisible = answerOpen && messages.length > 0;
+  // With room for margin notes the answers live there; the bar still opens
+  // for follow-ups.
+  const followUpOpen = answerOpen && messages.length > 0;
+  const sheetVisible = followUpOpen && !notesInMargin;
 
   /** Runs the current input: a new passage takes a question (or an explain),
    * otherwise it is a follow-up. */
@@ -104,7 +108,7 @@ export function AskBar() {
   }
 
   const hasSelection = selection !== null;
-  const showBar = hasSelection || sheetVisible;
+  const showBar = hasSelection || followUpOpen;
   const quote = selection
     ? (parseImageQuote(selection.text)?.alt ?? selection.text)
     : null;
@@ -128,6 +132,7 @@ export function AskBar() {
 
           {ready ? (
             <input
+              id="ask-input"
               ref={inputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -282,7 +287,7 @@ function AnswerSheet() {
               type="button"
               aria-pressed={history}
               onClick={() => setHistory((v) => !v)}
-              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[0.8125rem] outline-none focus-visible:ring-2"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[0.6875rem] outline-none focus-visible:ring-1"
             >
               <History className="size-3.5" aria-hidden />
               History · {exchanges.length}
@@ -342,7 +347,7 @@ function AnswerSheet() {
                   {current.question.text}
                 </p>
               )}
-            <div className="font-serif text-[0.9375rem] leading-[1.7]">
+            <div className="text-[0.8125rem] leading-[1.65] text-white/85">
               {answer?.text ? (
                 <Markdown>{answer.text}</Markdown>
               ) : streaming && latest ? (
@@ -382,7 +387,7 @@ function AnswerSheet() {
       </div>
 
       {!history && answer?.text && (
-        <footer className="border-border flex shrink-0 items-center gap-2 border-t px-4 pt-2 pb-2.5">
+        <footer className="flex shrink-0 items-center gap-3 px-4 pt-1 pb-3">
           <SheetButton onClick={() => void copy()}>
             {copied ? (
               <Check className="size-3.5" />
@@ -421,7 +426,7 @@ function SheetButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "bg-muted hover:bg-accent focus-visible:ring-ring/60 inline-flex h-[30px] items-center gap-1.5 rounded-[9px] px-3 text-[0.8125rem] font-semibold outline-none focus-visible:ring-2 disabled:opacity-50",
+        "text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 inline-flex items-center gap-1.5 rounded text-[0.6875rem] outline-none focus-visible:ring-1 disabled:opacity-50 [&>svg]:size-3",
       )}
     >
       {children}

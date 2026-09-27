@@ -4,8 +4,7 @@ import { AskBar } from "@/components/chat/ask-bar";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { ReaderView } from "@/components/layout/reader-view";
 import { SetupDialog } from "@/components/layout/setup-dialog";
-import { SpacesSidebar } from "@/components/layout/spaces-sidebar";
-import { TabStrip } from "@/components/layout/tab-strip";
+import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
 import { useThemeEffect } from "@/hooks/use-theme";
 import { openLinkFromClipboard } from "@/lib/open-link";
@@ -18,16 +17,15 @@ import { useTabsStore } from "@/stores/tabs-store";
 import { useUiStore } from "@/stores/ui-store";
 
 /**
- * The window: spaces sidebar, tab strip, the article "sheet" with the Ask
- * bar floating over it, and the overlays (command palette, setup). The
- * background is the frame colour; the sheet is the surface you read on.
+ * The window: a thin top bar over the page you read (the library or an
+ * article with its margin notes), the Ask bar floating over it, and the
+ * overlays (command palette, setup).
  */
 export function AppShell() {
   useThemeEffect();
   useSpaceAccent();
   const focusMode = useUiStore((s) => s.focusMode);
   const setFocusMode = useUiStore((s) => s.setFocusMode);
-  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const articles = useLibraryStore((s) => s.articles);
   const refreshLibrary = useLibraryStore((s) => s.refresh);
   const refreshAgent = useAgentStore((s) => s.refreshStatus);
@@ -62,7 +60,6 @@ export function AppShell() {
       if (command === "palette") ui.setPaletteOpen(!ui.paletteOpen);
       else if (command === "new-tab") void tabs.newTab();
       else if (command === "close-tab") void tabs.close(tabs.activeId);
-      else if (command === "toggle-sidebar") ui.setSidebarOpen(!ui.sidebarOpen);
       else if (command === "toggle-answer") {
         if (useChatStore.getState().messages.length > 0)
           ui.setAnswerOpen(!ui.answerOpen);
@@ -78,19 +75,11 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="bg-frame text-foreground flex h-screen w-screen">
-      {!focusMode && sidebarOpen && <SpacesSidebar />}
-
+    <div className="bg-background text-foreground flex h-screen w-screen">
       <div className="flex min-w-0 flex-1 flex-col">
-        {!focusMode && <TabStrip />}
-        {/* The sheet: where you read. The Ask bar floats over its bottom. */}
-        <div
-          className={
-            focusMode
-              ? "bg-background relative min-h-0 flex-1 overflow-hidden"
-              : "bg-background relative min-h-0 flex-1 overflow-hidden"
-          }
-        >
+        {!focusMode && <TopBar />}
+        {/* Where you read. The Ask bar floats over its bottom. */}
+        <div className="relative min-h-0 flex-1 overflow-hidden">
           <ReaderView />
           <AskBar />
         </div>

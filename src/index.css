@@ -67,7 +67,7 @@
   --reader-measure: 64ch;
 }
 
-/* macOS overlay title bar: room for the window buttons above the sidebar. */
+/* macOS overlay title bar height. */
 :root.platform-mac {
   --titlebar-h: 30px;
 }

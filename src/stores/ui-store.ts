@@ -33,9 +33,10 @@ interface UiState {
   /** The command palette (Cmd/Ctrl+K). */
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
-  /** The spaces sidebar. Remembered; starts closed in a narrow window. */
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
+  /** True while the reader is wide enough to show answers in its margin;
+   * the answer sheet above the Ask bar is only used when it is not. */
+  notesInMargin: boolean;
+  setNotesInMargin: (on: boolean) => void;
   /** The answer sheet above the Ask bar (Cmd/Ctrl+J). */
   answerOpen: boolean;
   setAnswerOpen: (open: boolean) => void;
@@ -52,14 +53,6 @@ interface UiState {
 }
 
 const BLOCK_IMAGES_KEY = "yomu-block-images";
-const SIDEBAR_KEY = "yomu-sidebar";
-
-// Remembered choice, else open unless the window is narrow.
-function initialSidebarOpen(): boolean {
-  const saved = read(SIDEBAR_KEY);
-  if (saved !== null) return saved === "1";
-  return typeof window === "undefined" || window.innerWidth >= 900;
-}
 
 export const useUiStore = create<UiState>((set, get) => ({
   theme: parseTheme(read(THEME_KEY)),
@@ -82,11 +75,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
-  sidebarOpen: initialSidebarOpen(),
-  setSidebarOpen: (sidebarOpen) => {
-    write(SIDEBAR_KEY, sidebarOpen ? "1" : "0");
-    set({ sidebarOpen });
-  },
+  notesInMargin: false,
+  setNotesInMargin: (notesInMargin) => set({ notesInMargin }),
   answerOpen: false,
   setAnswerOpen: (answerOpen) => set({ answerOpen }),
   answerFocus: null,

@@ -6,7 +6,6 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   MessageSquare,
-  PanelLeft,
   Plus,
   Search,
   Sparkles,
@@ -148,13 +147,6 @@ function PaletteBody({ close }: { close: () => void }) {
       icon: <Focus />,
       shortcut: `${MOD}.`,
       run: () => ui().setFocusMode(!ui().focusMode),
-    },
-    {
-      id: "sidebar",
-      label: "Show or hide spaces",
-      icon: <PanelLeft />,
-      shortcut: `${MOD}B`,
-      run: () => ui().setSidebarOpen(!ui().sidebarOpen),
     },
     {
       id: "answer",

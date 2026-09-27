@@ -296,3 +296,13 @@ What is thrown away: the Phase 2 header/`Aa` chrome styling and the current `lib
 - Spaces are tags with a stable colour slot per space (`lib/spaces.ts`, `stores/spaces-store.ts`); tabs are `stores/tabs-store.ts` (stops an answer mid-stream before switching so no text is lost).
 - The Ask bar keeps the selection in `stores/selection-store.ts` because clicking into it collapses the browser's own selection.
 - Removed: the old library sidebar, chat panel, floating Explain button, theme and image toggles (now in the Aa menu and palette).
+
+---
+
+## Redesign v3: margin notes (current, supersedes v2)
+
+- **Palette:** pure `#000` and white, greys between, red only for errors. Dark only for now; the theme code stays for a later option.
+- **Type:** Hanken Grotesk for the interface at 12–13px, Literata for reading at 17px. No display face.
+- **Layout:** no sidebar, no tab strip. One thin top bar (Library, article title, Search, Aa). The library is the home page: paste a link, then a quiet index filtered by space, with archive and delete on hover.
+- **The one bold idea:** answers are written in the margin beside the passage they explain, numbered in reading order like notes in a book (`components/reader/margin-notes.tsx`). Below 1040px of reading width they fall back to the sheet above the Ask bar.
+- **Selection** turns text black on white (reversed print).

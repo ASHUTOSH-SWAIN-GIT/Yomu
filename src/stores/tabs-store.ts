@@ -17,6 +17,8 @@ interface TabsStore {
   tabs: Tab[];
   activeId: string;
   newTab: () => Promise<void>;
+  /** Shows the library: an existing empty tab if there is one, else a new one. */
+  goHome: () => Promise<void>;
   /** Opens an article: focuses its tab if open, else uses an empty tab, else a new one. */
   openArticle: (articleId: string) => Promise<void>;
   activate: (id: string) => Promise<void>;
@@ -70,6 +72,12 @@ export const useTabsStore = create<TabsStore>((set, get) => {
       const tab = makeTab();
       update([...get().tabs, tab], tab.id);
       await show(tab);
+    },
+
+    async goHome() {
+      const empty = get().tabs.find((t) => t.articleId === null);
+      if (empty) return get().activate(empty.id);
+      await get().newTab();
     },
 
     async openArticle(articleId) {
