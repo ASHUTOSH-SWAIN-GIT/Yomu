@@ -139,3 +139,21 @@ export function slotOf(
 ): number | null {
   return spaceId === INBOX ? null : (slots[spaceId] ?? null);
 }
+
+/** The colour an article is drawn in: its space's colour, or (in the Inbox)
+ * one picked from its site so the same site always looks the same. */
+export function articleColor(
+  article: Pick<ArticleSummary, "tags" | "site">,
+  slots: Record<string, number>,
+): string {
+  const tag = article.tags[0];
+  const slot =
+    tag && slots[tag] !== undefined ? slots[tag] : hash(article.site);
+  return `var(--sp-${slot % SPACE_SLOTS})`;
+}
+
+function hash(text: string): number {
+  let h = 0;
+  for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h;
+}

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AskBar } from "@/components/chat/ask-bar";
 import { CommandPalette } from "@/components/layout/command-palette";
+import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { ReaderView } from "@/components/layout/reader-view";
 import { SetupDialog } from "@/components/layout/setup-dialog";
 import { TopBar } from "@/components/layout/top-bar";
@@ -12,19 +13,24 @@ import { shortcutFor } from "@/lib/shortcuts";
 import { useAgentStore } from "@/stores/agent-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
+import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
 import { useTabsStore } from "@/stores/tabs-store";
 import { useUiStore } from "@/stores/ui-store";
 
 /**
- * The window: a thin top bar over the page you read (the library or an
- * article with its margin notes), the Ask bar floating over it, and the
- * overlays (command palette, setup).
+ * The window: a warm frame holding a thin top bar and, on the library page,
+ * the spaces sidebar. What you read (the library or an article with its
+ * margin notes) sits on a raised sheet inside the frame, with the Ask bar
+ * floating over it, plus the overlays (command palette, setup).
  */
 export function AppShell() {
   useThemeEffect();
   useSpaceAccent();
   const focusMode = useUiStore((s) => s.focusMode);
+  const onHome = useReaderStore(
+    (s) => s.state.status === "empty" || s.state.status === "error",
+  );
   const setFocusMode = useUiStore((s) => s.setFocusMode);
   const articles = useLibraryStore((s) => s.articles);
   const refreshLibrary = useLibraryStore((s) => s.refresh);
@@ -75,11 +81,20 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="bg-background text-foreground flex h-screen w-screen">
-      <div className="flex min-w-0 flex-1 flex-col">
-        {!focusMode && <TopBar />}
-        {/* Where you read. The Ask bar floats over its bottom. */}
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+    <div className="bg-frame text-foreground flex h-screen w-screen flex-col">
+      {!focusMode && <TopBar />}
+      <div className="flex min-h-0 flex-1">
+        {!focusMode && onHome && <LibrarySidebar />}
+        {/* Where you read: a sheet lifted off the frame. The Ask bar floats
+            over its bottom. */}
+        <div
+          className={
+            focusMode
+              ? "bg-background relative min-h-0 flex-1 overflow-hidden"
+              : "bg-background relative mr-2 mb-2 min-h-0 flex-1 overflow-hidden rounded-xl shadow-[var(--shadow-sheet)] " +
+                (onHome ? "" : "ml-2")
+          }
+        >
           <ReaderView />
           <AskBar />
         </div>

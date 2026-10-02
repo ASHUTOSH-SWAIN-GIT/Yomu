@@ -57,7 +57,7 @@ export function ImageBlock({
         <button
           type="button"
           onClick={() => setAllowed(true)}
-          className="border-input text-muted-foreground hover:bg-accent focus-visible:ring-ring/50 mx-auto flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-sm outline-none focus-visible:ring-2"
+          className="border-border text-muted-foreground hover:bg-accent focus-visible:ring-ring/50 mx-auto flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-sm outline-none focus-visible:ring-2"
         >
           <ImageOff className="size-4" aria-hidden />
           <span>Image blocked{alt ? `: ${alt}` : ""}. Click to load it.</span>
@@ -69,7 +69,7 @@ export function ImageBlock({
   if (failed) {
     return (
       <figure className="my-[1em]">
-        <div className="border-input text-muted-foreground flex items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-sm">
+        <div className="border-border text-muted-foreground flex items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-sm">
           <ImageOff className="size-4" aria-hidden />
           <span>Image unavailable{alt ? `: ${alt}` : ""}</span>
         </div>
@@ -86,7 +86,7 @@ export function ImageBlock({
         loading="lazy"
         // Don't tell the image host which article you're reading.
         referrerPolicy="no-referrer"
-        className="border-border mx-auto max-w-full rounded-md border"
+        className="mx-auto max-w-full rounded-lg shadow-[var(--shadow-card)]"
       />
       {article && !isSvgUrl(remote) && (
         <Button

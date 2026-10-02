@@ -6,7 +6,7 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   MessageSquare,
-  Plus,
+  Library,
   Search,
   Sparkles,
 } from "lucide-react";
@@ -58,8 +58,8 @@ export function CommandPalette() {
       label="Command palette"
       shouldFilter={false}
       loop
-      overlayClassName="fixed inset-0 z-50 bg-black/35 backdrop-blur-[3px]"
-      contentClassName="pop-in fixed top-[13vh] left-1/2 z-50 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-xl border border-white/20 bg-black text-white shadow-[var(--shadow-float)] outline-none"
+      overlayClassName="fade-in fixed inset-0 z-50 bg-[var(--scrim)] backdrop-blur-[2px]"
+      contentClassName="pop-in fixed top-[13vh] left-1/2 z-50 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-[var(--shadow-float)] outline-none"
     >
       {/* Mounted only while open, so the query and results reset on close. */}
       <PaletteBody close={() => setOpen(false)} />
@@ -113,10 +113,10 @@ function PaletteBody({ close }: { close: () => void }) {
   const actions: Action[] = [
     {
       id: "new-tab",
-      label: "New tab",
-      icon: <Plus />,
+      label: "Go to the library",
+      icon: <Library />,
       shortcut: `${MOD}T`,
-      run: () => void newTab(),
+      run: () => void useTabsStore.getState().goHome(),
     },
     {
       id: "paste-link",
@@ -193,19 +193,21 @@ function PaletteBody({ close }: { close: () => void }) {
 
   return (
     <>
-      <div className="flex h-11 items-center gap-2.5 border-b border-white/15 px-3.5">
-        <Search className="size-3.5 shrink-0 text-white/55" aria-hidden />
+      <div className="border-border flex h-13 items-center gap-3 border-b px-4">
+        <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
         <Command.Input
           value={query}
           onValueChange={setQuery}
           placeholder="Search articles, chats and commands…"
-          className="flex-1 bg-transparent text-[0.8125rem] text-white outline-none placeholder:text-white/45"
+          className="placeholder:text-muted-foreground flex-1 bg-transparent text-[0.9375rem] outline-none"
         />
-        <kbd className="font-sans text-[0.6875rem] text-white/50">esc</kbd>
+        <kbd className="bg-muted text-muted-foreground rounded px-1.5 py-px font-sans text-[0.6875rem]">
+          esc
+        </kbd>
       </div>
 
-      <Command.List className="max-h-[min(22rem,55vh)] overflow-y-auto p-1.5">
-        <Command.Empty className="px-4 py-8 text-center text-sm text-white/55">
+      <Command.List className="max-h-[min(24rem,55vh)] overflow-y-auto p-2">
+        <Command.Empty className="text-muted-foreground px-4 py-10 text-center text-sm">
           Nothing found. Try fewer words.
         </Command.Empty>
 
@@ -219,7 +221,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(a.id)}
               >
                 <span className="truncate">{a.title}</span>
-                <span className="ml-auto text-[0.6875rem] text-white/45">
+                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
                   {a.site}
                 </span>
               </Row>
@@ -237,7 +239,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(a.id)}
               >
                 <span className="truncate">{a.title}</span>
-                <span className="ml-auto text-[0.6875rem] text-white/45">
+                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
                   {a.site}
                 </span>
               </Row>
@@ -258,7 +260,7 @@ function PaletteBody({ close }: { close: () => void }) {
                   <span className="block truncate">
                     {byId.get(h.articleId)?.title}
                   </span>
-                  <span className="block truncate text-[0.6875rem] text-white/50">
+                  <span className="text-muted-foreground block truncate text-[0.6875rem]">
                     <Snippet text={h.snippet} />
                   </span>
                 </span>
@@ -277,7 +279,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(h.articleId)}
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-[0.6875rem] text-white/50">
+                  <span className="text-muted-foreground block truncate text-[0.6875rem]">
                     <Snippet text={h.snippet} />
                   </span>
                   <span className="block truncate">
@@ -298,7 +300,13 @@ function PaletteBody({ close }: { close: () => void }) {
                 icon={
                   <span
                     aria-hidden
-                    className="mx-0.5 size-3 rounded-[4px] ring-2 ring-white/40 ring-inset"
+                    className="mx-[3px] size-2.5 rounded-full"
+                    style={{
+                      background:
+                        s.slot === null
+                          ? "var(--sp-inbox)"
+                          : `var(--sp-${s.slot})`,
+                    }}
                   />
                 }
                 onSelect={() => {
@@ -308,7 +316,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 }}
               >
                 <span>{s.id === INBOX ? "Inbox" : displaySpaceName(s.id)}</span>
-                <span className="ml-auto text-[0.6875rem] text-white/45">
+                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
                   {s.count}
                 </span>
               </Row>
@@ -330,7 +338,7 @@ function PaletteBody({ close }: { close: () => void }) {
               >
                 <span>{a.label}</span>
                 {a.shortcut && (
-                  <kbd className="ml-auto font-sans text-[0.6875rem] text-white/45">
+                  <kbd className="bg-muted text-muted-foreground ml-auto rounded px-1.5 py-px font-sans text-[0.6875rem]">
                     {a.shortcut}
                   </kbd>
                 )}
@@ -340,7 +348,7 @@ function PaletteBody({ close }: { close: () => void }) {
         )}
       </Command.List>
 
-      <div className="flex gap-4 border-t border-white/15 px-3.5 py-2 text-[0.6875rem] text-white/45">
+      <div className="border-border text-muted-foreground bg-muted/60 flex gap-4 border-t px-4 py-2 text-[0.6875rem]">
         <span>↑↓ move</span>
         <span>↵ open</span>
         <span>esc close</span>
@@ -358,7 +366,7 @@ function Group({
 }) {
   return (
     <Command.Group className="pb-1">
-      <div className="px-2.5 pt-2 pb-1 text-[0.6875rem] text-white/45">
+      <div className="text-muted-foreground px-2.5 pt-2.5 pb-1 text-[0.6875rem] font-medium">
         {label}
       </div>
       {children}
@@ -382,9 +390,9 @@ function Row({
       value={value}
       onSelect={onSelect}
       className={cn(
-        "relative flex min-h-8 cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[0.8125rem] text-white/80 outline-none",
-        "data-[selected=true]:bg-white data-[selected=true]:text-black data-[selected=true]:[&_kbd]:text-black/50 data-[selected=true]:[&>svg]:text-black",
-        "[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-white/50",
+        "relative flex min-h-9 cursor-pointer items-center gap-3 rounded-lg px-2.5 py-1.5 text-[0.8125rem] outline-none",
+        "data-[selected=true]:bg-accent data-[selected=true]:[&>svg]:text-foreground",
+        "[&>svg]:text-muted-foreground [&>svg]:size-4 [&>svg]:shrink-0",
       )}
     >
       {icon}
@@ -404,7 +412,9 @@ function Snippet({ text }: { text: string }) {
         const [match, after] = chunk.split(MATCH_END);
         return (
           <span key={i}>
-            <mark className="bg-white px-0.5 text-black">{match}</mark>
+            <mark className="text-foreground rounded-sm bg-[var(--mark-active)] px-0.5">
+              {match}
+            </mark>
             {after}
           </span>
         );

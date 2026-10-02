@@ -38,7 +38,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={label}
       className={cn(
-        "border-input inline-flex rounded-md border p-0.5",
+        "bg-muted inline-flex rounded-lg p-0.5 shadow-[inset_0_0_0_1px_var(--border)]",
         className,
       )}
     >
@@ -63,9 +63,9 @@ export function Segmented<T extends string>({
               }
             }}
             className={cn(
-              "focus-visible:ring-ring/60 min-w-8 rounded-[5px] px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2",
+              "focus-visible:ring-ring/60 min-w-7 rounded-md px-2 py-1 text-[0.72rem] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-[var(--dur-fast)] outline-none focus-visible:ring-2",
               checked
-                ? "bg-primary text-primary-foreground"
+                ? "text-foreground bg-card shadow-[var(--shadow-card)]"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

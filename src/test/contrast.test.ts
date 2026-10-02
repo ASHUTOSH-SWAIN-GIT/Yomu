@@ -18,8 +18,13 @@ function tokensIn(selector: string): Record<string, string> {
   return tokens;
 }
 
+// Paper and Night override only some tokens; the rest come from Page.
 const base = tokensIn(":root");
-const themes: Record<string, Record<string, string>> = { black: base };
+const themes: Record<string, Record<string, string>> = {
+  page: base,
+  paper: { ...base, ...tokensIn(":root.paper") },
+  night: { ...base, ...tokensIn(":root.dark") },
+};
 
 function luminance(hex: string): number {
   const channel = (i: number) => {
@@ -39,13 +44,8 @@ const PAIRS: [string, string, number, string][] = [
   ["foreground", "background", 4.5, "body text"],
   ["muted-foreground", "background", 4.5, "secondary text"],
   ["muted-foreground", "muted", 4.5, "secondary text on tinted areas"],
-  [
-    "muted-foreground",
-    "frame-base",
-    4.5,
-    "secondary text on the sidebar and tab strip",
-  ],
-  ["foreground", "frame-base", 4.5, "text on the sidebar and tab strip"],
+  ["muted-foreground", "frame-base", 4.5, "secondary text on the window frame"],
+  ["foreground", "frame-base", 4.5, "text on the window frame"],
   ["popover-foreground", "popover", 4.5, "menu text"],
   ["primary-foreground", "primary", 4.5, "primary button text"],
   ["secondary-foreground", "secondary", 4.5, "secondary button text"],
@@ -54,6 +54,10 @@ const PAIRS: [string, string, number, string][] = [
   ["destructive", "muted", 4.5, "error text on tinted areas"],
   ["destructive-foreground", "destructive", 4.5, "destructive button text"],
   ["input", "background", 3, "input and outlined-button edges"],
+  ["muted-foreground", "card", 4.5, "secondary text on cards"],
+  ["muted-foreground", "popover", 4.5, "secondary text in menus"],
+  ["honey-ink", "background", 4.5, "note numbers and honey text"],
+  ["ring", "background", 3, "focus ring"],
   // Every space colour is used as a line, dot or fill against the surface.
   ...[0, 1, 2, 3, 4, 5, 6, 7].map((i): [string, string, number, string] => [
     `sp-${i}`,

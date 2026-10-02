@@ -35,6 +35,9 @@ interface UiState {
   setPaletteOpen: (open: boolean) => void;
   /** True while the reader is wide enough to show answers in its margin;
    * the answer sheet above the Ask bar is only used when it is not. */
+  /** The article title has scrolled out of view (the top bar shows it). */
+  pastTitle: boolean;
+  setPastTitle: (past: boolean) => void;
   notesInMargin: boolean;
   setNotesInMargin: (on: boolean) => void;
   /** The answer sheet above the Ask bar (Cmd/Ctrl+J). */
@@ -75,6 +78,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  pastTitle: false,
+  setPastTitle: (pastTitle) => set({ pastTitle }),
   notesInMargin: false,
   setNotesInMargin: (notesInMargin) => set({ notesInMargin }),
   answerOpen: false,

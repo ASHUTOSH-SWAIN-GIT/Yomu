@@ -5,7 +5,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Markdown } from "@/components/chat/markdown";
 import { groupExchanges, type Exchange } from "@/lib/exchanges";
 import { parseImageQuote } from "@/lib/images";
@@ -79,11 +79,27 @@ export function MarginNotes({
     [messages, highlights],
   );
   const noteRefs = useRef(new Map<string, HTMLElement>());
+  const ranges = useRef(new Map<string, Range>());
+  const [hovered, setHovered] = useState<string | null>(null);
+
   const [layout, setLayout] = useState<{
     notes: Record<string, number>;
     marks: { key: string; n: number; x: number; y: number }[];
   }>({ notes: {}, marks: [] });
   const [tick, setTick] = useState(0);
+
+  // Light up the passage of the note being pointed at (or read).
+  const activeKey =
+    hovered ??
+    threads.find((t) => t.highlight && t.highlight.id === answerFocus)?.key ??
+    null;
+  useLayoutEffect(() => {
+    if (typeof CSS === "undefined" || !("highlights" in CSS)) return;
+    const range = activeKey ? ranges.current.get(activeKey) : undefined;
+    if (range) CSS.highlights.set("yomu-active", new Highlight(range));
+    else CSS.highlights.delete("yomu-active");
+    return () => void CSS.highlights.delete("yomu-active");
+  }, [activeKey, layout]);
 
   // Re-measure whenever the text reflows (width, font, images loading) or a
   // note changes height (streaming, folding).
@@ -103,6 +119,7 @@ export function MarginNotes({
     if (!container || !text) return;
     const origin = container.getBoundingClientRect();
 
+    ranges.current.clear();
     const anchored = threads.map((t) => {
       if (!t.highlight) return { t, y: 0, rect: null as DOMRect | null };
       const block = text.querySelector<HTMLElement>(
@@ -111,6 +128,7 @@ export function MarginNotes({
       const range =
         block &&
         rangeInBlock(block, t.highlight.startOffset, t.highlight.endOffset);
+      if (range) ranges.current.set(t.key, range);
       const rects = range?.getClientRects();
       const first = rects?.[0];
       const last = rects?.[rects.length - 1];
@@ -158,8 +176,8 @@ export function MarginNotes({
         <sup
           key={m.key}
           aria-hidden
-          className="text-foreground pointer-events-none absolute font-sans text-[0.625rem] font-semibold"
-          style={{ left: m.x + 1, top: m.y - 2 }}
+          className="bg-honey pointer-events-none absolute grid h-[14px] min-w-[14px] place-items-center rounded-full px-1 font-sans text-[0.5625rem] leading-none font-bold text-[#2a1d05]"
+          style={{ left: m.x + 1, top: m.y - 9 }}
         >
           {m.n}
         </sup>
@@ -168,6 +186,7 @@ export function MarginNotes({
         aria-label="Notes"
         className="absolute top-0 right-0 w-[var(--margin-w)]"
       >
+        {threads.length === 0 && <EmptyMargin article={article} />}
         {threads.map((t) => (
           <Note
             key={t.key}
@@ -180,6 +199,7 @@ export function MarginNotes({
               } else noteRefs.current.delete(t.key);
             }}
             thread={t}
+            onHover={(on) => setHovered(on ? t.key : null)}
             number={numberOf.get(t.key)}
             top={layout.notes[t.key]}
             latest={t.key === latestKey}
@@ -197,6 +217,7 @@ export function MarginNotes({
 
 function Note({
   ref,
+  onHover,
   thread,
   number,
   top,
@@ -205,6 +226,7 @@ function Note({
   article,
 }: {
   ref: (el: HTMLElement | null) => void;
+  onHover: (on: boolean) => void;
   thread: Thread;
   number: number | undefined;
   top: number | undefined;
@@ -263,21 +285,36 @@ function Note({
       ref={ref}
       aria-label={thread.summary ? "Summary" : `Note ${number ?? ""}`}
       onClick={() => setAnswerFocus(thread.highlight?.id ?? null)}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
       className={cn(
-        "absolute inset-x-0 border-l pl-3.5 transition-[top,border-color] duration-[var(--dur)] ease-[var(--ease)]",
-        focused ? "border-foreground" : "border-border hover:border-input",
+        "absolute -inset-x-3.5 rounded-xl px-3.5 py-3 transition-[top,background-color,box-shadow] duration-[var(--dur)] ease-[var(--ease)]",
+        focused
+          ? "bg-card shadow-[var(--shadow-card-hover)]"
+          : "hover:shadow-[inset_0_0_0_1px_var(--border)]",
         top === undefined && "invisible",
       )}
       style={{ top: top ?? 0 }}
     >
-      <p className="text-muted-foreground mb-1.5 font-sans text-[0.6875rem] font-semibold tabular-nums">
-        {label}
+      <p className="text-muted-foreground mb-2 flex items-center gap-2 font-sans text-[0.6875rem] font-medium">
+        {thread.summary ? (
+          <Sparkles className="text-honey-ink size-3.5" aria-hidden />
+        ) : (
+          <span className="bg-honey grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[0.625rem] font-bold text-[#2a1d05] tabular-nums">
+            {number ?? "·"}
+          </span>
+        )}
+        {thread.summary
+          ? "Summary"
+          : label.endsWith("Image")
+            ? "About this image"
+            : "Note"}
       </p>
 
       <div
         ref={bodyRef}
         className={cn(
-          "relative overflow-hidden font-sans text-[0.78rem] leading-[1.6] text-white/85",
+          "relative overflow-hidden font-sans text-[0.8125rem] leading-[1.6] text-[var(--reader-ink)]",
           !open && "max-h-[11rem]",
         )}
       >
@@ -290,15 +327,25 @@ function Note({
           return (
             <div
               key={i}
-              className={cn(i > 0 && "border-border mt-3 border-t pt-3")}
+              className={cn(
+                i > 0 && "border-border mt-3 border-t border-dashed pt-3",
+              )}
             >
               {ownQuestion && (
-                <p className="text-foreground mb-1 font-medium">
+                <p className="text-foreground mb-1.5 font-semibold">
                   {e.question.text}
                 </p>
               )}
               {answer?.text ? (
-                <Markdown>{answer.text}</Markdown>
+                <>
+                  <Markdown>{answer.text}</Markdown>
+                  {busy && i === thread.exchanges.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="bg-honey ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse"
+                    />
+                  )}
+                </>
               ) : busy && i === thread.exchanges.length - 1 ? (
                 <Loader2
                   className="text-muted-foreground size-3.5 animate-spin"
@@ -311,7 +358,7 @@ function Note({
         {!open && overflows && (
           <div
             aria-hidden
-            className="absolute inset-x-0 bottom-0 h-8 bg-[linear-gradient(transparent,#000)]"
+            className="absolute inset-x-0 bottom-0 h-10 bg-[linear-gradient(transparent,var(--background))]"
           />
         )}
       </div>
@@ -325,7 +372,7 @@ function Note({
         </div>
       )}
 
-      <div className="text-muted-foreground mt-1.5 flex flex-wrap gap-x-3 text-[0.6875rem]">
+      <div className="text-muted-foreground mt-2 -ml-1.5 flex flex-wrap gap-0.5 text-[0.6875rem] font-medium">
         {!open && overflows && (
           <NoteAction onClick={() => setExpanded(true)}>Read all</NoteAction>
         )}
@@ -352,6 +399,32 @@ function Note({
   );
 }
 
+/** Before the first question, the margin says what it is for. */
+function EmptyMargin({ article }: { article: StoredArticle }) {
+  const summarize = useChatStore((s) => s.summarize);
+  const streaming = useChatStore((s) => s.streaming);
+  return (
+    <div className="text-muted-foreground sticky top-6 -mx-3.5 mt-[5.5rem] rounded-xl px-3.5 py-3.5 text-[0.75rem] leading-[1.6] shadow-[inset_0_0_0_1px_var(--border)]">
+      <p className="text-foreground mb-1 flex items-center gap-2 font-medium">
+        <Sparkles className="text-honey-ink size-3.5" aria-hidden />
+        Your margin
+      </p>
+      <p>
+        Select any passage to ask about it. Answers are written here, beside the
+        text they explain.
+      </p>
+      <button
+        type="button"
+        disabled={streaming}
+        onClick={() => void summarize(article)}
+        className="bg-card text-foreground hover:bg-accent focus-visible:ring-ring/60 mt-3 h-7 rounded-lg px-2.5 font-medium shadow-[var(--shadow-card)] outline-none focus-visible:ring-2 disabled:opacity-50"
+      >
+        Summarize the article
+      </button>
+    </div>
+  );
+}
+
 function NoteAction({
   onClick,
   children,
@@ -366,7 +439,7 @@ function NoteAction({
         e.stopPropagation();
         onClick();
       }}
-      className="hover:text-foreground focus-visible:ring-ring/60 rounded outline-none focus-visible:ring-1"
+      className="hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 h-6 rounded-md px-1.5 outline-none focus-visible:ring-2"
     >
       {children}
     </button>

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  */
 export function ParagraphBlock({ spans }: { spans: Span[] }) {
   return (
-    <p className="text-foreground my-[0.55em] text-pretty">
+    <p className="my-[0.55em] text-pretty text-[var(--reader-ink)]">
       {spans.map((span, i) => (
         <SpanText key={i} span={span} />
       ))}
@@ -21,7 +21,7 @@ export function SpanText({ span }: { span: Span }) {
     span.bold && "font-semibold",
     span.italic && "italic",
     span.code &&
-      "rounded bg-muted px-[0.3em] py-[0.08em] font-mono text-[0.85em] text-foreground",
+      "rounded-[0.3em] bg-muted px-[0.32em] py-[0.08em] font-mono text-[0.84em] text-foreground shadow-[inset_0_0_0_1px_var(--border)]",
   );
 
   const content = span.text.split("\n").map((line, i, arr) => (
@@ -38,8 +38,9 @@ export function SpanText({ span }: { span: Span }) {
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          // Links carry the accent so they are findable in a wall of prose.
-          "text-primary decoration-primary/35 hover:decoration-primary underline underline-offset-[0.2em]",
+          // Links keep the ink colour with a honey underline, so they are
+          // findable in a wall of prose without shouting.
+          "text-foreground decoration-honey/60 hover:decoration-honey underline decoration-[0.09em] underline-offset-[0.2em] transition-colors",
           className,
         )}
       >

@@ -3,56 +3,74 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens: pure black and white (dark only for now).
+ * Design tokens: "warm editorial".
  *
- * Black is #000, text is #fff, and every other value is a grey between them.
- * Surfaces are separated by hairlines, not by lighter panels. The one bold
- * gesture is the reversal: selected text turns black on white, and passages
- * you have asked about keep a white underline. No hue anywhere except red
- * for errors.
+ * The window is a warm frame; what you read sits on a lighter sheet lifted
+ * from it by a hairline and a soft shadow (layered paper, not flat black).
+ * Ink is a warm near-black, never pure. The one accent is honey: it marks
+ * what you selected or asked about, like a highlighter on a page. Primary
+ * buttons are ink, so honey stays special. Spaces get eight muted, earthy
+ * colours, used for small dots and article covers only.
  *
- * Token names follow shadcn so existing components keep working. The
- * `--sp-*` space slots stay (spaces-store assigns them) but are all white.
+ * Three themes: Page (light, default), Paper (sepia) and Night (dark).
+ * Token names follow shadcn so components keep working; contrast is checked
+ * by src/test/contrast.test.ts for every theme block below.
  */
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
-  --background: #000000;
-  --foreground: #ffffff;
-  --muted: #0e0e0e;
-  --muted-foreground: #8f8f8f;
-  --card: #000000;
-  --card-foreground: #ffffff;
-  --popover: #0a0a0a;
-  --popover-foreground: #ffffff;
-  --border: #262626;
-  /* Control edges (inputs, outlined buttons): >= 3:1 against black. */
-  --input: #5c5c5c;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #141414;
-  --secondary-foreground: #ffffff;
-  --accent: #171717;
-  --accent-foreground: #ffffff;
-  --destructive: #ff6b6b;
-  --destructive-foreground: #000000;
-  --frame-base: #000000;
+  --frame-base: #f1eee8;
+  --background: #fbfaf7;
+  --foreground: #1e1b17;
+  --muted: #f3f0ea;
+  --muted-foreground: #6a6359;
+  --card: #ffffff;
+  --card-foreground: #1e1b17;
+  --popover: #ffffff;
+  --popover-foreground: #1e1b17;
+  --border: #e4dfd6;
+  /* Control edges (inputs, outlined buttons): >= 3:1 against the sheet. */
+  --input: #928a7d;
+  --primary: #1e1b17;
+  --primary-foreground: #fbfaf7;
+  --secondary: #ece8e0;
+  --secondary-foreground: #1e1b17;
+  --accent: #efebe4;
+  --accent-foreground: #1e1b17;
+  --destructive: #b83222;
+  --destructive-foreground: #ffffff;
 
-  --sp-0: #ffffff;
-  --sp-1: #ffffff;
-  --sp-2: #ffffff;
-  --sp-3: #ffffff;
-  --sp-4: #ffffff;
-  --sp-5: #ffffff;
-  --sp-6: #ffffff;
-  --sp-7: #ffffff;
-  --sp-inbox: #ffffff;
+  /* Honey: selection, asked-about passages, note numbers, focus. */
+  --honey: #e7a93a;
+  --honey-ink: #8a5a0c;
+  --ring: #a8700f;
+  --mark-fill: rgb(231 169 58 / 0.22);
+  --mark-active: rgb(231 169 58 / 0.42);
+  --selection: rgb(231 169 58 / 0.32);
+
+  --sp-0: #b4532f;
+  --sp-1: #4c7848;
+  --sp-2: #3e6c97;
+  --sp-3: #87589b;
+  --sp-4: #9a6f0f;
+  --sp-5: #2c7a73;
+  --sp-6: #ad4768;
+  --sp-7: #676c29;
+  --sp-inbox: #857d71;
   --space: var(--sp-inbox);
   --frame: var(--frame-base);
-  --ring: #ffffff;
-  --mark-fill: rgb(255 255 255 / 0.1);
 
-  --shadow-float: 0 0 0 1px var(--border), 0 24px 60px rgb(0 0 0 / 0.9);
+  --shadow-sheet:
+    0 0 0 1px var(--border), 0 1px 2px rgb(40 30 20 / 0.04),
+    0 8px 24px -12px rgb(40 30 20 / 0.1);
+  --shadow-card: 0 0 0 1px var(--border), 0 1px 2px rgb(40 30 20 / 0.05);
+  --shadow-card-hover:
+    0 0 0 1px var(--input), 0 2px 4px rgb(40 30 20 / 0.06),
+    0 12px 28px -10px rgb(40 30 20 / 0.18);
+  --shadow-float:
+    0 0 0 1px rgb(40 30 20 / 0.08), 0 4px 10px -4px rgb(40 30 20 / 0.1),
+    0 18px 44px -12px rgb(40 30 20 / 0.24);
+  --scrim: rgb(30 25 20 / 0.28);
 
   /* Motion: only where it explains a change. */
   --dur-fast: 120ms;
@@ -61,10 +79,113 @@
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* Reading preferences (set by the Aa menu, see stores/ui-store.ts). */
+  --reader-ink: #2c2721;
   --reader-font: var(--font-serif);
   --reader-size: 1.0625rem;
   --reader-leading: 1.72;
   --reader-measure: 64ch;
+}
+
+/* Paper: a sepia page for long evenings in daylight. */
+:root.paper {
+  --frame-base: #e9e1d2;
+  --background: #f6efe2;
+  --foreground: #2a231a;
+  --muted: #eee6d7;
+  --muted-foreground: #66594a;
+  --card: #fbf6ec;
+  --card-foreground: #2a231a;
+  --popover: #fbf6ec;
+  --popover-foreground: #2a231a;
+  --border: #ddd2bf;
+  --input: #93856e;
+  --primary: #2a231a;
+  --primary-foreground: #f6efe2;
+  --secondary: #e8dfcd;
+  --secondary-foreground: #2a231a;
+  --accent: #ece3d2;
+  --accent-foreground: #2a231a;
+  --destructive: #a92f1b;
+  --destructive-foreground: #ffffff;
+  --honey-ink: #80520a;
+  --ring: #9a650c;
+  --reader-ink: #33291e;
+}
+
+/* Night: a proper neutral dark, not warm. Honey stays as the one accent. */
+:root.dark {
+  --frame-base: #0c0c0d;
+  --background: #161618;
+  --foreground: #ededee;
+  --muted: #1e1e20;
+  --muted-foreground: #9b9b9f;
+  --card: #1c1c1e;
+  --card-foreground: #ededee;
+  --popover: #1f1f22;
+  --popover-foreground: #ededee;
+  --border: #2a2a2d;
+  --input: #68686d;
+  --primary: #ededee;
+  --primary-foreground: #161618;
+  --secondary: #262629;
+  --secondary-foreground: #ededee;
+  --accent: #26262a;
+  --accent-foreground: #ededee;
+  --destructive: #f0766a;
+  --destructive-foreground: #161618;
+
+  --honey: #e0a94a;
+  --honey-ink: #e7b45e;
+  --ring: #e0a94a;
+  --mark-fill: rgb(224 169 74 / 0.15);
+  --mark-active: rgb(224 169 74 / 0.3);
+  --selection: rgb(224 169 74 / 0.26);
+
+  --sp-0: #e38c66;
+  --sp-1: #8dbb82;
+  --sp-2: #86addb;
+  --sp-3: #c69adb;
+  --sp-4: #d9ae4a;
+  --sp-5: #6fc2b8;
+  --sp-6: #e78ba7;
+  --sp-7: #b6bb6b;
+  --sp-inbox: #908f93;
+
+  --shadow-sheet: 0 0 0 1px var(--border), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-card: 0 0 0 1px var(--border), 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-card-hover: 0 0 0 1px #3a3a3e, 0 12px 28px -10px rgb(0 0 0 / 0.7);
+  --shadow-float:
+    0 0 0 1px #343438, 0 4px 10px -4px rgb(0 0 0 / 0.5),
+    0 22px 50px -12px rgb(0 0 0 / 0.75);
+  --scrim: rgb(0 0 0 / 0.55);
+
+  --reader-ink: #cfcfd1;
+}
+
+/* The page's space colour (see hooks/use-space-accent.ts). */
+:root[data-space="0"] {
+  --space: var(--sp-0);
+}
+:root[data-space="1"] {
+  --space: var(--sp-1);
+}
+:root[data-space="2"] {
+  --space: var(--sp-2);
+}
+:root[data-space="3"] {
+  --space: var(--sp-3);
+}
+:root[data-space="4"] {
+  --space: var(--sp-4);
+}
+:root[data-space="5"] {
+  --space: var(--sp-5);
+}
+:root[data-space="6"] {
+  --space: var(--sp-6);
+}
+:root[data-space="7"] {
+  --space: var(--sp-7);
 }
 
 /* macOS overlay title bar height. */
@@ -115,6 +236,8 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-frame: var(--frame);
   --color-space: var(--space);
+  --color-honey: var(--honey);
+  --color-honey-ink: var(--honey-ink);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -130,7 +253,7 @@
     "Segoe UI", sans-serif;
   --font-serif:
     "Literata Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-display: var(--font-serif);
+  --font-display: "Fraunces Variable", "Literata Variable", Georgia, serif;
   --font-mono:
     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -140,6 +263,9 @@
     @apply border-border outline-ring/50;
   }
   html {
+    color-scheme: light;
+  }
+  html.dark {
     color-scheme: dark;
   }
   body {
@@ -148,43 +274,66 @@
     line-height: 1.5;
     font-feature-settings: "ss01", "cv11";
   }
-  /* The reversal: selected text is printed black on white. */
+  /* Selecting text is like running a highlighter over it. */
   ::selection {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: var(--selection);
   }
   :focus-visible {
-    outline-color: #ffffff;
+    outline-color: var(--ring);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border: 3px solid transparent;
+    border-radius: 99px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--input);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
   a {
     text-underline-offset: 0.18em;
   }
 }
 
-/* Code: Shiki's dark theme, drained to greys so token contrast survives
-   without any hue. */
+/* Code: Shiki renders light and dark colours as variables; the theme
+   picks one. The block itself sits on the muted surface. */
 .shiki {
   background-color: var(--muted) !important;
-  filter: grayscale(1);
   font-family: var(--font-mono);
 }
 .shiki,
 .shiki span {
+  color: var(--shiki-light);
+}
+.dark .shiki,
+.dark .shiki span {
   color: var(--shiki-dark);
 }
 .shiki span {
   background-color: transparent !important;
 }
 
-/* Passages the user has asked the agent about (hooks/use-highlights): a wash
-   of the space colour with an underline. The Custom Highlight API allows
-   only a few properties; these are within them. */
+/* Passages the user has asked the agent about (hooks/use-highlights): a
+   honey wash with an underline, like a marked-up book. The Custom Highlight
+   API allows only a few properties; these are within them. */
 ::highlight(yomu) {
   background-color: var(--mark-fill);
   text-decoration: underline;
-  text-decoration-color: #ffffff;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+  text-decoration-color: var(--honey);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+}
+
+/* The passage whose note you are pointing at or reading. */
+::highlight(yomu-active) {
+  background-color: var(--mark-active);
 }
 
 /* Entrances that answer an action (a menu opening, the Ask bar appearing).
@@ -209,12 +358,34 @@
     transform: none;
   }
 }
+@keyframes yomu-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes yomu-load {
+  from {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  70% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
 .pop-in,
 [data-slot="popover-content"][data-state="open"] {
   animation: yomu-pop var(--dur) var(--ease);
 }
 .rise-in {
   animation: yomu-rise var(--dur-slow) var(--ease);
+}
+.fade-in {
+  animation: yomu-fade var(--dur) var(--ease);
 }
 
 /* Motion is opt-out for people who ask for less of it. */

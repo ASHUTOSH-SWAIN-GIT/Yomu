@@ -8,16 +8,16 @@ export function TableBlock({
   rows: string[][];
 }) {
   return (
-    <div className="border-border my-[0.9em] overflow-x-auto rounded-md border font-sans">
+    <div className="bg-card my-[1.1em] overflow-x-auto rounded-lg font-sans shadow-[var(--shadow-card)]">
       <table className="w-full border-collapse text-left text-[0.8125rem] leading-snug">
         {header.length > 0 && (
-          <thead className="bg-muted/50">
+          <thead className="bg-muted">
             <tr>
               {header.map((cell, i) => (
                 <th
                   key={i}
                   scope="col"
-                  className="border-border border-b px-3 py-2 font-medium"
+                  className="border-border text-muted-foreground border-b px-3.5 py-2.5 text-[0.75rem] font-semibold"
                 >
                   {cell}
                 </th>
@@ -29,7 +29,7 @@ export function TableBlock({
           {rows.map((row, i) => (
             <tr key={i} className="border-border border-b last:border-b-0">
               {row.map((cell, j) => (
-                <td key={j} className="px-3 py-2 align-top">
+                <td key={j} className="px-3.5 py-2.5 align-top">
                   {cell}
                 </td>
               ))}

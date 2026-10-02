@@ -23,7 +23,7 @@ export function ListBlock({
           <li
             key={i}
             data-marker={marker}
-            className="text-foreground before:text-muted-foreground flex gap-2 before:w-5 before:shrink-0 before:text-right before:content-[attr(data-marker)]"
+            className="before:text-muted-foreground flex gap-2 text-[var(--reader-ink)] before:w-5 before:shrink-0 before:text-right before:font-sans before:tabular-nums before:content-[attr(data-marker)]"
             style={{ paddingLeft: `${item.depth * 1.25}rem` }}
           >
             <span className="min-w-0">

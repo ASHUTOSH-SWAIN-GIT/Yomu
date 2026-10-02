@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/popover";
 import { Segmented } from "@/components/ui/segmented";
 import type { CodeExamplePref, ExplainLevel } from "@/lib/explain-prefs";
-import { useUiStore } from "@/stores/ui-store";
+import { useUiStore, type Theme } from "@/stores/ui-store";
 
 const MOD = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl+";
 
@@ -15,6 +15,8 @@ const MOD = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl+";
  * and view options. Everything is remembered between sessions. */
 export function ReaderSettings() {
   const reader = useUiStore((s) => s.reader);
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
   const setReader = useUiStore((s) => s.setReader);
   const blockImages = useUiStore((s) => s.blockRemoteImages);
   const setBlockImages = useUiStore((s) => s.setBlockRemoteImages);
@@ -28,14 +30,27 @@ export function ReaderSettings() {
         <Button
           variant="ghost"
           size="sm"
-          className="gap-0 px-2"
+          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 size-8 gap-0 px-0"
           aria-label="Reading settings"
         >
           <span className="font-serif text-base leading-none">A</span>
           <span className="font-serif text-xs leading-none">a</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="flex flex-col gap-3">
+      <PopoverContent className="flex w-[22rem] flex-col gap-2.5">
+        <Row label="Theme">
+          <Segmented<Theme>
+            label="Theme"
+            value={theme}
+            onChange={setTheme}
+            options={[
+              { value: "light", label: "Page" },
+              { value: "paper", label: "Paper" },
+              { value: "dark", label: "Night" },
+              { value: "system", label: "Auto" },
+            ]}
+          />
+        </Row>
         <Row label="Typeface">
           <Segmented
             label="Typeface"
@@ -44,7 +59,7 @@ export function ReaderSettings() {
             options={[
               {
                 value: "serif",
-                label: <span className="font-serif text-sm">Serif</span>,
+                label: <span className="font-serif">Serif</span>,
               },
               { value: "sans", label: "Sans" },
             ]}
@@ -76,15 +91,15 @@ export function ReaderSettings() {
           />
         </Row>
 
-        <div className="border-border -mx-4 border-t" />
+        <div className="border-border -mx-3.5 my-0.5 border-t" />
 
-        <Row label="Explain like I'm">
+        <Row label="Explanations">
           <Segmented<ExplainLevel>
             label="Explanation level"
             value={explainPrefs.level}
             onChange={(level) => setExplainPrefs({ level })}
             options={[
-              { value: "beginner", label: "New" },
+              { value: "beginner", label: "Beginner" },
               { value: "balanced", label: "Balanced" },
               { value: "expert", label: "Expert" },
             ]}
@@ -103,10 +118,10 @@ export function ReaderSettings() {
           />
         </Row>
 
-        <div className="border-border -mx-4 border-t" />
+        <div className="border-border -mx-3.5 my-0.5 border-t" />
 
         <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground text-xs">
+          <span className="text-muted-foreground text-[0.72rem]">
             Block remote images
           </span>
           <button
@@ -116,10 +131,10 @@ export function ReaderSettings() {
             aria-label="Block remote images"
             onClick={() => setBlockImages(!blockImages)}
             className={
-              "focus-visible:ring-ring/60 relative h-5 w-9 shrink-0 rounded-full border transition-colors outline-none focus-visible:ring-2 " +
+              "focus-visible:ring-ring/60 relative h-5 w-9 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2 " +
               (blockImages
-                ? "border-primary bg-primary"
-                : "border-input bg-transparent")
+                ? "bg-primary"
+                : "bg-secondary shadow-[inset_0_0_0_1px_var(--border)]")
             }
           >
             <span
@@ -127,7 +142,7 @@ export function ReaderSettings() {
                 "absolute top-0.5 size-3.5 rounded-full transition-transform " +
                 (blockImages
                   ? "bg-primary-foreground translate-x-[18px]"
-                  : "bg-muted-foreground translate-x-0.5")
+                  : "bg-card translate-x-0.5 shadow-[var(--shadow-card)]")
               }
             />
           </button>
@@ -136,7 +151,7 @@ export function ReaderSettings() {
         <Button
           variant="outline"
           size="sm"
-          className="justify-between"
+          className="h-8 justify-between text-[0.75rem]"
           onClick={() => setFocusMode(true)}
         >
           <span className="flex items-center gap-2">
@@ -161,7 +176,9 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="text-muted-foreground text-[0.72rem] whitespace-nowrap">
+        {label}
+      </span>
       {children}
     </div>
   );

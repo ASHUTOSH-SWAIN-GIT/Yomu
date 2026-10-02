@@ -306,3 +306,25 @@ What is thrown away: the Phase 2 header/`Aa` chrome styling and the current `lib
 - **Layout:** no sidebar, no tab strip. One thin top bar (Library, article title, Search, Aa). The library is the home page: paste a link, then a quiet index filtered by space, with archive and delete on hover.
 - **The one bold idea:** answers are written in the margin beside the passage they explain, numbered in reading order like notes in a book (`components/reader/margin-notes.tsx`). Below 1040px of reading width they fall back to the sheet above the Ask bar.
 - **Selection** turns text black on white (reversed print).
+
+### v3 iteration notes (benchmarked against Readwise Reader, Gwern.net, Vercel Geist, Linear, Raycast)
+
+- **Selection toolbar** above the passage (Explain, Ask…, Simpler, Example) instead of a bar at the bottom of the window: the action sits where the eye already is.
+- **Margin notes** light up their passage on hover and show a live cursor while streaming. An empty margin explains itself and offers "Summarize the article".
+- **Body text** is a soft white (`--reader-ink`); pure white is kept for headings and UI.
+- **Top bar** holds the article actions (spaces, menu); the title fades in only once the heading scrolls away.
+- **Library** groups each space into Reading, New and Finished, with arrow-key (or j/k) navigation.
+- **Loading** shows the site and a page skeleton; **setup** is a numbered three-step sequence; code blocks have a copy button.
+
+---
+
+## Redesign v4: warm editorial (current, supersedes v3's palette and library)
+
+Chosen with you on 2026-10-02 over a Linear-style and a black-and-white polish option.
+
+- **Palette:** warm paper instead of pure black. Window frame `#f1eee8`, reading sheet `#fbfaf7`, warm ink `#1e1b17`. Three themes: Page (light), Paper (sepia), Night (warm charcoal `#1b1916`). All pass `src/test/contrast.test.ts`, which now checks every theme.
+- **Accent:** honey (`--honey`), used only for selection, asked-about passages, note numbers, the reading progress line and focus. Primary buttons are ink.
+- **Depth:** the content sits on a raised, rounded sheet inside the window frame (`--shadow-sheet`); cards and menus use `--shadow-card` and `--shadow-float` in place of white outlines.
+- **Library:** spaces sidebar on the frame (`layout/library-sidebar.tsx`), a greeting plus the space name in Fraunces, a paste-link card, "Continue reading" cards with generated covers (`layout/article-cover.tsx`, colour from `articleColor` in `lib/spaces.ts`), then "Up next" and "Finished" lists.
+- **Reader:** site line with the space dot, a larger serif title, and a honey rule. Code blocks get a language header and a copy button. Margin notes are soft cards with honey number badges.
+- **Top bar:** back to Library, a search pill, a light/dark toggle and Aa (which now also picks the theme).

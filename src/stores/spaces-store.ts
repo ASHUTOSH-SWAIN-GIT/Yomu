@@ -40,6 +40,9 @@ interface SpacesStore {
   /** Colour slot per space (see lib/spaces.ts). */
   slots: Record<string, number>;
   setActive: (id: string) => void;
+  /** The library shows archived articles instead of the active space. */
+  showArchive: boolean;
+  setShowArchive: (on: boolean) => void;
   /** Creates a space from a name; returns its id, or null if the name is empty. */
   createSpace: (name: string) => string | null;
   /** Gives every known space a stable colour slot. */
@@ -53,8 +56,11 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
 
   setActive(id) {
     writeStorage(ACTIVE_KEY, id);
-    set({ active: id });
+    set({ active: id, showArchive: false });
   },
+
+  showArchive: false,
+  setShowArchive: (showArchive) => set({ showArchive }),
 
   createSpace(name) {
     const id = normalizeTag(name);

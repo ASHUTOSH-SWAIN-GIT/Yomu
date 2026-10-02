@@ -59,11 +59,11 @@ export function ArticleTools({ article }: { article: StoredArticle }) {
   }
 
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 font-sans text-[0.8125rem]">
+    <div className="flex items-center gap-1.5 font-sans text-[0.75rem]">
       {tags.map((tag) => (
         <span
           key={tag}
-          className="border-border text-muted-foreground flex items-center gap-1 rounded-full border py-0.5 pr-1 pl-2.5"
+          className="border-border text-foreground flex h-6 items-center gap-1 rounded-md border pr-1 pl-2"
         >
           {tag}
           <button
@@ -80,10 +80,10 @@ export function ArticleTools({ article }: { article: StoredArticle }) {
         <input
           value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
-          placeholder={tags.length ? "Add space" : "Add to a space"}
+          placeholder="+ Add to a space"
           aria-label="Add to a space"
           maxLength={32}
-          className="placeholder:text-muted-foreground focus-visible:ring-ring/60 w-24 rounded bg-transparent px-1 py-0.5 outline-none focus-visible:ring-2"
+          className="placeholder:text-muted-foreground hover:placeholder:text-foreground focus:border-input h-6 w-[7.5rem] rounded-md border border-transparent bg-transparent px-1.5 text-right outline-none focus:text-left"
         />
       </form>
 
@@ -92,13 +92,13 @@ export function ArticleTools({ article }: { article: StoredArticle }) {
           <Button
             variant="ghost"
             size="icon"
-            className="text-muted-foreground ml-auto size-7"
+            className="text-muted-foreground size-6"
             aria-label="Article actions"
           >
-            <MoreHorizontal className="size-4" />
+            <MoreHorizontal className="size-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="flex w-56 flex-col gap-0.5 p-1.5">
+        <PopoverContent className="flex w-52 flex-col gap-0.5 p-1">
           <MenuItem
             icon={<RefreshCw className="size-3.5" />}
             label="Re-fetch article"
@@ -151,7 +151,7 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
-      className="hover:bg-accent focus-visible:bg-accent flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[0.8125rem] outline-none"
+      className="hover:bg-accent focus-visible:bg-accent flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[0.75rem] outline-none"
     >
       <span className="text-muted-foreground">{icon}</span>
       {label}

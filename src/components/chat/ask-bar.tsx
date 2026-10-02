@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   Check,
   Copy,
@@ -16,7 +22,8 @@ import { parseImageQuote } from "@/lib/images";
 import { logError } from "@/lib/log";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
-import { useChatStore } from "@/stores/chat-store";
+import { rangeInBlock } from "@/hooks/use-highlights";
+import { useChatStore, type Selection } from "@/stores/chat-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -38,10 +45,10 @@ const QUICK = [
 ];
 
 /**
- * The Explain surface: a bar at the bottom of the article. Select text and it
- * offers to explain it or take your own question; the answer rises above it
- * as a sheet. It replaces the old side chat panel. Everything runs through
- * the chat store, so history, resume and regenerate behave as before.
+ * The Explain surface. Selecting text opens a small toolbar right above the
+ * passage (explain it, or type a question); answers go to the margin, or to
+ * a sheet above a bottom bar when the window is too narrow for one. The
+ * bottom bar also takes follow-ups. Everything runs through the chat store.
  */
 export function AskBar() {
   const article = useReaderStore((s) =>
@@ -55,7 +62,6 @@ export function AskBar() {
   const askAbout = useChatStore((s) => s.askAbout);
   const send = useChatStore((s) => s.send);
   const stop = useChatStore((s) => s.stop);
-  const summarize = useChatStore((s) => s.summarize);
   const answerOpen = useUiStore((s) => s.answerOpen);
   const notesInMargin = useUiStore((s) => s.notesInMargin);
   const setAnswerOpen = useUiStore((s) => s.setAnswerOpen);
@@ -65,16 +71,15 @@ export function AskBar() {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const ready = agentStatus === "ready";
-  // With room for margin notes the answers live there; the bar still opens
-  // for follow-ups.
   const followUpOpen = answerOpen && messages.length > 0;
   const sheetVisible = followUpOpen && !notesInMargin;
 
-  /** Runs the current input: a new passage takes a question (or an explain),
-   * otherwise it is a follow-up. */
-  function run(prompt: string | null) {
+  /** Runs a question: about the selected passage if there is one (an
+   * explanation when empty), otherwise a follow-up. */
+  function run(prompt: string | null, typedText = text) {
     if (!article || streaming) return;
-    const typed = (prompt ?? text).trim();
+    const typed = (prompt ?? typedText).trim();
+    if (!ready) return setSetupOpen(true);
     if (selection) {
       if (typed) void askAbout(article, selection, typed);
       else void explain(article, selection);
@@ -87,14 +92,17 @@ export function AskBar() {
     setText("");
   }
 
-  // Cmd/Ctrl+E: explain the selection, or jump to the input.
+  // Cmd/Ctrl+E: explain the selection, or jump to the follow-up input.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "e") return;
       e.preventDefault();
       if (!ready) return setSetupOpen(true);
       if (selection && article) run(null);
-      else inputRef.current?.focus();
+      else if (messages.length > 0) {
+        setAnswerOpen(true);
+        requestAnimationFrame(() => inputRef.current?.focus());
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -107,30 +115,30 @@ export function AskBar() {
     run(null);
   }
 
-  const hasSelection = selection !== null;
-  const showBar = hasSelection || followUpOpen;
-  const quote = selection
-    ? (parseImageQuote(selection.text)?.alt ?? selection.text)
-    : null;
-
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex flex-col items-center gap-3 px-6">
-      {sheetVisible && <AnswerSheet />}
+    <>
+      {selection && (
+        <SelectionToolbar
+          key={`${selection.blockIndex}:${selection.startOffset}:${selection.endOffset}`}
+          selection={selection}
+          ready={ready}
+          streaming={streaming}
+          onRun={(prompt, typed) => run(prompt, typed)}
+          onClose={() => {
+            setSelection(null);
+            window.getSelection()?.removeAllRanges();
+          }}
+        />
+      )}
 
-      {showBar ? (
-        <form
-          onSubmit={onSubmit}
-          aria-label="Ask about this article"
-          className="rise-in pointer-events-auto flex w-[min(42.5rem,100%)] items-center gap-2.5 rounded-xl bg-black p-1.5 pl-3 text-white shadow-[var(--shadow-float)] ring-1 ring-white/25"
-        >
-          {quote && (
-            <span className="flex h-7 max-w-[14rem] shrink-0 items-center gap-2 rounded-md border border-white/20 px-2 font-serif text-[0.75rem] italic">
-              <i aria-hidden className="hidden" />
-              <span className="truncate">“{quote}”</span>
-            </span>
-          )}
-
-          {ready ? (
+      {(sheetVisible || (followUpOpen && !selection)) && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex flex-col items-center gap-2.5 px-6">
+          {sheetVisible && <AnswerSheet />}
+          <form
+            onSubmit={onSubmit}
+            aria-label="Ask a follow-up"
+            className="rise-in bg-popover text-popover-foreground focus-within:ring-ring/40 pointer-events-auto flex w-[min(38rem,100%)] items-center gap-2 rounded-2xl p-1.5 pl-4 shadow-[var(--shadow-float)] focus-within:ring-2"
+          >
             <input
               id="ask-input"
               ref={inputRef}
@@ -139,90 +147,191 @@ export function AskBar() {
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   setText("");
-                  setSelection(null);
-                  e.currentTarget.blur();
+                  setAnswerOpen(false);
                 }
               }}
-              disabled={streaming}
-              placeholder={
-                hasSelection ? "Ask about this…" : "Ask a follow-up…"
-              }
-              aria-label={
-                hasSelection
-                  ? "Ask about the selected passage"
-                  : "Ask a follow-up"
-              }
-              className="min-w-0 flex-1 bg-transparent text-[0.8125rem] text-white outline-none placeholder:text-white/50 disabled:opacity-60"
+              disabled={streaming || !ready}
+              placeholder={ready ? "Ask a follow-up…" : "Set up Explain to ask"}
+              aria-label="Ask a follow-up"
+              className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.875rem] outline-none disabled:opacity-60"
             />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSetupOpen(true)}
-              className="min-w-0 flex-1 truncate text-left text-[0.8125rem] text-white/80 underline decoration-white/30 underline-offset-4 outline-none hover:decoration-white focus-visible:ring-2 focus-visible:ring-white/60"
-            >
-              Set up Explain to ask questions
-            </button>
-          )}
-
-          {ready && !streaming && (
-            <span className="hidden shrink-0 gap-1.5 md:flex">
-              {QUICK.slice(hasSelection ? 0 : 0, hasSelection ? 2 : 3).map(
-                (q) => (
-                  <button
-                    key={q.label}
-                    type="button"
-                    onClick={() => run(q.prompt)}
-                    className="h-7 rounded-md border border-white/20 px-2.5 text-[0.75rem] transition-colors outline-none hover:border-white/60 focus-visible:ring-2 focus-visible:ring-white/60"
-                  >
+            {ready && !streaming && (
+              <span className="hidden shrink-0 gap-1.5 md:flex">
+                {QUICK.map((q) => (
+                  <QuickButton key={q.label} onClick={() => run(q.prompt)}>
                     {q.label}
-                  </button>
-                ),
-              )}
-            </span>
-          )}
-
-          {streaming ? (
-            <button
-              type="button"
-              onClick={() => void stop()}
-              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/30 px-3 text-[0.75rem] font-medium outline-none hover:border-white focus-visible:ring-2 focus-visible:ring-white/60"
-            >
-              <Square className="size-3" aria-hidden /> Stop
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!ready || (!hasSelection && !text.trim())}
-              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 text-[0.75rem] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-40"
-            >
-              {hasSelection && !text.trim() ? "Explain" : "Ask"}
-              <kbd className="px-0.5 font-sans text-[0.6875rem] opacity-60">
-                {MOD}↵
-              </kbd>
-            </button>
-          )}
-        </form>
-      ) : (
-        <div className="text-muted-foreground bg-background border-border pointer-events-auto flex items-center gap-3 rounded-lg border px-3 py-1.5 text-[0.75rem]">
-          <span className="flex items-center gap-2">
-            <Sparkles className="size-3.5" aria-hidden />
-            Select any passage to ask about it
-            <kbd className="text-foreground font-sans text-[0.6875rem]">
-              {MOD}E
-            </kbd>
-          </span>
-          {ready && messages.length === 0 && (
-            <button
-              type="button"
-              onClick={() => void summarize(article)}
-              className="hover:text-foreground focus-visible:ring-ring/60 rounded underline underline-offset-4 outline-none focus-visible:ring-2"
-            >
-              or summarize the article
-            </button>
-          )}
+                  </QuickButton>
+                ))}
+              </span>
+            )}
+            {streaming ? (
+              <button
+                type="button"
+                onClick={() => void stop()}
+                className="bg-secondary hover:bg-accent focus-visible:ring-ring/60 flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-[0.8125rem] font-medium outline-none focus-visible:ring-2"
+              >
+                <Square className="size-3" aria-hidden /> Stop
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!ready || !text.trim()}
+                className="bg-primary text-primary-foreground focus-visible:ring-ring/60 disabled:bg-secondary disabled:text-muted-foreground flex h-9 shrink-0 items-center rounded-xl px-4 text-[0.8125rem] font-semibold outline-none focus-visible:ring-2"
+              >
+                Ask
+              </button>
+            )}
+          </form>
         </div>
       )}
-    </div>
+    </>
+  );
+}
+
+function QuickButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 h-8 rounded-lg px-2.5 text-[0.8125rem] font-medium transition-colors outline-none focus-visible:ring-2"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Where the selected passage is on screen, kept current while scrolling. */
+function useSelectionRect(selection: Selection): DOMRect | null {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  useLayoutEffect(() => {
+    function measure() {
+      const block = document.querySelector<HTMLElement>(
+        `article [data-block-index="${selection.blockIndex}"]`,
+      );
+      const range =
+        block &&
+        rangeInBlock(block, selection.startOffset, selection.endOffset);
+      setRect(range ? range.getBoundingClientRect() : null);
+    }
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [selection]);
+  return rect;
+}
+
+/** The small toolbar above a fresh selection: Explain in one click, or type
+ * your own question about the passage. */
+function SelectionToolbar({
+  selection,
+  ready,
+  streaming,
+  onRun,
+  onClose,
+}: {
+  selection: Selection;
+  ready: boolean;
+  streaming: boolean;
+  onRun: (prompt: string | null, typed: string) => void;
+  onClose: () => void;
+}) {
+  const rect = useSelectionRect(selection);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [measured, setMeasured] = useState(268);
+  const [asking, setAsking] = useState(false);
+  const [question, setQuestion] = useState("");
+  const isImage = parseImageQuote(selection.text) !== null;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useLayoutEffect(() => {
+    if (formRef.current && !asking) setMeasured(formRef.current.offsetWidth);
+  }, [asking, ready, rect]);
+
+  if (!rect || isImage) return null;
+
+  const width = asking ? 360 : measured;
+  const below = rect.top < 100;
+  const top = below ? rect.bottom + 10 : rect.top - 46;
+  const left = Math.min(
+    Math.max(rect.left + rect.width / 2 - width / 2, 12),
+    window.innerWidth - width - 12,
+  );
+
+  return (
+    <form
+      ref={formRef}
+      role="dialog"
+      aria-label="Ask about the selected passage"
+      onMouseDown={(e) => e.target === e.currentTarget && e.preventDefault()}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onRun(null, question);
+      }}
+      className="pop-in bg-popover text-popover-foreground fixed z-30 flex h-10 items-center gap-0.5 rounded-xl p-1 shadow-[var(--shadow-float)]"
+      style={{ top, left, width: asking ? width : undefined }}
+    >
+      {asking ? (
+        <>
+          <input
+            autoFocus
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ask about this passage…"
+            aria-label="Your question about the passage"
+            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent px-2 text-[0.8125rem] outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!question.trim() || streaming}
+            className="bg-primary text-primary-foreground disabled:bg-secondary disabled:text-muted-foreground h-8 shrink-0 rounded-lg px-3 text-[0.8125rem] font-semibold outline-none"
+          >
+            Ask
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="submit"
+            disabled={streaming}
+            className="bg-primary text-primary-foreground focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg pr-2.5 pl-2 text-[0.8125rem] font-semibold outline-none focus-visible:ring-2 disabled:opacity-40"
+          >
+            <Sparkles className="text-honey size-3.5" aria-hidden />
+            {ready ? "Explain" : "Set up Explain"}
+            {ready && (
+              <kbd className="font-sans text-[0.6875rem] opacity-50">
+                {MOD}E
+              </kbd>
+            )}
+          </button>
+          {ready && (
+            <>
+              <QuickButton onClick={() => setAsking(true)}>Ask…</QuickButton>
+              <QuickButton onClick={() => onRun(QUICK[0].prompt, "")}>
+                Simpler
+              </QuickButton>
+              <QuickButton onClick={() => onRun(QUICK[2].prompt, "")}>
+                Example
+              </QuickButton>
+            </>
+          )}
+        </>
+      )}
+    </form>
   );
 }
 
@@ -276,10 +385,10 @@ function AnswerSheet() {
   return (
     <section
       aria-label="Answer"
-      className="rise-in bg-popover text-popover-foreground border-border pointer-events-auto flex max-h-[min(26rem,50vh)] w-[min(42.5rem,100%)] flex-col rounded-xl border shadow-[var(--shadow-float)]"
+      className="rise-in bg-popover text-popover-foreground pointer-events-auto flex max-h-[min(26rem,50vh)] w-[min(42.5rem,100%)] flex-col rounded-2xl shadow-[var(--shadow-float)]"
     >
-      <header className="flex shrink-0 items-center gap-2.5 px-4 pt-3 pb-2 text-[0.75rem] font-medium">
-        <i aria-hidden className="bg-foreground size-1.5 rounded-full" />
+      <header className="flex shrink-0 items-center gap-2 px-5 pt-3.5 pb-2 text-[0.75rem] font-medium">
+        <Sparkles aria-hidden className="text-honey-ink size-3.5" />
         {title}
         <span className="ml-auto flex items-center gap-1 font-medium">
           {exchanges.length > 1 && (
@@ -305,7 +414,7 @@ function AnswerSheet() {
       </header>
 
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-4 pb-2"
+        className="min-h-0 flex-1 overflow-y-auto px-5 pb-2"
         role="log"
         aria-live="polite"
       >
@@ -335,7 +444,7 @@ function AnswerSheet() {
         ) : (
           <>
             {current.question.quote && (
-              <blockquote className="border-foreground text-muted-foreground mb-3 line-clamp-3 border-l pl-3 font-serif text-[0.8125rem] italic">
+              <blockquote className="border-honey text-muted-foreground mb-3 line-clamp-3 border-l-2 pl-3 font-serif text-[0.875rem] italic">
                 {parseImageQuote(current.question.quote)?.alt ||
                   current.question.quote}
               </blockquote>
@@ -347,7 +456,7 @@ function AnswerSheet() {
                   {current.question.text}
                 </p>
               )}
-            <div className="text-[0.8125rem] leading-[1.65] text-white/85">
+            <div className="text-[0.875rem] leading-[1.65] text-[var(--reader-ink)]">
               {answer?.text ? (
                 <Markdown>{answer.text}</Markdown>
               ) : streaming && latest ? (
@@ -387,7 +496,7 @@ function AnswerSheet() {
       </div>
 
       {!history && answer?.text && (
-        <footer className="flex shrink-0 items-center gap-3 px-4 pt-1 pb-3">
+        <footer className="border-border flex shrink-0 items-center gap-1 border-t px-3.5 py-2">
           <SheetButton onClick={() => void copy()}>
             {copied ? (
               <Check className="size-3.5" />
@@ -426,7 +535,7 @@ function SheetButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 inline-flex items-center gap-1.5 rounded text-[0.6875rem] outline-none focus-visible:ring-1 disabled:opacity-50 [&>svg]:size-3",
+        "text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[0.75rem] font-medium outline-none focus-visible:ring-2 disabled:opacity-50 [&>svg]:size-3.5",
       )}
     >
       {children}

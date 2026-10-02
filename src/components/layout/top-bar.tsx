@@ -1,5 +1,7 @@
+import { ChevronLeft, Moon, Search, Sun } from "lucide-react";
 import { usesOverlayTitleBar } from "@/lib/platform";
 import { UpdateBanner } from "@/components/layout/update-banner";
+import { ArticleTools } from "@/components/reader/article-tools";
 import { ReaderSettings } from "@/components/reader/reader-settings";
 import { useAgentStore } from "@/stores/agent-store";
 import { useReaderStore } from "@/stores/reader-store";
@@ -17,41 +19,57 @@ export function TopBar() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const agentStatus = useAgentStore((s) => s.status);
+  const pastTitle = useUiStore((s) => s.pastTitle);
 
-  const title = reader.status === "ready" ? reader.article.title : null;
+  const article = reader.status === "ready" ? reader.article : null;
+  const title = article?.title ?? null;
+
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
+  const dark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
     <header
       data-tauri-drag-region
-      className="border-border flex h-10 shrink-0 items-center gap-4 border-b pr-2 text-[0.75rem]"
-      style={{ paddingLeft: usesOverlayTitleBar() ? "5.5rem" : "0.75rem" }}
+      className="flex h-11 shrink-0 items-center gap-3 pr-2 text-[0.8125rem]"
+      style={{ paddingLeft: usesOverlayTitleBar() ? "5.5rem" : "0.875rem" }}
     >
-      <div data-tauri-drag-region className="flex shrink-0 items-center gap-3">
+      <div data-tauri-drag-region className="flex shrink-0 items-center gap-1">
         <button
           type="button"
           onClick={() => void goHome()}
           aria-current={title ? undefined : "page"}
-          className="focus-visible:ring-ring/60 flex items-center gap-2 rounded px-1 py-0.5 font-semibold tracking-[-0.01em] outline-none focus-visible:ring-1"
+          aria-label={title ? "Back to the library" : "Yomu library"}
+          className="hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-2 rounded-lg px-1.5 outline-none focus-visible:ring-2"
         >
           <span
             aria-hidden
-            className="bg-foreground text-background grid size-[18px] place-items-center rounded-[4px] text-[0.625rem] font-bold"
+            className="bg-primary text-primary-foreground grid size-5 place-items-center rounded-[6px] font-serif text-[0.6875rem] font-semibold"
           >
             読
           </span>
           {title ? (
-            <span className="text-muted-foreground hover:text-foreground font-normal">
+            <span className="text-muted-foreground flex items-center gap-1 pr-1">
+              <ChevronLeft className="size-3.5" aria-hidden />
               Library
             </span>
           ) : (
-            "Yomu"
+            <span className="font-display pr-1 text-[0.9375rem] font-semibold tracking-[-0.01em]">
+              Yomu
+            </span>
           )}
         </button>
       </div>
 
       <p
         data-tauri-drag-region
-        className="text-muted-foreground min-w-0 flex-1 truncate text-center"
+        className={
+          "text-muted-foreground min-w-0 flex-1 truncate text-center font-serif text-[0.8125rem] transition-opacity duration-[var(--dur)] " +
+          (pastTitle ? "opacity-100" : "opacity-0")
+        }
         title={title ?? undefined}
       >
         {title}
@@ -59,26 +77,37 @@ export function TopBar() {
 
       <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
         <UpdateBanner />
-        {agentStatus !== "ready" && (
+        {article && <ArticleTools article={article} />}
+        {article && agentStatus !== "ready" && (
           <button
             type="button"
             onClick={() => setSetupOpen(true)}
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 flex h-7 items-center gap-1.5 rounded-md px-2 outline-none focus-visible:ring-1"
+            className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-2 rounded-lg px-2.5 outline-none focus-visible:ring-2"
           >
-            <span
-              aria-hidden
-              className="ring-muted-foreground size-1.5 rounded-full ring-1"
-            />
+            <span aria-hidden className="bg-honey size-1.5 rounded-full" />
             {agentStatus === "checking" ? "Checking Codex…" : "Set up Explain"}
           </button>
         )}
+        {article && <span aria-hidden className="bg-border mx-1 h-5 w-px" />}
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
-          className="text-muted-foreground hover:text-foreground hover:border-input border-border focus-visible:ring-ring/60 flex h-7 items-center gap-3 rounded-md border px-2.5 outline-none focus-visible:ring-1"
+          className="bg-background text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mr-0.5 flex h-8 w-52 items-center gap-2 rounded-lg px-2.5 shadow-[var(--shadow-card)] outline-none focus-visible:ring-2"
         >
-          Search
-          <kbd className="font-sans text-[0.6875rem] opacity-70">{MOD}K</kbd>
+          <Search className="size-3.5" aria-hidden />
+          Search or jump to…
+          <kbd className="bg-muted ml-auto rounded px-1.5 py-px font-sans text-[0.6875rem]">
+            {MOD}K
+          </kbd>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTheme(dark ? "light" : "dark")}
+          aria-label={dark ? "Use the light theme" : "Use the dark theme"}
+          title={dark ? "Light theme" : "Dark theme"}
+          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 grid size-8 place-items-center rounded-lg outline-none focus-visible:ring-2"
+        >
+          {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
         <ReaderSettings />
       </div>
