@@ -95,7 +95,11 @@ describe("priorExplanations", () => {
 
   it("excludes summaries, plain follow-ups, unanswered questions and image questions", () => {
     const messages = [
-      { role: "user" as const, text: "Summarize this article", summary: true },
+      {
+        role: "user" as const,
+        text: "Summarize this article",
+        scope: "article" as const,
+      },
       a("Summary answer."),
       { role: "user" as const, text: "a plain follow up, no highlight" },
       a("Follow-up answer."),

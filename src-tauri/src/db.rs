@@ -74,6 +74,12 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_4,
         },
+        Migration {
+            version: 5,
+            description: "message scope",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_5,
+        },
     ]
 }
 
@@ -147,4 +153,12 @@ pub const MIGRATION_3: &str = r#"
 /// scraper/jsonld.rs), separate from `scraped_at` (when *we* fetched it).
 pub const MIGRATION_4: &str = r#"
     ALTER TABLE articles ADD COLUMN published_at INTEGER;
+"#;
+
+/// What a message is about: `passage` (the first question about a selected
+/// passage), `followup` (a reply inside that note), `article` (a question
+/// about the whole article) or `library` (a question across saved articles).
+/// NULL on rows from before this migration; `src/lib/scope.ts` infers it.
+pub const MIGRATION_5: &str = r#"
+    ALTER TABLE messages ADD COLUMN scope TEXT;
 "#;

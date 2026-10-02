@@ -1,3 +1,4 @@
+import type { MessageScope } from "@/lib/scope";
 import type { Block } from "@/types/article";
 
 /** A row from the `articles` table (see src-tauri/src/db.rs), fully
@@ -67,10 +68,12 @@ export interface Chat {
   acpSessionId: string | null;
 }
 
-/** `highlight` is set on the message that started an explain. */
+/** `highlight` is set on the message that started an explain. `scope` is
+ * stored for new rows and inferred for older ones (see lib/scope.ts). */
 export interface StoredMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  scope: MessageScope;
   highlight: Highlight | null;
 }

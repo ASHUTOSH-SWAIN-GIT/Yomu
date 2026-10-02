@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildPrompt, buildSummaryPrompt } from "@/lib/prompt";
+import {
+  buildArticlePrompt,
+  buildLibraryPrompt,
+  buildPrompt,
+} from "@/lib/prompt";
 import { makeArticle, p } from "@/test/fixtures";
 import type { Highlight } from "@/types/library";
 
@@ -265,17 +269,71 @@ describe("buildPrompt personalization", () => {
   });
 });
 
-describe("buildSummaryPrompt", () => {
+describe("buildArticlePrompt", () => {
+  it("puts the article first and the instruction last", () => {
+    const article = makeArticle([p("Each value has one owner.")]);
+    const prompt = buildArticlePrompt(article, "List the key points.");
+    expect(prompt).toContain("Ownership in Rust (https://example.dev/post)");
+    expect(prompt).toContain("Each value has one owner.");
+    expect(prompt).toContain("Do not use tools");
+    expect(prompt.trim().endsWith("List the key points.")).toBe(true);
+  });
+
+  it("appends personalization notes after the instruction", () => {
+    const prompt = buildArticlePrompt(makeArticle([p("text")]), "Summarize.", [
+      "The developer is new to this topic.",
+    ]);
+    expect(prompt.indexOf("Summarize.")).toBeLessThan(
+      prompt.indexOf("The developer is new"),
+    );
+  });
+
   it("truncates very long articles and says so", () => {
     const article = makeArticle([p("y".repeat(40000))]);
-    const prompt = buildSummaryPrompt(article);
+    const prompt = buildArticlePrompt(article, "Summarize.");
     expect(prompt).toContain("[article truncated]");
     expect(prompt.length).toBeLessThan(31000);
   });
 
   it("does not mark short articles as truncated", () => {
-    expect(buildSummaryPrompt(makeArticle([p("short")]))).not.toContain(
-      "truncated",
+    expect(
+      buildArticlePrompt(makeArticle([p("short")]), "Summarize."),
+    ).not.toContain("truncated");
+  });
+});
+
+describe("buildLibraryPrompt", () => {
+  const passages = [
+    { articleId: "a", title: "Rust ownership", snippet: "one owner at a time" },
+    { articleId: "b", title: "Go generics", snippet: "type parameters" },
+  ];
+
+  it("lists the supplied passages and restricts citations to them", () => {
+    const prompt = buildLibraryPrompt("What is ownership?", passages, null);
+    expect(prompt).toContain('- "Rust ownership": one owner at a time');
+    expect(prompt).toContain('- "Go generics": type parameters');
+    expect(prompt).toContain("never cite a title that is not listed");
+    expect(prompt).toContain("Question: What is ownership?");
+  });
+
+  it("says nothing matched instead of leaving the section empty", () => {
+    const prompt = buildLibraryPrompt("anything", [], null);
+    expect(prompt).toContain("No saved article matched this question.");
+  });
+
+  it("names the open article only when there is one", () => {
+    expect(buildLibraryPrompt("q", passages, "Open one")).toContain(
+      'currently reading: "Open one"',
+    );
+    expect(buildLibraryPrompt("q", passages, null)).not.toContain(
+      "currently reading",
+    );
+  });
+
+  it("appends personalization notes after the question", () => {
+    const prompt = buildLibraryPrompt("q", passages, null, ["Be concise."]);
+    expect(prompt.indexOf("Question: q")).toBeLessThan(
+      prompt.indexOf("Be concise."),
     );
   });
 });

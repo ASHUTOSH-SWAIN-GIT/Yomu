@@ -5,7 +5,7 @@ export type ShortcutId =
   | "new-tab"
   | "close-tab"
   | "toggle-sidebar"
-  | "toggle-answer"
+  | "focus-ask"
   | "focus-mode"
   | "paste-link"
   | `tab-${number}`;
@@ -27,7 +27,7 @@ export function shortcutFor(e: KeyLike): ShortcutId | null {
   if (key === "t") return "new-tab";
   if (key === "w") return "close-tab";
   if (key === "b") return "toggle-sidebar";
-  if (key === "j") return "toggle-answer";
+  if (key === "j") return "focus-ask";
   if (key === ".") return "focus-mode";
   if (/^[1-9]$/.test(key)) return `tab-${Number(key)}`;
   return null;

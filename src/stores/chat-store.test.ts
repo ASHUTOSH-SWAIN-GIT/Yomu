@@ -32,6 +32,7 @@ vi.mock("@/lib/db", () => ({
   getChatForArticle: vi.fn(),
   listHighlights: vi.fn(),
   listMessages: vi.fn(),
+  libraryPassages: vi.fn(),
   relatedArticles: vi.fn(),
   setChatSession: vi.fn(),
 }));
@@ -80,6 +81,7 @@ beforeEach(async () => {
   m(db.listHighlights).mockResolvedValue([]);
   m(db.listMessages).mockResolvedValue([]);
   m(db.relatedArticles).mockResolvedValue([]);
+  m(db.libraryPassages).mockResolvedValue([]);
   m(commands.agentNewSession).mockResolvedValue("s1");
   m(commands.agentCancel).mockResolvedValue(undefined);
   await useChatStore.getState().loadForArticle(null);
@@ -109,11 +111,14 @@ describe("explain", () => {
       "user",
       "Each value",
       "h1",
+      "passage",
     );
     expect(db.addMessage).toHaveBeenCalledWith(
       "c1",
       "assistant",
       "It means one owner.",
+      null,
+      "passage",
     );
   });
 
@@ -247,6 +252,7 @@ describe("askAbout", () => {
       "user",
       "why is it dropped?",
       "h1",
+      "passage",
     );
   });
 
@@ -437,7 +443,13 @@ describe("stop", () => {
     finish(); // the agent ends the turn after the cancel
     await running;
     expect(useChatStore.getState().streaming).toBe(false);
-    expect(db.addMessage).toHaveBeenCalledWith("c1", "assistant", "partial");
+    expect(db.addMessage).toHaveBeenCalledWith(
+      "c1",
+      "assistant",
+      "partial",
+      null,
+      "passage",
+    );
   });
 
   it("is a no-op when nothing is streaming", async () => {
@@ -606,7 +618,15 @@ describe("restoring a saved chat", () => {
         new Promise((r) =>
           setTimeout(
             () =>
-              r([{ id: "x", role: "user", content: "stale", highlight: null }]),
+              r([
+                {
+                  id: "x",
+                  role: "user",
+                  content: "stale",
+                  scope: "followup",
+                  highlight: null,
+                },
+              ]),
             20,
           ),
         ),
@@ -616,5 +636,150 @@ describe("restoring a saved chat", () => {
     await slow;
     expect(useChatStore.getState().articleId).toBe("a2");
     expect(useChatStore.getState().messages).toEqual([]);
+  });
+});
+
+describe("article questions", () => {
+  it("sends the article with the instruction and saves both sides as article scope", async () => {
+    agentReplies("It is about ownership.");
+    await useChatStore.getState().askArticle(article, "What is this about?");
+
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).toContain("Each value has one owner.");
+    expect(prompt.trim().endsWith("What is this about?")).toBe(true);
+    const s = useChatStore.getState();
+    expect(s.messages.map((x) => [x.role, x.scope])).toEqual([
+      ["user", "article"],
+      ["assistant", "article"],
+    ]);
+    expect(db.addMessage).toHaveBeenCalledWith(
+      "c1",
+      "user",
+      "What is this about?",
+      null,
+      "article",
+    );
+    expect(db.addMessage).toHaveBeenCalledWith(
+      "c1",
+      "assistant",
+      "It is about ownership.",
+      null,
+      "article",
+    );
+  });
+
+  it("turns a quick action's stored message back into its instruction", async () => {
+    agentReplies("- a\n- b");
+    await useChatStore.getState().askArticle(article, "Quiz me");
+    expect(m(commands.agentPrompt).mock.calls[0][1]).toContain(
+      "short quiz of 4 questions",
+    );
+    expect(useChatStore.getState().messages[0].text).toBe("Quiz me");
+  });
+
+  it("opens the sheet and ignores an empty question", async () => {
+    const { useUiStore } = await import("@/stores/ui-store");
+    useUiStore.getState().setAnswerOpen(false);
+    await useChatStore.getState().askArticle(article, "   ");
+    expect(commands.agentPrompt).not.toHaveBeenCalled();
+    agentReplies("x");
+    await useChatStore.getState().askArticle(article, "why?");
+    expect(useUiStore.getState().answerOpen).toBe(true);
+  });
+
+  it("regenerating re-asks the same article question with the article", async () => {
+    agentReplies("first");
+    await useChatStore.getState().askArticle(article, "Key takeaways");
+    agentReplies("second");
+    m(commands.agentPrompt).mockClear();
+    agentReplies("second");
+    await useChatStore.getState().regenerate(article);
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).toContain("3 to 5 most important takeaways");
+    expect(
+      useChatStore.getState().messages.map((x) => [x.role, x.text, x.scope]),
+    ).toEqual([
+      ["user", "Key takeaways", "article"],
+      ["assistant", "second", "article"],
+    ]);
+  });
+});
+
+describe("library questions", () => {
+  it("answers from the library passages, not the article body", async () => {
+    m(db.libraryPassages).mockResolvedValue([
+      { articleId: "b", title: "Go generics", snippet: "type parameters" },
+    ]);
+    agentReplies("See Go generics.");
+    await useChatStore
+      .getState()
+      .askLibrary(article, "Where did I read about generics?");
+
+    expect(db.libraryPassages).toHaveBeenCalledWith(
+      "Where did I read about generics?",
+    );
+    const prompt = m(commands.agentPrompt).mock.calls[0][1];
+    expect(prompt).toContain('- "Go generics": type parameters');
+    expect(prompt).not.toContain("Each value has one owner.");
+    expect(useChatStore.getState().messages[0].scope).toBe("library");
+  });
+
+  it("still sends the article to a later passage question in the same session", async () => {
+    agentReplies("none found");
+    await useChatStore.getState().askLibrary(article, "anything?");
+    agentReplies("It means one owner.");
+    m(commands.agentPrompt).mockClear();
+    agentReplies("It means one owner.");
+    await useChatStore.getState().explain(article, selection);
+    // The library turn never carried the article, so this must.
+    expect(m(commands.agentPrompt).mock.calls[0][1]).toContain(
+      "Article context:",
+    );
+  });
+
+  it("asks anyway when the library search fails", async () => {
+    m(db.libraryPassages).mockRejectedValue(new Error("fts broke"));
+    agentReplies("I could not find anything.");
+    await useChatStore.getState().askLibrary(article, "q");
+    expect(m(commands.agentPrompt).mock.calls[0][1]).toContain(
+      "No saved article matched this question.",
+    );
+  });
+});
+
+describe("loading a saved chat", () => {
+  it("gives each reply the scope of the question before it", async () => {
+    m(db.getChatForArticle).mockResolvedValue({
+      id: "c1",
+      articleId: "a1",
+      acpSessionId: null,
+    });
+    const user = (id: string, content: string, scope: string) => ({
+      id,
+      role: "user",
+      content,
+      scope,
+      highlight: null,
+    });
+    const reply = (id: string) => ({
+      id,
+      role: "assistant",
+      content: "ok",
+      scope: "followup",
+      highlight: null,
+    });
+    m(db.listMessages).mockResolvedValue([
+      user("1", "Summarize this article", "article"),
+      reply("2"),
+      user("3", "and then?", "followup"),
+      reply("4"),
+    ]);
+    await useChatStore.getState().loadForArticle("a1");
+    expect(useChatStore.getState().messages.map((x) => x.scope)).toEqual([
+      "article",
+      "article",
+      "followup",
+      "followup",
+    ]);
   });
 });

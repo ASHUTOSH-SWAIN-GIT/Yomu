@@ -10,21 +10,22 @@ import { Markdown } from "@/components/chat/markdown";
 import { groupExchanges, type Exchange } from "@/lib/exchanges";
 import { parseImageQuote } from "@/lib/images";
 import { logError } from "@/lib/log";
+import { isThreadScope } from "@/lib/scope";
 import { cn } from "@/lib/utils";
 import { rangeInBlock } from "@/hooks/use-highlights";
 import { useChatStore } from "@/stores/chat-store";
+import { useSelectionStore } from "@/stores/selection-store";
 import { useUiStore } from "@/stores/ui-store";
 import type { Highlight, StoredArticle } from "@/types/library";
 
 const GAP = 14; // px between stacked notes
 const COLLAPSED_MAX = 176; // px before a note folds
 
-/** One note: a passage (or the summary) and every exchange about it,
- * including follow-ups asked after it. */
+/** One note: a passage and every exchange about it, including follow-ups
+ * asked after it. */
 interface Thread {
   key: string;
-  highlight: Highlight | null;
-  summary: boolean;
+  highlight: Highlight;
   exchanges: Exchange[];
 }
 
@@ -35,16 +36,13 @@ function buildThreads(
   const byId = new Map(highlights.map((h) => [h.id, h]));
   const threads: Thread[] = [];
   for (const e of exchanges) {
+    // Article and library questions live in the thread sheet, not here.
+    if (isThreadScope(e.question.scope)) continue;
     const h = e.question.highlightId
       ? byId.get(e.question.highlightId)
       : undefined;
-    if (h || e.question.summary) {
-      threads.push({
-        key: h?.id ?? `summary-${threads.length}`,
-        highlight: h ?? null,
-        summary: !h,
-        exchanges: [e],
-      });
+    if (h) {
+      threads.push({ key: h.id, highlight: h, exchanges: [e] });
     } else {
       // A follow-up belongs to the note it was asked after.
       threads[threads.length - 1]?.exchanges.push(e);
@@ -90,9 +88,7 @@ export function MarginNotes({
 
   // Light up the passage of the note being pointed at (or read).
   const activeKey =
-    hovered ??
-    threads.find((t) => t.highlight && t.highlight.id === answerFocus)?.key ??
-    null;
+    hovered ?? threads.find((t) => t.highlight.id === answerFocus)?.key ?? null;
   useLayoutEffect(() => {
     if (typeof CSS === "undefined" || !("highlights" in CSS)) return;
     const range = activeKey ? ranges.current.get(activeKey) : undefined;
@@ -121,7 +117,6 @@ export function MarginNotes({
 
     ranges.current.clear();
     const anchored = threads.map((t) => {
-      if (!t.highlight) return { t, y: 0, rect: null as DOMRect | null };
       const block = text.querySelector<HTMLElement>(
         `[data-block-index="${t.highlight.blockIndex}"]`,
       );
@@ -149,7 +144,7 @@ export function MarginNotes({
       notes[t.key] = top;
       const height = noteRefs.current.get(t.key)?.offsetHeight ?? 0;
       floor = top + height + GAP;
-      if (t.highlight && rect) {
+      if (rect) {
         n += 1;
         marks.push({
           key: t.key,
@@ -186,7 +181,7 @@ export function MarginNotes({
         aria-label="Notes"
         className="absolute top-0 right-0 w-[var(--margin-w)]"
       >
-        {threads.length === 0 && <EmptyMargin article={article} />}
+        {threads.length === 0 && <EmptyMargin />}
         {threads.map((t) => (
           <Note
             key={t.key}
@@ -204,7 +199,7 @@ export function MarginNotes({
             top={layout.notes[t.key]}
             latest={t.key === latestKey}
             focused={
-              answerFocus === t.highlight?.id ||
+              answerFocus === t.highlight.id ||
               (t.key === latestKey && streaming)
             }
             article={article}
@@ -269,22 +264,21 @@ function Note({
   }
 
   function followUp() {
-    setAnswerFocus(thread.highlight?.id ?? null);
+    setAnswerFocus(thread.highlight.id);
     setAnswerOpen(true);
+    useSelectionStore
+      .getState()
+      .setReplyTo({ highlightId: thread.highlight.id, number: number ?? 0 });
     requestAnimationFrame(() => document.getElementById("ask-input")?.focus());
   }
 
-  const label = thread.summary
-    ? "Summary"
-    : parseImageQuote(thread.highlight?.text ?? "")
-      ? `${number ?? ""} Image`
-      : String(number ?? "");
+  const isImage = parseImageQuote(thread.highlight.text) !== null;
 
   return (
     <section
       ref={ref}
-      aria-label={thread.summary ? "Summary" : `Note ${number ?? ""}`}
-      onClick={() => setAnswerFocus(thread.highlight?.id ?? null)}
+      aria-label={`Note ${number ?? ""}`}
+      onClick={() => setAnswerFocus(thread.highlight.id)}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       className={cn(
@@ -297,18 +291,10 @@ function Note({
       style={{ top: top ?? 0 }}
     >
       <p className="text-muted-foreground mb-2 flex items-center gap-2 font-sans text-[0.6875rem] font-medium">
-        {thread.summary ? (
-          <Sparkles className="text-honey-ink size-3.5" aria-hidden />
-        ) : (
-          <span className="bg-honey grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[0.625rem] font-bold text-[#2a1d05] tabular-nums">
-            {number ?? "·"}
-          </span>
-        )}
-        {thread.summary
-          ? "Summary"
-          : label.endsWith("Image")
-            ? "About this image"
-            : "Note"}
+        <span className="bg-honey grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[0.625rem] font-bold text-[#2a1d05] tabular-nums">
+          {number ?? "·"}
+        </span>
+        {isImage ? "About this image" : "Note"}
       </p>
 
       <div
@@ -321,7 +307,6 @@ function Note({
         {thread.exchanges.map((e, i) => {
           const answer = e.answers[e.answers.length - 1];
           const ownQuestion =
-            !e.question.summary &&
             e.question.text !== "Explain this" &&
             !parseImageQuote(e.question.quote ?? "");
           return (
@@ -400,9 +385,7 @@ function Note({
 }
 
 /** Before the first question, the margin says what it is for. */
-function EmptyMargin({ article }: { article: StoredArticle }) {
-  const summarize = useChatStore((s) => s.summarize);
-  const streaming = useChatStore((s) => s.streaming);
+function EmptyMargin() {
   return (
     <div className="text-muted-foreground sticky top-6 -mx-3.5 mt-[5.5rem] rounded-xl px-3.5 py-3.5 text-[0.75rem] leading-[1.6] shadow-[inset_0_0_0_1px_var(--border)]">
       <p className="text-foreground mb-1 flex items-center gap-2 font-medium">
@@ -410,17 +393,9 @@ function EmptyMargin({ article }: { article: StoredArticle }) {
         Your margin
       </p>
       <p>
-        Select any passage to ask about it. Answers are written here, beside the
+        Select any passage, then ask below. Answers are written here, beside the
         text they explain.
       </p>
-      <button
-        type="button"
-        disabled={streaming}
-        onClick={() => void summarize(article)}
-        className="bg-card text-foreground hover:bg-accent focus-visible:ring-ring/60 mt-3 h-7 rounded-lg px-2.5 font-medium shadow-[var(--shadow-card)] outline-none focus-visible:ring-2 disabled:opacity-50"
-      >
-        Summarize the article
-      </button>
     </div>
   );
 }

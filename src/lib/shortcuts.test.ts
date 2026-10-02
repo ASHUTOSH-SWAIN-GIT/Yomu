@@ -15,7 +15,7 @@ describe("shortcutFor", () => {
     ["t", "new-tab"],
     ["w", "close-tab"],
     ["b", "toggle-sidebar"],
-    ["j", "toggle-answer"],
+    ["j", "focus-ask"],
     [".", "focus-mode"],
     ["1", "tab-1"],
     ["9", "tab-9"],

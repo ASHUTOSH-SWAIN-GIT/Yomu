@@ -11,7 +11,6 @@ import { useThemeEffect } from "@/hooks/use-theme";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { shortcutFor } from "@/lib/shortcuts";
 import { useAgentStore } from "@/stores/agent-store";
-import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
@@ -66,10 +65,9 @@ export function AppShell() {
       if (command === "palette") ui.setPaletteOpen(!ui.paletteOpen);
       else if (command === "new-tab") void tabs.newTab();
       else if (command === "close-tab") void tabs.close(tabs.activeId);
-      else if (command === "toggle-answer") {
-        if (useChatStore.getState().messages.length > 0)
-          ui.setAnswerOpen(!ui.answerOpen);
-      } else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
+      else if (command === "focus-ask")
+        document.getElementById("ask-input")?.focus();
+      else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
       else if (command === "paste-link") void openLinkFromClipboard();
       else if (command.startsWith("tab-")) {
         const tab = tabs.tabs[Number(command.slice(4)) - 1];

@@ -22,6 +22,7 @@ import {
   spaceOfArticle,
 } from "@/lib/spaces";
 import { cn } from "@/lib/utils";
+import { SUMMARY_LABEL } from "@/lib/scope";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
@@ -131,7 +132,10 @@ function PaletteBody({ close }: { close: () => void }) {
             id: "summarize",
             label: "Summarize this article",
             icon: <Sparkles />,
-            run: () => void useChatStore.getState().summarize(openArticleId),
+            run: () =>
+              void useChatStore
+                .getState()
+                .askArticle(openArticleId, SUMMARY_LABEL),
           },
         ]
       : []),

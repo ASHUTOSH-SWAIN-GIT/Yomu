@@ -180,20 +180,54 @@ export function buildPrompt(
 }
 
 // Long articles are cut to keep the request a sensible size.
-const SUMMARY_MAX_CHARS = 30000;
+const ARTICLE_MAX_CHARS = 30000;
 
-/** Prompt for "Summarize this article" (no selection needed). */
-export function buildSummaryPrompt(article: StoredArticle): string {
+/** Prompt for a question about the whole article (summary, takeaways, quiz
+ * or a free-form question): the article text, then the instruction. */
+export function buildArticlePrompt(
+  article: StoredArticle,
+  instruction: string,
+  personalizationNotes: string[] = [],
+): string {
   const body = fullArticleText(article.blocks);
-  const truncated = body.length > SUMMARY_MAX_CHARS;
+  const truncated = body.length > ARTICLE_MAX_CHARS;
   return [
-    "You are helping a developer decide what to take from a technical article. Use only the text below. Do not use tools, read files, or browse. Reply in Markdown.",
+    "You are helping a developer read a technical article. Use only the text below. Do not use tools, read files, or browse. Reply in Markdown.",
     "",
     `Article: ${article.title} (${article.url})`,
     "",
-    body.slice(0, SUMMARY_MAX_CHARS) +
+    body.slice(0, ARTICLE_MAX_CHARS) +
       (truncated ? "\n\n[article truncated]" : ""),
     "",
-    "Summarize it: a few bullet points with the key ideas, then one sentence on who should read it and why.",
+    [instruction, ...personalizationNotes].join("\n"),
   ].join("\n");
+}
+
+/** Prompt for a question across the developer's saved library. The model
+ * may only draw on the passages supplied, and may only cite titles that are
+ * in them, so the UI can trust and link every citation it shows. */
+export function buildLibraryPrompt(
+  question: string,
+  passages: RelatedArticle[],
+  currentTitle: string | null,
+  personalizationNotes: string[] = [],
+): string {
+  const found =
+    passages.length > 0
+      ? passages.map((r) => `- "${r.title}": ${r.snippet}`).join("\n")
+      : "(No saved article matched this question.)";
+  return [
+    "You are helping a developer search their own saved reading. Answer using only the passages below, which come from articles they saved. Cite the article title in quotes whenever you use a passage, and never cite a title that is not listed. If the passages do not answer the question, say so plainly instead of guessing. Do not use tools, read files, or browse. Reply in Markdown.",
+    "",
+    currentTitle
+      ? `The developer is currently reading: "${currentTitle}"`
+      : null,
+    currentTitle ? "" : null,
+    "Passages from saved articles:",
+    found,
+    "",
+    [`Question: ${question}`, ...personalizationNotes].join("\n"),
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }

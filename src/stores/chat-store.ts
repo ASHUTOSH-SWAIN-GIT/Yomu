@@ -15,6 +15,7 @@ import {
   getChatForArticle,
   listHighlights,
   listMessages,
+  libraryPassages as findLibraryPassages,
   relatedArticles as findRelatedArticles,
   setChatSession,
 } from "@/lib/db";
@@ -22,9 +23,12 @@ import { priorExplanations as findPriorExplanations } from "@/lib/exchanges";
 import { explainPrefInstructions } from "@/lib/explain-prefs";
 import { logError } from "@/lib/log";
 import { imageQuote, parseImageQuote } from "@/lib/images";
+import { articleInstruction } from "@/lib/quick-actions";
+import type { MessageScope } from "@/lib/scope";
 import {
   buildPrompt,
-  buildSummaryPrompt,
+  buildArticlePrompt,
+  buildLibraryPrompt,
   type PromptOptions,
 } from "@/lib/prompt";
 import { useAgentStore } from "@/stores/agent-store";
@@ -38,11 +42,11 @@ export interface ChatMessage {
   /** Set on the message that started an explain. */
   quote?: string;
   highlightId?: string;
-  /** True for the "Summarize this article" request. */
-  summary?: boolean;
+  /** What the message is about; decides whether it shows in a margin note
+   * or in the thread sheet (see lib/scope.ts). */
+  scope?: MessageScope;
 }
 
-const SUMMARY_LABEL = "Summarize this article";
 const EXPLAIN_LABEL = "Explain this";
 
 export type Selection = Omit<Highlight, "id" | "articleId">;
@@ -74,8 +78,10 @@ interface ChatStore {
     article: StoredArticle,
     image: { blockIndex: number; src: string; alt: string | null },
   ) => Promise<void>;
-  /** Summarizes the whole article, no selection needed. */
-  summarize: (article: StoredArticle) => Promise<void>;
+  /** Asks about the whole article (a quick action's message or free text). */
+  askArticle: (article: StoredArticle, text: string) => Promise<void>;
+  /** Asks a question answered from the developer's other saved articles. */
+  askLibrary: (article: StoredArticle, text: string) => Promise<void>;
   /** Stops the reply in flight; the partial text is kept and saved. */
   stop: () => Promise<void>;
 }
@@ -111,6 +117,8 @@ function specFor(
 }
 let lastBuild: PromptBuilder | null = null;
 let lastHighlight: Highlight | null = null;
+// The scope of the turn in flight, stamped on its streamed reply.
+let turnScope: MessageScope = "passage";
 // Sessions (by live ACP session id) that have already received the full
 // article body once this app run — lets buildPrompt skip resending it on a
 // later Explain/question in the same session, since the model already has
@@ -135,7 +143,11 @@ export const useChatStore = create<ChatStore>((set, get) => {
               text: last.text + event.text,
             };
           } else {
-            messages.push({ role: "assistant", text: event.text });
+            messages.push({
+              role: "assistant",
+              text: event.text,
+              scope: turnScope,
+            });
           }
           return { messages };
         });
@@ -145,7 +157,13 @@ export const useChatStore = create<ChatStore>((set, get) => {
         const last = messages[messages.length - 1];
         set({ streaming: false });
         if (chat && last?.role === "assistant" && last.text) {
-          void addMessage(chat.id, "assistant", last.text);
+          void addMessage(
+            chat.id,
+            "assistant",
+            last.text,
+            null,
+            last.scope ?? turnScope,
+          );
         }
         break;
       }
@@ -186,7 +204,14 @@ export const useChatStore = create<ChatStore>((set, get) => {
     return { sessionId, fresh: true };
   }
 
-  async function runTurn(chat: Chat, build: PromptBuilder) {
+  /** `sendsArticle` is false for turns that don't put the article body in
+   * the model's context (a library question), so a later passage question
+   * still sends it. */
+  async function runTurn(
+    chat: Chat,
+    build: PromptBuilder,
+    sendsArticle = true,
+  ) {
     lastBuild = build;
     set({ streaming: true, error: null });
     try {
@@ -196,7 +221,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       // Whatever kind of turn this is, the model now has the article body
       // in its own session context (a plain Explain sends it via
       // buildPrompt; summarize sends even more of it directly).
-      fullContextSentFor.add(sessionId);
+      if (sendsArticle) fullContextSentFor.add(sessionId);
       if (imageUrl) await agentPrompt(sessionId, text, imageUrl);
       else await agentPrompt(sessionId, text);
     } catch (err) {
@@ -237,6 +262,21 @@ export const useChatStore = create<ChatStore>((set, get) => {
     }
   }
 
+  /** Passages from across the saved library for an "ask my library" turn.
+   * A search hiccup yields none; the prompt then says nothing matched. */
+  async function libraryPassagesFor(text: string) {
+    try {
+      return await findLibraryPassages(text);
+    } catch (err) {
+      logError("library lookup failed", err);
+      return [];
+    }
+  }
+
+  /** Personalization sentences (level, code examples) for any prompt. */
+  const notes = () =>
+    explainPrefInstructions(useUiStore.getState().explainPrefs);
+
   /** Saves a highlight and asks about it: an explanation when `question` is
    * absent, otherwise the user's own question about that passage. */
   async function startOnHighlight(
@@ -245,7 +285,11 @@ export const useChatStore = create<ChatStore>((set, get) => {
     question?: string,
   ) {
     if (get().streaming) return;
-    useUiStore.getState().setAnswerOpen(true);
+    // The answer is written in the margin when there is room for one; only
+    // a narrow window shows it in the sheet above the bar.
+    if (!useUiStore.getState().notesInMargin) {
+      useUiStore.getState().setAnswerOpen(true);
+    }
     useUiStore.getState().setAnswerFocus(null);
 
     const chat = await chatFor(article);
@@ -256,7 +300,14 @@ export const useChatStore = create<ChatStore>((set, get) => {
     lastHighlight = highlight;
     // The message content is the question, or the passage itself for a plain
     // explanation (restore shows that case as "Explain this").
-    await addMessage(chat.id, "user", question ?? highlight.text, highlight.id);
+    await addMessage(
+      chat.id,
+      "user",
+      question ?? highlight.text,
+      highlight.id,
+      "passage",
+    );
+    turnScope = "passage";
     set((s) => ({
       chat,
       highlights: [...s.highlights, highlight],
@@ -267,6 +318,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           text: question ?? EXPLAIN_LABEL,
           quote: highlight.text,
           highlightId: highlight.id,
+          scope: "passage",
         },
       ],
     }));
@@ -327,19 +379,24 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
       const withHighlight = [...stored].reverse().find((m) => m.highlight);
       lastHighlight = withHighlight?.highlight ?? null;
+      // A reply belongs to the question before it, so it takes that scope.
+      let scope: MessageScope = "followup";
       set({
         chat,
-        messages: stored.map((m) => ({
-          role: m.role,
-          // A plain explanation stores the passage itself as its content.
-          text:
-            m.highlight && m.content === m.highlight.text
-              ? EXPLAIN_LABEL
-              : m.content,
-          quote: m.highlight?.text,
-          highlightId: m.highlight?.id,
-          summary: m.role === "user" && m.content === SUMMARY_LABEL,
-        })),
+        messages: stored.map((m) => {
+          if (m.role === "user") scope = m.scope;
+          return {
+            role: m.role,
+            // A plain explanation stores the passage itself as its content.
+            text:
+              m.highlight && m.content === m.highlight.text
+                ? EXPLAIN_LABEL
+                : m.content,
+            quote: m.highlight?.text,
+            highlightId: m.highlight?.id,
+            scope,
+          };
+        }),
       });
     },
 
@@ -356,8 +413,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
     async send(article, text) {
       if (get().streaming) return;
       const chat = await chatFor(article);
-      await addMessage(chat.id, "user", text);
-      set((s) => ({ chat, messages: [...s.messages, { role: "user", text }] }));
+      await addMessage(chat.id, "user", text, null, "followup");
+      turnScope = "followup";
+      set((s) => ({
+        chat,
+        messages: [...s.messages, { role: "user", text, scope: "followup" }],
+      }));
 
       // A follow up normally rides on the live session's context. If the
       // session was lost (fresh), re-send the passage context with it.
@@ -385,6 +446,11 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }
       const highlight = highlights.find((h) => h.id === lastUser.highlightId);
       const asked = lastUser.text !== EXPLAIN_LABEL;
+      turnScope = lastUser.scope ?? "followup";
+      const library =
+        lastUser.scope === "library"
+          ? await libraryPassagesFor(lastUser.text)
+          : [];
       const related = highlight
         ? await relatedArticlesFor(
             article.id,
@@ -406,7 +472,25 @@ export const useChatStore = create<ChatStore>((set, get) => {
               : undefined,
           });
         }
-        if (lastUser.summary) return { text: buildSummaryPrompt(article) };
+        if (lastUser.scope === "article") {
+          return {
+            text: buildArticlePrompt(
+              article,
+              articleInstruction(lastUser.text),
+              notes(),
+            ),
+          };
+        }
+        if (lastUser.scope === "library") {
+          return {
+            text: buildLibraryPrompt(
+              lastUser.text,
+              library,
+              article.title,
+              notes(),
+            ),
+          };
+        }
         return fresh && lastHighlight
           ? specFor(article, lastHighlight, {
               question: lastUser.text,
@@ -431,18 +515,53 @@ export const useChatStore = create<ChatStore>((set, get) => {
       });
     },
 
-    async summarize(article) {
-      if (get().streaming) return;
+    async askArticle(article, text) {
+      const question = text.trim();
+      if (!question || get().streaming) return;
       const chat = await chatFor(article);
-      await addMessage(chat.id, "user", SUMMARY_LABEL);
+      await addMessage(chat.id, "user", question, null, "article");
+      turnScope = "article";
+      useUiStore.getState().setAnswerOpen(true);
+      useUiStore.getState().setAnswerFocus(null);
       set((s) => ({
         chat,
         messages: [
           ...s.messages,
-          { role: "user", text: SUMMARY_LABEL, summary: true },
+          { role: "user", text: question, scope: "article" },
         ],
       }));
-      await runTurn(chat, () => ({ text: buildSummaryPrompt(article) }));
+      await runTurn(chat, () => ({
+        text: buildArticlePrompt(
+          article,
+          articleInstruction(question),
+          notes(),
+        ),
+      }));
+    },
+
+    async askLibrary(article, text) {
+      const question = text.trim();
+      if (!question || get().streaming) return;
+      const chat = await chatFor(article);
+      await addMessage(chat.id, "user", question, null, "library");
+      turnScope = "library";
+      useUiStore.getState().setAnswerOpen(true);
+      useUiStore.getState().setAnswerFocus(null);
+      set((s) => ({
+        chat,
+        messages: [
+          ...s.messages,
+          { role: "user", text: question, scope: "library" },
+        ],
+      }));
+      const passages = await libraryPassagesFor(question);
+      await runTurn(
+        chat,
+        () => ({
+          text: buildLibraryPrompt(question, passages, article.title, notes()),
+        }),
+        false,
+      );
     },
 
     async stop() {

@@ -31,7 +31,7 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
       type: "paragraph",
       spans: [
         {
-          text: "Select this sentence with your mouse. A bar appears at the bottom of the window with your selection in it. Press ",
+          text: "Select this sentence with your mouse. It lands in the ask bar at the bottom of the window, which is always there. Press ",
         },
         { text: "Enter", bold: true },
         {
@@ -50,7 +50,7 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
         {
           spans: [
             {
-              text: "Simpler, Go deeper and Example are one-click follow-ups.",
+              text: "Simpler, Go deeper and Example are one-tap follow-ups for a passage.",
             },
           ],
           depth: 0,
@@ -69,6 +69,17 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
           ],
           depth: 0,
         },
+      ],
+    },
+    { type: "heading", level: 2, text: "Or ask about the whole article" },
+    {
+      type: "paragraph",
+      spans: [
+        {
+          text: "With nothing selected, the bar asks about the whole article: try Summarize, Key takeaways or Quiz me. Switch it to Library to ask across everything you have saved. These answers open in a sheet above the bar, and ",
+        },
+        { text: "Cmd+J", code: true },
+        { text: " jumps to the bar from anywhere." },
       ],
     },
     { type: "heading", level: 2, text: "Spaces keep your reading in order" },

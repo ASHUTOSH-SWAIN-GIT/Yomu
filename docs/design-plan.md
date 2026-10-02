@@ -328,3 +328,17 @@ Chosen with you on 2026-10-02 over a Linear-style and a black-and-white polish o
 - **Library:** spaces sidebar on the frame (`layout/library-sidebar.tsx`), a greeting plus the space name in Fraunces, a paste-link card, "Continue reading" cards with generated covers (`layout/article-cover.tsx`, colour from `articleColor` in `lib/spaces.ts`), then "Up next" and "Finished" lists.
 - **Reader:** site line with the space dot, a larger serif title, and a honey rule. Code blocks get a language header and a copy button. Margin notes are soft cards with honey number badges.
 - **Top bar:** back to Library, a search pill, a light/dark toggle and Aa (which now also picks the theme).
+
+---
+
+## Redesign v5: the always-there Ask bar (current agent UX)
+
+Replaces the select-then-popup toolbar. Plan: `~/.claude/plans/okay-so-now-we-calm-journal.md`.
+
+- **Entry point:** a bar docked at the bottom of every article (`components/chat/ask-bar.tsx`, `Cmd+J` to focus). Selecting text attaches the passage as a chip; nothing pops up. `Enter` on an empty bar explains it, typing asks about it, `Cmd+E` explains at once, `Esc` clears the chip.
+- **Quick actions** (above the bar, on focus or when a chip exists): with a passage Explain, Simpler, Go deeper, Example; without one Summarize, Key takeaways, Quiz me (`lib/quick-actions.ts`).
+- **Scope:** Article or Library switch. Library questions are answered from passages found across saved articles (`libraryPassages` in `lib/db.ts`) and may only cite titles from them; the sheet links only titles that match a saved article (`lib/sources.ts`).
+- **Answers:** passage answers are margin notes; article and library answers open in a sheet above the bar (`components/chat/answer-sheet.tsx`). In a narrow window the sheet shows everything.
+- **Data:** `messages.scope` (migration 5) says which a message is; rows from before are inferred (`lib/scope.ts`). The chat store gained `askArticle` and `askLibrary`.
+- **Follow up** on the latest note sets a "Replying to note N" chip (`selection-store.replyTo`).
+- Not in v1: Translate (needs a target-language setting) and agent actions that change things.

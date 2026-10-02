@@ -3,7 +3,6 @@ import { usesOverlayTitleBar } from "@/lib/platform";
 import { UpdateBanner } from "@/components/layout/update-banner";
 import { ArticleTools } from "@/components/reader/article-tools";
 import { ReaderSettings } from "@/components/reader/reader-settings";
-import { useAgentStore } from "@/stores/agent-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useTabsStore } from "@/stores/tabs-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -17,8 +16,6 @@ export function TopBar() {
   const reader = useReaderStore((s) => s.state);
   const goHome = useTabsStore((s) => s.goHome);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
-  const setSetupOpen = useUiStore((s) => s.setSetupOpen);
-  const agentStatus = useAgentStore((s) => s.status);
   const pastTitle = useUiStore((s) => s.pastTitle);
 
   const article = reader.status === "ready" ? reader.article : null;
@@ -78,16 +75,6 @@ export function TopBar() {
       <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
         <UpdateBanner />
         {article && <ArticleTools article={article} />}
-        {article && agentStatus !== "ready" && (
-          <button
-            type="button"
-            onClick={() => setSetupOpen(true)}
-            className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-2 rounded-lg px-2.5 outline-none focus-visible:ring-2"
-          >
-            <span aria-hidden className="bg-honey size-1.5 rounded-full" />
-            {agentStatus === "checking" ? "Checking Codex…" : "Set up Explain"}
-          </button>
-        )}
         {article && <span aria-hidden className="bg-border mx-1 h-5 w-px" />}
         <button
           type="button"

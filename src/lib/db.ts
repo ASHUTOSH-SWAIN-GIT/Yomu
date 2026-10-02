@@ -1,6 +1,7 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { Block } from "@/types/article";
 import { articleText } from "@/lib/article-text";
+import { resolveScope, type MessageScope } from "@/lib/scope";
 import { normalizeTag } from "@/lib/tags";
 import type {
   ArticleSummary,
@@ -244,11 +245,20 @@ export async function addMessage(
   role: "user" | "assistant",
   content: string,
   highlightId: string | null = null,
+  scope: MessageScope | null = null,
 ): Promise<void> {
   const db = await getDb();
   await db.execute(
-    "INSERT INTO messages (id, chat_id, highlight_id, role, content, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
-    [crypto.randomUUID(), chatId, highlightId, role, content, Date.now()],
+    "INSERT INTO messages (id, chat_id, highlight_id, role, content, scope, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    [
+      crypto.randomUUID(),
+      chatId,
+      highlightId,
+      role,
+      content,
+      scope,
+      Date.now(),
+    ],
   );
 }
 
@@ -259,6 +269,7 @@ export async function listMessages(chatId: string): Promise<StoredMessage[]> {
       id: string;
       role: "user" | "assistant";
       content: string;
+      scope: string | null;
       h_id: string | null;
       article_id: string | null;
       block_index: number | null;
@@ -267,7 +278,7 @@ export async function listMessages(chatId: string): Promise<StoredMessage[]> {
       h_text: string | null;
     }[]
   >(
-    `SELECT m.id, m.role, m.content, h.id AS h_id, h.article_id, h.block_index,
+    `SELECT m.id, m.role, m.content, m.scope, h.id AS h_id, h.article_id, h.block_index,
             h.start_offset, h.end_offset, h.text AS h_text
      FROM messages m LEFT JOIN highlights h ON h.id = m.highlight_id
      WHERE m.chat_id = $1 ORDER BY m.created_at, m.rowid`,
@@ -277,6 +288,11 @@ export async function listMessages(chatId: string): Promise<StoredMessage[]> {
     id: r.id,
     role: r.role,
     content: r.content,
+    scope: resolveScope({
+      scope: r.scope,
+      content: r.content,
+      hasHighlight: r.h_id !== null,
+    }),
     highlight: r.h_id
       ? {
           id: r.h_id,
@@ -472,6 +488,25 @@ export async function relatedArticles(
   queryText: string,
   limit = 3,
 ): Promise<RelatedArticle[]> {
+  return searchArticleBodies(queryText, excludeArticleId, limit, 16);
+}
+
+/** Passages from across the whole saved library (including the open
+ * article) that match a question, for "ask my library". Longer snippets than
+ * `relatedArticles`, since here they are the main source, not a hint. */
+export async function libraryPassages(
+  queryText: string,
+  limit = 6,
+): Promise<RelatedArticle[]> {
+  return searchArticleBodies(queryText, null, limit, 40);
+}
+
+async function searchArticleBodies(
+  queryText: string,
+  excludeArticleId: string | null,
+  limit: number,
+  snippetTokens: number,
+): Promise<RelatedArticle[]> {
   const match = toRelatedQuery(queryText);
   if (!match) return [];
   const db = await getDb();
@@ -479,13 +514,14 @@ export async function relatedArticles(
     { article_id: string; title: string | null; snip: string }[]
   >(
     `SELECT si.article_id, a.title,
-            snippet(search_index, 3, char(1), char(2), '…', 16) AS snip
+            snippet(search_index, 3, char(1), char(2), '…', $4) AS snip
      FROM search_index si
      JOIN articles a ON a.id = si.article_id
-     WHERE search_index MATCH $1 AND si.kind = 'article' AND si.article_id != $2
+     WHERE search_index MATCH $1 AND si.kind = 'article'
+       AND ($2 IS NULL OR si.article_id != $2)
      ORDER BY rank
      LIMIT $3`,
-    [match, excludeArticleId, limit],
+    [match, excludeArticleId, limit, snippetTokens],
   );
   return rows.map((row) => ({
     articleId: row.article_id,
