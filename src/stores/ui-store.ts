@@ -56,6 +56,9 @@ interface UiState {
   /** Which highlight's answer the sheet shows; null means the latest. */
   answerFocus: string | null;
   setAnswerFocus: (highlightId: string | null) => void;
+  /** The chat panel on the right of an article. */
+  chatOpen: boolean;
+  setChatOpen: (open: boolean) => void;
   /** The Codex setup checklist dialog. */
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
@@ -103,6 +106,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   pastTitle: false,
   setPastTitle: (pastTitle) => set({ pastTitle }),
+  chatOpen: false,
+  setChatOpen: (chatOpen) => set({ chatOpen }),
   notesInMargin: false,
   setNotesInMargin: (notesInMargin) => set({ notesInMargin }),
   answerOpen: false,

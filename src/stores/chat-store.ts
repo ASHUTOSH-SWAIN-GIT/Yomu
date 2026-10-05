@@ -78,6 +78,8 @@ interface ChatStore {
     article: StoredArticle,
     image: { blockIndex: number; src: string; alt: string | null },
   ) => Promise<void>;
+  /** A message in the chat panel: a question about the open article. */
+  ask: (article: StoredArticle, text: string) => Promise<void>;
   /** Asks about the whole article (a quick action's message or free text). */
   askArticle: (article: StoredArticle, text: string) => Promise<void>;
   /** Asks a question answered from the developer's other saved articles. */
@@ -125,6 +127,16 @@ let turnScope: MessageScope = "passage";
 // it. Never consulted for a long article, which always sends only the
 // passage's nearby blocks (see lib/prompt.ts).
 const fullContextSentFor = new Set<string>();
+
+/** The last few messages as plain text, for a session that lost its history. */
+function transcript(messages: ChatMessage[]): string {
+  const recent = messages.slice(-6);
+  if (recent.length === 0) return "";
+  const lines = recent.map(
+    (m) => `${m.role === "user" ? "Reader" : "You"}: ${m.text.slice(0, 1200)}`,
+  );
+  return `Earlier in this conversation:\n${lines.join("\n")}\n\nThe reader now asks:`;
+}
 
 export const useChatStore = create<ChatStore>((set, get) => {
   // Every session's events share one channel; only the open chat's
@@ -513,6 +525,37 @@ export const useChatStore = create<ChatStore>((set, get) => {
         endOffset: 0,
         text: imageQuote(image.alt, image.src),
       });
+    },
+
+    async ask(article, text) {
+      const question = text.trim();
+      if (!question || get().streaming) return;
+      const chat = await chatFor(article);
+      await addMessage(chat.id, "user", question, null, "article");
+      turnScope = "article";
+      const earlier = get().messages;
+      set((s) => ({
+        chat,
+        messages: [
+          ...s.messages,
+          { role: "user", text: question, scope: "article" },
+        ],
+      }));
+      // The live session already holds the article and the conversation, so
+      // it only needs the question. A new session gets the article again,
+      // plus the recent conversation it has not seen.
+      await runTurn(chat, (fresh, alreadySent) => ({
+        text:
+          alreadySent && !fresh
+            ? question
+            : buildArticlePrompt(
+                article,
+                [transcript(earlier), articleInstruction(question)]
+                  .filter(Boolean)
+                  .join("\n\n"),
+                notes(),
+              ),
+      }));
     },
 
     async askArticle(article, text) {

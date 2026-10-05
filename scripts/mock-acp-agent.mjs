@@ -15,6 +15,7 @@ import readline from "node:readline";
 
 let sessionCounter = 0;
 const sessions = new Map(); // sessionId -> modeId
+const models = new Map(); // sessionId -> modelId
 let requestCounter = 0;
 const pendingClientReplies = new Map();
 const cancelled = new Set();
@@ -51,6 +52,21 @@ async function handlePrompt(id, { sessionId, prompt }) {
     });
     reply = `permission outcome: ${answer?.result?.outcome?.outcome}`;
   }
+  // Like a plan that does not allow some models: the retired default always
+  // fails, and "REJECT_MODEL" makes the model that replaced it fail too.
+  const model = models.get(sessionId) ?? "";
+  const modelName = model.split("[")[0];
+  if (
+    modelName === "retired" ||
+    text.includes("REJECT_ALL") ||
+    (text.includes("REJECT_MODEL") && modelName === "current")
+  ) {
+    return respondError(
+      id,
+      `The '${modelName}' model is not supported when using Codex with a ChatGPT account.`,
+    );
+  }
+  if (text.includes("SHOW_MODEL")) reply = `model ${model}`;
   if (text.includes("USAGE_LIMIT")) {
     return respondError(id, "You've hit your usage limit");
   }
@@ -99,7 +115,19 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     case "session/new": {
       const sessionId = `mock-session-${++sessionCounter}`;
       sessions.set(sessionId, "agent"); // like Codex: NOT read-only by default
-      respond(id, { sessionId });
+      // Like Codex, the session starts on the model from the user's config,
+      // which here is one the account does not offer.
+      models.set(sessionId, "retired[low]");
+      respond(id, {
+        sessionId,
+        models: {
+          currentModelId: "retired[low]",
+          availableModels: [
+            { modelId: "current[low]" },
+            { modelId: "backup[low]" },
+          ],
+        },
+      });
       break;
     }
     case "session/resume":
@@ -110,6 +138,13 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       if (!sessions.has(params.sessionId)) respondError(id, "unknown session");
       else {
         sessions.set(params.sessionId, params.modeId);
+        respond(id, {});
+      }
+      break;
+    case "session/set_model":
+      if (!sessions.has(params.sessionId)) respondError(id, "unknown session");
+      else {
+        models.set(params.sessionId, params.modelId);
         respond(id, {});
       }
       break;

@@ -705,6 +705,28 @@ describe("article questions", () => {
   });
 });
 
+describe("chat panel questions", () => {
+  it("sends the article with the first question, then only the question", async () => {
+    agentReplies("one");
+    await useChatStore.getState().ask(article, "What is this about?");
+    const first = m(commands.agentPrompt).mock.calls[0][1];
+    expect(first).toContain("Each value has one owner.");
+    expect(first.trim().endsWith("What is this about?")).toBe(true);
+
+    agentReplies("two");
+    await useChatStore.getState().ask(article, "and why?");
+    expect(m(commands.agentPrompt).mock.calls[1][1]).toBe("and why?");
+    expect(
+      useChatStore.getState().messages.map((x) => [x.role, x.text]),
+    ).toEqual([
+      ["user", "What is this about?"],
+      ["assistant", "one"],
+      ["user", "and why?"],
+      ["assistant", "two"],
+    ]);
+  });
+});
+
 describe("library questions", () => {
   it("answers from the library passages, not the article body", async () => {
     m(db.libraryPassages).mockResolvedValue([

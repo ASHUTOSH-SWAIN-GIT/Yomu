@@ -1,5 +1,6 @@
+use std::collections::HashSet;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use serde_json::{json, Value};
 use tokio::process::Command;
@@ -64,7 +65,21 @@ pub struct AgentHarness {
     // binary (see agent/tests.rs). `None` means "not available". Boxed
     // (rather than a bare `fn`).
     command_factory: Box<dyn Fn() -> Option<Command> + Send + Sync>,
+    // Which models the account offers, and which it turned down this run.
+    // Held only for short, non-async updates.
+    models: StdMutex<ModelState>,
 }
+
+#[derive(Default)]
+struct ModelState {
+    /// Model ids (`name[effort]`) from the latest session, best first.
+    available: Vec<String>,
+    /// Model names the account rejected a prompt on; never picked again.
+    rejected: HashSet<String>,
+}
+
+/// How many models to try for one prompt before giving up.
+const MAX_MODEL_SWITCHES: usize = 4;
 
 #[derive(Clone)]
 struct Connection {
@@ -78,6 +93,7 @@ impl AgentHarness {
             client: Mutex::new(None),
             event_tx,
             command_factory: Box::new(default_command),
+            models: StdMutex::default(),
         }
     }
 
@@ -90,6 +106,7 @@ impl AgentHarness {
             client: Mutex::new(None),
             event_tx,
             command_factory: Box::new(command_factory),
+            models: StdMutex::default(),
         }
     }
 
@@ -144,6 +161,8 @@ impl AgentHarness {
             .ok_or_else(|| "agent did not return a sessionId".to_string())?;
 
         lock_down(&conn.client, &session_id).await?;
+        self.use_supported_model(&conn.client, &session_id, &result)
+            .await;
         Ok(session_id)
     }
 
@@ -152,7 +171,8 @@ impl AgentHarness {
     /// then fall back to `new_session`.
     pub async fn resume_session(&self, session_id: &str, cwd: &Path) -> Result<(), String> {
         let conn = self.connection().await?;
-        conn.client
+        let result = conn
+            .client
             .request(
                 "session/resume",
                 json!({
@@ -162,7 +182,10 @@ impl AgentHarness {
                 }),
             )
             .await?;
-        lock_down(&conn.client, session_id).await
+        lock_down(&conn.client, session_id).await?;
+        self.use_supported_model(&conn.client, session_id, &result)
+            .await;
+        Ok(())
     }
 
     /// Sends a prompt in an existing session. Text arrives as `Token`
@@ -185,13 +208,28 @@ impl AgentHarness {
         if let Some((mime, base64)) = image {
             parts.push(json!({ "type": "image", "data": base64, "mimeType": mime }));
         }
-        conn.client
-            .request(
-                "session/prompt",
-                json!({ "sessionId": session_id, "prompt": parts }),
-            )
-            .await
-            .inspect_err(|e| log::error!("prompt failed: {e}"))?;
+        let params = json!({ "sessionId": session_id, "prompt": parts });
+        // A plan can turn a model down at prompt time even after the session
+        // started on it. Switch to another model the account offers and ask
+        // again, a few times at most.
+        let mut tried = HashSet::new();
+        loop {
+            match conn.client.request("session/prompt", params.clone()).await {
+                Ok(_) => break,
+                Err(e) => {
+                    if is_model_rejected(&e)
+                        && tried.len() < MAX_MODEL_SWITCHES
+                        && self
+                            .switch_model(&conn.client, session_id, &e, &mut tried)
+                            .await
+                    {
+                        continue;
+                    }
+                    log::error!("prompt failed: {e}");
+                    return Err(e);
+                }
+            }
+        }
         let _ = conn.notify_tx.send((
             TURN_FINISHED.to_string(),
             json!({ "sessionId": session_id }),
@@ -239,6 +277,136 @@ async fn lock_down(client: &RpcClient, session_id: &str) -> Result<(), String> {
         .await
         .map(|_| ())
         .map_err(|e| format!("could not switch the session to read-only: {e}"))
+}
+
+impl AgentHarness {
+    fn record_models(&self, models: &Value) {
+        let available: Vec<String> = models
+            .get("availableModels")
+            .and_then(Value::as_array)
+            .map(|list| {
+                list.iter()
+                    .filter_map(|m| m.get("modelId").and_then(Value::as_str))
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !available.is_empty() {
+            self.models.lock().unwrap().available = available;
+        }
+    }
+
+    /// The offered models minus any the account rejected this run.
+    fn usable_models(&self) -> Vec<String> {
+        let state = self.models.lock().unwrap();
+        state
+            .available
+            .iter()
+            .filter(|m| !state.rejected.contains(model_name(m)))
+            .cloned()
+            .collect()
+    }
+
+    async fn set_model(&self, client: &RpcClient, session_id: &str, model: &str) -> bool {
+        match client
+            .request(
+                "session/set_model",
+                json!({ "sessionId": session_id, "modelId": model }),
+            )
+            .await
+        {
+            Ok(_) => true,
+            Err(e) => {
+                log::warn!("could not switch to {model}: {e}");
+                false
+            }
+        }
+    }
+
+    /// Codex takes its model from the user's own `~/.codex/config.toml`, which
+    /// may name one their ChatGPT plan can't use (every prompt then fails with
+    /// "model not supported"). A new or resumed session reports the model it
+    /// is on and the models the account offers; when the first isn't among the
+    /// second, switch to one that is. A failed switch is only logged: the
+    /// prompt then reports the real error.
+    async fn use_supported_model(&self, client: &RpcClient, session_id: &str, session: &Value) {
+        let Some(models) = session.get("models") else {
+            return;
+        };
+        self.record_models(models);
+        let current = models.get("currentModelId").and_then(Value::as_str);
+        let usable = self.usable_models();
+        let usable: Vec<&str> = usable.iter().map(String::as_str).collect();
+        let Some(pick) = pick_model(current, &usable) else {
+            return;
+        };
+        log::warn!("model {current:?} is not offered to this account; using {pick}");
+        self.set_model(client, session_id, &pick).await;
+    }
+
+    /// After a prompt was turned down for its model: remember that model as
+    /// unusable, move the session to the next offered one, and say whether
+    /// there was one to move to. `tried` keeps one prompt from circling.
+    async fn switch_model(
+        &self,
+        client: &RpcClient,
+        session_id: &str,
+        error: &str,
+        tried: &mut HashSet<String>,
+    ) -> bool {
+        if let Some(name) = rejected_model(error) {
+            self.models.lock().unwrap().rejected.insert(name.clone());
+            tried.insert(name);
+        }
+        let Some(pick) = self
+            .usable_models()
+            .into_iter()
+            .find(|m| !tried.contains(model_name(m)))
+        else {
+            return false;
+        };
+        tried.insert(model_name(&pick).to_string());
+        log::warn!("model turned down for this account; trying {pick}");
+        self.set_model(client, session_id, &pick).await
+    }
+}
+
+fn model_name(id: &str) -> &str {
+    id.split('[').next().unwrap_or(id)
+}
+
+/// The agent's error for a model the account can't use, e.g. "The
+/// 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT
+/// account."
+fn is_model_rejected(error: &str) -> bool {
+    let error = error.to_lowercase();
+    error.contains("model") && error.contains("not supported")
+}
+
+/// The model named in quotes in such an error, if any.
+fn rejected_model(error: &str) -> Option<String> {
+    let name = error.split('\'').nth(1)?.trim();
+    (!name.is_empty() && name.len() < 64 && !name.contains(' ')).then(|| name.to_string())
+}
+
+/// The model to switch to, or `None` when the current one is usable. Model
+/// ids look like `gpt-5.5[low]` (name plus reasoning effort); a model whose
+/// name is offered at any effort is usable. Otherwise take the first offered
+/// model at the same effort, so the user's speed preference is kept.
+fn pick_model(current: Option<&str>, available: &[&str]) -> Option<String> {
+    let name = model_name;
+    fn effort(id: &str) -> Option<&str> {
+        id.split_once('[')?.1.strip_suffix(']')
+    }
+    let current = current?;
+    if available.is_empty() || available.iter().any(|m| name(m) == name(current)) {
+        return None;
+    }
+    available
+        .iter()
+        .find(|m| effort(m) == effort(current))
+        .or(available.first())
+        .map(|m| m.to_string())
 }
 
 /// Spawns the agent and routes its notifications into normalized
@@ -296,5 +464,49 @@ fn parse_notification(method: &str, params: &Value) -> Option<AgentEvent> {
                 .to_string(),
         }),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod model_tests {
+    use super::pick_model;
+
+    const OFFERED: [&str; 4] = ["luna[low]", "luna[high]", "gpt-5.5[low]", "gpt-5.5[high]"];
+
+    #[test]
+    fn keeps_a_model_the_account_offers() {
+        assert_eq!(pick_model(Some("gpt-5.5[high]"), &OFFERED), None);
+        // Offered at other efforts is still the same model.
+        assert_eq!(pick_model(Some("luna[xhigh]"), &OFFERED), None);
+    }
+
+    #[test]
+    fn switches_to_the_same_effort_of_an_offered_model() {
+        assert_eq!(
+            pick_model(Some("sol[high]"), &OFFERED),
+            Some("luna[high]".to_string())
+        );
+        assert_eq!(
+            pick_model(Some("sol[low]"), &OFFERED),
+            Some("luna[low]".to_string())
+        );
+    }
+
+    #[test]
+    fn falls_back_to_the_first_offered_model() {
+        assert_eq!(
+            pick_model(Some("sol[ultra]"), &OFFERED),
+            Some("luna[low]".to_string())
+        );
+        assert_eq!(
+            pick_model(Some("sol"), &OFFERED),
+            Some("luna[low]".to_string())
+        );
+    }
+
+    #[test]
+    fn does_nothing_without_information() {
+        assert_eq!(pick_model(None, &OFFERED), None);
+        assert_eq!(pick_model(Some("sol[low]"), &[]), None);
     }
 }

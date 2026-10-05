@@ -163,11 +163,17 @@ fn spawn_reader(
                     let Some(id) = id.as_i64() else { continue };
                     if let Some(sender) = pending.lock().await.remove(&id) {
                         let result = if let Some(err) = message.error {
-                            Err(err
-                                .get("message")
-                                .and_then(Value::as_str)
-                                .map(str::to_string)
-                                .unwrap_or_else(|| err.to_string()))
+                            // Codex often answers "Internal error" and keeps the
+                            // real reason in `data.details`; show both.
+                            let text =
+                                |v: Option<&Value>| v.and_then(Value::as_str).map(str::to_string);
+                            let details = text(err.get("data").and_then(|d| d.get("details")));
+                            Err(match (text(err.get("message")), details) {
+                                (Some(m), Some(d)) => format!("{m}: {d}"),
+                                (Some(m), None) => m,
+                                (None, Some(d)) => d,
+                                (None, None) => err.to_string(),
+                            })
                         } else {
                             Ok(message.result.unwrap_or(Value::Null))
                         };

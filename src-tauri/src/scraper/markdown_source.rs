@@ -10,7 +10,9 @@
 
 use std::time::Duration;
 
+use once_cell::sync::Lazy;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use regex::Regex;
 use url::Url;
 
 use super::blocks::{clean_heading, merge_adjacent, trim_trailing_newlines, Block, ListItem, Span};
@@ -192,12 +194,21 @@ fn parser_options() -> Options {
     options
 }
 
+/// Some sites (Better Stack's raw Markdown, for one) write an image's size
+/// after its URL, `![alt](url =2400x1260)`. That is not CommonMark, so the
+/// parser would show the whole thing as text instead of an image; drop the
+/// size so it parses as a normal image.
+static IMAGE_SIZE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(!\[[^\]]*\]\([^)\s]+)\s+=(?:\d+x?\d*|x\d+)\)").expect("valid regex")
+});
+
 /// Walks a Markdown document into our `Block` list, mirroring the shape
 /// `blocks::html_to_blocks` produces from HTML (nested lists flattened with
 /// a `depth`, headings collapsed to plain text, standalone images promoted
 /// out of their paragraph) so both pipelines are interchangeable to callers.
 pub fn markdown_to_blocks(markdown: &str) -> Vec<Block> {
-    let mut iter = Parser::new_ext(markdown, parser_options());
+    let markdown = IMAGE_SIZE_RE.replace_all(markdown, "$1)");
+    let mut iter = Parser::new_ext(&markdown, parser_options());
     let mut blocks = Vec::new();
     while let Some(event) = iter.next() {
         match event {
@@ -633,6 +644,19 @@ mod tests {
                     spans: vec![Span::plain("More text.".into())]
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn an_image_with_a_size_suffix_is_still_an_image() {
+        let blocks =
+            markdown_to_blocks("![og.jpg](https://cdn.x.dev/9d7a/orig =2400x1260)\n\nText.");
+        assert_eq!(
+            blocks[0],
+            Block::Image {
+                src: "https://cdn.x.dev/9d7a/orig".into(),
+                alt: Some("og.jpg".into())
+            }
         );
     }
 

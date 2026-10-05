@@ -220,3 +220,43 @@ async fn until_done_with(
     .expect("timed out waiting for Done");
     events
 }
+
+#[tokio::test]
+async fn moves_off_a_model_the_account_does_not_offer() {
+    let mut f = fixture("model-start").await;
+    // The mock starts every session on a model it does not offer.
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness.prompt(&session, "SHOW_MODEL").await.unwrap();
+    let events = until_done(&mut f.events).await;
+    assert_eq!(joined_tokens(&events).trim(), "model current[low]");
+}
+
+#[tokio::test]
+async fn switches_again_when_a_prompt_is_turned_down() {
+    let mut f = fixture("model-reject").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    // The first replacement is rejected at prompt time: the harness retries
+    // on the next offered model without the caller seeing an error.
+    f.harness
+        .prompt(&session, "REJECT_MODEL SHOW_MODEL")
+        .await
+        .unwrap();
+    let events = until_done(&mut f.events).await;
+    assert!(joined_tokens(&events).contains("model backup[low]"));
+
+    // And the rejected model is not picked again by later sessions.
+    let next = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness.prompt(&next, "SHOW_MODEL").await.unwrap();
+    let events = until_done(&mut f.events).await;
+    assert_eq!(joined_tokens(&events).trim(), "model backup[low]");
+}
+
+#[tokio::test]
+async fn reports_the_error_when_every_model_is_turned_down() {
+    let f = fixture("model-none").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    // Every offered model is rejected in turn; the harness gives up and the
+    // caller sees the agent's own error.
+    let err = f.harness.prompt(&session, "REJECT_ALL").await.unwrap_err();
+    assert!(err.contains("not supported"), "{err}");
+}

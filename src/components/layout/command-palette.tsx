@@ -148,11 +148,11 @@ function PaletteBody({ close }: { close: () => void }) {
       run: () => ui().setFocusMode(!ui().focusMode),
     },
     {
-      id: "answer",
-      label: "Show or hide the answer",
+      id: "chat",
+      label: "Show or hide the chat",
       icon: <MessageSquare />,
       shortcut: `${MOD}J`,
-      run: () => ui().setAnswerOpen(!ui().answerOpen),
+      run: () => ui().setChatOpen(!ui().chatOpen),
     },
     {
       id: "images",

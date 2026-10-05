@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { AskBar } from "@/components/chat/ask-bar";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { ReaderView } from "@/components/layout/reader-view";
@@ -64,9 +63,13 @@ export function AppShell() {
       if (command === "palette") ui.setPaletteOpen(!ui.paletteOpen);
       else if (command === "new-tab") void tabs.newTab();
       else if (command === "close-tab") void tabs.close(tabs.activeId);
-      else if (command === "focus-ask")
-        document.getElementById("ask-input")?.focus();
-      else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
+      else if (command === "focus-ask") {
+        if (useReaderStore.getState().state.status !== "ready") return;
+        ui.setChatOpen(true);
+        requestAnimationFrame(() =>
+          document.getElementById("chat-input")?.focus(),
+        );
+      } else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
       else if (command === "paste-link") void openLinkFromClipboard();
       else if (command.startsWith("tab-")) {
         const tab = tabs.tabs[Number(command.slice(4)) - 1];
@@ -88,7 +91,6 @@ export function AppShell() {
           {!focusMode && <TopBar />}
           <div className="relative min-h-0 flex-1 overflow-hidden">
             <ReaderView />
-            <AskBar />
           </div>
         </div>
       </div>

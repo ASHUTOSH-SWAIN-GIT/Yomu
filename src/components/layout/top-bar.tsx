@@ -1,4 +1,4 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, MessageSquare } from "lucide-react";
 import { UpdateBanner } from "@/components/layout/update-banner";
 import { useReaderStore } from "@/stores/reader-store";
 import { useTabsStore } from "@/stores/tabs-store";
@@ -10,6 +10,8 @@ export function TopBar() {
   const reader = useReaderStore((s) => s.state);
   const goHome = useTabsStore((s) => s.goHome);
   const pastTitle = useUiStore((s) => s.pastTitle);
+  const chatOpen = useUiStore((s) => s.chatOpen);
+  const setChatOpen = useUiStore((s) => s.setChatOpen);
 
   const article = reader.status === "ready" ? reader.article : null;
   const title = article?.title ?? null;
@@ -44,6 +46,20 @@ export function TopBar() {
 
       <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
         <UpdateBanner />
+        {article && (
+          <button
+            type="button"
+            onClick={() => setChatOpen(!chatOpen)}
+            aria-pressed={chatOpen}
+            className={
+              "hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-2 rounded-md px-2.5 outline-none focus-visible:ring-2 " +
+              (chatOpen ? "bg-accent text-foreground" : "text-muted-foreground")
+            }
+          >
+            <MessageSquare className="size-4" aria-hidden />
+            Chat
+          </button>
+        )}
       </div>
     </header>
   );
