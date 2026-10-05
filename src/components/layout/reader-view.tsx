@@ -3,6 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { BlockRenderer } from "@/components/reader/block-renderer";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
+import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
 import { useUiStore } from "@/stores/ui-store";
 import { formatRelativeTime } from "@/lib/format";
@@ -13,6 +14,7 @@ import type { StoredArticle } from "@/types/library";
 export function ReaderView() {
   const state = useReaderStore((s) => s.state);
   const chatOpen = useUiStore((s) => s.chatOpen);
+  const chatFull = useUiStore((s) => s.chatFull);
   const focusMode = useUiStore((s) => s.focusMode);
   const scrollRef = useRef<HTMLElement>(null);
 
@@ -37,7 +39,23 @@ export function ReaderView() {
           <Home />
         )}
       </main>
-      {state.status === "ready" && chatOpen && !focusMode && <ChatPanel />}
+      {state.status === "ready" && (
+        // Always mounted so it can slide: the wrapper's width animates from
+        // nothing to the panel width (or the whole page) and back.
+        <div
+          inert={!chatOpen || focusMode}
+          className={cn(
+            "shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            !chatOpen || focusMode
+              ? "w-0"
+              : chatFull
+                ? "w-full"
+                : "w-[26rem] max-w-[45%]",
+          )}
+        >
+          <ChatPanel />
+        </div>
+      )}
     </div>
   );
 }

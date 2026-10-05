@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Square, X } from "lucide-react";
+import { ArrowUp, Maximize2, Minimize2, Square, X } from "lucide-react";
 import { Markdown } from "@/components/chat/markdown";
 import { ARTICLE_ACTIONS } from "@/lib/quick-actions";
 import { cn } from "@/lib/utils";
@@ -21,12 +21,16 @@ export function ChatPanel() {
   const ask = useChatStore((s) => s.ask);
   const stop = useChatStore((s) => s.stop);
   const retry = useChatStore((s) => s.retry);
+  const chatOpen = useUiStore((s) => s.chatOpen);
   const setChatOpen = useUiStore((s) => s.setChatOpen);
+  const full = useUiStore((s) => s.chatFull);
+  const setFull = useUiStore((s) => s.setChatFull);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const ready = useAgentStore((s) => s.status) === "ready";
 
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const waiting =
     streaming && messages[messages.length - 1]?.role !== "assistant";
 
@@ -34,6 +38,21 @@ export function ChatPanel() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, waiting]);
+
+  // Opening the chat puts the cursor in the box once the slide has started.
+  useEffect(() => {
+    if (!chatOpen) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 120);
+    return () => clearTimeout(t);
+  }, [chatOpen]);
+
+  // Escape leaves full screen.
+  useEffect(() => {
+    if (!full || !chatOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setFull(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [full, chatOpen, setFull]);
 
   if (!article) return null;
 
@@ -52,13 +71,26 @@ export function ChatPanel() {
   return (
     <aside
       aria-label="Chat about this article"
-      className="bg-background border-border flex h-full w-[26rem] max-w-[45%] shrink-0 flex-col border-l"
+      className="bg-background border-border flex h-full w-full min-w-[26rem] flex-col border-l"
     >
       <header className="border-border flex h-11 shrink-0 items-center gap-2 border-b pr-2 pl-4">
         <h2 className="text-[0.8125rem] font-medium">Chat</h2>
         <span className="text-muted-foreground min-w-0 flex-1 truncate text-[0.75rem]">
           {article.title}
         </span>
+        <button
+          type="button"
+          onClick={() => setFull(!full)}
+          aria-label={full ? "Exit full screen" : "Full screen"}
+          title={full ? "Exit full screen (Esc)" : "Full screen"}
+          className="text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 grid size-7 shrink-0 place-items-center outline-none focus-visible:ring-2"
+        >
+          {full ? (
+            <Minimize2 className="size-4" aria-hidden />
+          ) : (
+            <Maximize2 className="size-4" aria-hidden />
+          )}
+        </button>
         <button
           type="button"
           onClick={() => setChatOpen(false)}
@@ -70,81 +102,84 @@ export function ChatPanel() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 ? (
-          <div className="text-muted-foreground text-[0.8125rem]">
-            <p>Ask anything about this article.</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {ARTICLE_ACTIONS.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  disabled={streaming}
-                  onClick={() => send(a.message)}
-                  className="border-border hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 h-8 border px-3 text-[0.75rem] outline-none focus-visible:ring-2"
-                >
-                  {a.label}
-                </button>
-              ))}
+        <div className="mx-auto w-full max-w-3xl">
+          {messages.length === 0 ? (
+            <div className="text-muted-foreground text-[0.8125rem]">
+              <p>Ask anything about this article.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {ARTICLE_ACTIONS.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    disabled={streaming}
+                    onClick={() => send(a.message)}
+                    className="border-border hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 h-8 border px-3 text-[0.75rem] outline-none focus-visible:ring-2"
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-4">
-            {messages.map((m, i) => (
-              <li
-                key={i}
-                className={cn(
-                  "text-[0.875rem] leading-relaxed",
-                  m.role === "user" && "bg-muted ml-8 px-3 py-2",
-                )}
-              >
-                {m.quote && (
-                  <p className="text-muted-foreground border-border mb-1.5 line-clamp-2 border-l-2 pl-2 text-[0.75rem] italic">
-                    {m.quote}
-                  </p>
-                )}
-                {m.role === "user" ? (
-                  <p className="whitespace-pre-wrap">{m.text}</p>
-                ) : (
-                  <Markdown>{m.text}</Markdown>
-                )}
-              </li>
-            ))}
-            {waiting && (
-              <li className="text-muted-foreground animate-pulse text-[0.8125rem]">
-                Thinking…
-              </li>
-            )}
-          </ul>
-        )}
-        {error && (
-          <div
-            role="alert"
-            className="text-destructive border-destructive/40 mt-4 flex flex-col gap-2 border px-3 py-2.5 text-[0.8125rem]"
-          >
-            {error.message}
-            <button
-              type="button"
-              onClick={() =>
-                error.kind === "logged_out" || error.kind === "adapter_missing"
-                  ? setSetupOpen(true)
-                  : void retry()
-              }
-              className="self-start font-medium underline underline-offset-2"
+          ) : (
+            <ul className="flex flex-col gap-4">
+              {messages.map((m, i) => (
+                <li
+                  key={i}
+                  className={cn(
+                    "border-border border px-3 py-2.5 text-[0.875rem] leading-relaxed",
+                    m.role === "user" ? "bg-muted ml-8" : "bg-card mr-8",
+                  )}
+                >
+                  {m.quote && (
+                    <p className="text-muted-foreground border-border mb-1.5 line-clamp-2 border-l-2 pl-2 text-[0.75rem] italic">
+                      {m.quote}
+                    </p>
+                  )}
+                  {m.role === "user" ? (
+                    <p className="whitespace-pre-wrap">{m.text}</p>
+                  ) : (
+                    <Markdown>{m.text}</Markdown>
+                  )}
+                </li>
+              ))}
+              {waiting && (
+                <li className="text-muted-foreground animate-pulse text-[0.8125rem]">
+                  Thinking…
+                </li>
+              )}
+            </ul>
+          )}
+          {error && (
+            <div
+              role="alert"
+              className="text-destructive border-destructive/40 mt-4 flex flex-col gap-2 border px-3 py-2.5 text-[0.8125rem]"
             >
-              {error.kind === "logged_out" || error.kind === "adapter_missing"
-                ? "Open setup"
-                : "Try again"}
-            </button>
-          </div>
-        )}
-        <div ref={endRef} />
+              {error.message}
+              <button
+                type="button"
+                onClick={() =>
+                  error.kind === "logged_out" ||
+                  error.kind === "adapter_missing"
+                    ? setSetupOpen(true)
+                    : void retry()
+                }
+                className="self-start font-medium underline underline-offset-2"
+              >
+                {error.kind === "logged_out" || error.kind === "adapter_missing"
+                  ? "Open setup"
+                  : "Try again"}
+              </button>
+            </div>
+          )}
+          <div ref={endRef} />
+        </div>
       </div>
 
       <form onSubmit={onSubmit} className="border-border shrink-0 border-t p-3">
-        <div className="bg-card focus-within:ring-ring/40 flex items-end gap-2 p-2 shadow-[var(--shadow-card)] focus-within:ring-2">
+        <div className="bg-card focus-within:ring-ring/40 mx-auto flex w-full max-w-3xl items-end gap-2 p-2 shadow-[var(--shadow-card)] focus-within:ring-2">
           <textarea
             id="chat-input"
-            autoFocus
+            ref={inputRef}
             rows={1}
             value={text}
             onChange={(e) => setText(e.target.value)}

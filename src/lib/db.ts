@@ -494,6 +494,14 @@ export async function relatedArticles(
 /** Passages from across the whole saved library (including the open
  * article) that match a question, for "ask my library". Longer snippets than
  * `relatedArticles`, since here they are the main source, not a hint. */
+/** Matching passages from across the whole library for the universal chat:
+ * more of them, and longer, than the quick "ask my library" lookup. */
+export async function inventoryPassages(
+  queryText: string,
+): Promise<RelatedArticle[]> {
+  return searchArticleBodies(queryText, null, 10, 64);
+}
+
 export async function libraryPassages(
   queryText: string,
   limit = 6,

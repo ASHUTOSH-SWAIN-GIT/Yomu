@@ -22,7 +22,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
-import { useTabsStore } from "@/stores/tabs-store";
+import { goHome, openSavedArticle } from "@/lib/navigate";
 import { useUiStore } from "@/stores/ui-store";
 import type { SearchHit } from "@/types/library";
 
@@ -41,7 +41,7 @@ interface Action {
 /**
  * Cmd/Ctrl+K: one place to find anything (articles, chat answers, spaces)
  * and to run commands. Search is full-text (see searchLibrary); with no
- * query it lists open tabs, recent articles and commands.
+ * query it lists recent articles and commands.
  */
 export function CommandPalette() {
   const open = useUiStore((s) => s.paletteOpen);
@@ -65,9 +65,6 @@ export function CommandPalette() {
 
 function PaletteBody({ close }: { close: () => void }) {
   const articles = useLibraryStore((s) => s.articles);
-  const tabs = useTabsStore((s) => s.tabs);
-  const openArticleTab = useTabsStore((s) => s.openArticle);
-  const newTab = useTabsStore((s) => s.newTab);
   const active = useSpacesStore((s) => s.active);
   const extra = useSpacesStore((s) => s.extra);
   const slots = useSpacesStore((s) => s.slots);
@@ -100,7 +97,7 @@ function PaletteBody({ close }: { close: () => void }) {
   function openArticle(id: string) {
     const article = byId.get(id);
     if (article) setActive(spaceOfArticle(article, active));
-    void openArticleTab(id);
+    void openSavedArticle(id);
     close();
   }
 
@@ -108,11 +105,10 @@ function PaletteBody({ close }: { close: () => void }) {
   const ui = useUiStore.getState;
   const actions: Action[] = [
     {
-      id: "new-tab",
-      label: "Go to the library",
+      id: "library",
+      label: "Go to Home",
       icon: <Library />,
-      shortcut: `${MOD}T`,
-      run: () => void useTabsStore.getState().goHome(),
+      run: () => void goHome(),
     },
     {
       id: "paste-link",
@@ -184,9 +180,6 @@ function PaletteBody({ close }: { close: () => void }) {
     .filter((a) => !a.archived)
     .sort((a, b) => b.scrapedAt - a.scrapedAt)
     .slice(0, 5);
-  const openTabs = tabs
-    .map((t) => (t.articleId ? byId.get(t.articleId) : undefined))
-    .filter((a): a is NonNullable<typeof a> => Boolean(a));
 
   const searching = query.trim().length > 0;
 
@@ -209,24 +202,6 @@ function PaletteBody({ close }: { close: () => void }) {
         <Command.Empty className="text-muted-foreground px-4 py-10 text-center text-sm">
           Nothing found. Try fewer words.
         </Command.Empty>
-
-        {!searching && openTabs.length > 0 && (
-          <Group label="Open tabs">
-            {openTabs.map((a) => (
-              <Row
-                key={`tab-${a.id}`}
-                value={`tab-${a.id}`}
-                icon={<FileText />}
-                onSelect={() => openArticle(a.id)}
-              >
-                <span className="truncate">{a.title}</span>
-                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
-                  {a.site}
-                </span>
-              </Row>
-            ))}
-          </Group>
-        )}
 
         {!searching && (
           <Group label="Recent">
@@ -310,7 +285,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 }
                 onSelect={() => {
                   setActive(s.id);
-                  void newTab();
+                  void goHome();
                   close();
                 }}
               >

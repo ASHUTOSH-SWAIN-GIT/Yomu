@@ -1,10 +1,10 @@
 import type { ScrapedArticle } from "@/types/article";
 import { upsertArticle } from "@/lib/db";
 import { useLibraryStore } from "@/stores/library-store";
-import { useTabsStore } from "@/stores/tabs-store";
+import { openSavedArticle } from "@/lib/navigate";
 
 /**
- * A short built-in article that teaches the loop (select, ask, follow up),
+ * A short built-in article that teaches the loop (paste, read, chat),
  * saved as a normal article so every feature works on it, including asking
  * the agent about it. Its canonical URL is not a web address, so it never
  * touches the network and can't collide with a real page.
@@ -26,20 +26,25 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
         },
       ],
     },
-    { type: "heading", level: 2, text: "Ask about any passage" },
+    { type: "heading", level: 2, text: "Paste a link" },
     {
       type: "paragraph",
       spans: [
         {
-          text: "Select this sentence with your mouse. It lands in the ask bar at the bottom of the window, which is always there. Press ",
+          text: "On Home, paste a link into the box and press Enter. Yomu fetches the page, saves it on this computer, and opens it. Every blog you save stays in Home, and images are kept for offline reading. Press ",
         },
-        { text: "Enter", bold: true },
+        { text: "Cmd+Shift+V", code: true },
+        { text: " to open a link you have copied, from anywhere." },
+      ],
+    },
+    { type: "heading", level: 2, text: "Chat about the article" },
+    {
+      type: "paragraph",
+      spans: [
+        { text: "Press " },
+        { text: "Chat", bold: true },
         {
-          text: " to have your local Codex agent explain it, or type your own question first, such as ",
-        },
-        { text: "why does this matter?", italic: true },
-        {
-          text: ". The answer is written in the margin beside the passage, numbered, and the passage stays marked so you can find it again. In a narrow window it rises above the bar instead.",
+          text: " in the top bar, or Cmd+J, and a chat opens beside the article. Your local Codex agent has read the article, so ask it anything: what a term means, why a step matters, or for an example. The full screen button gives the chat the whole window.",
         },
       ],
     },
@@ -50,44 +55,35 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
         {
           spans: [
             {
-              text: "Simpler, Go deeper and Example are one-tap follow-ups for a passage.",
+              text: "Summarize, Key takeaways and Quiz me are one-tap questions.",
             },
           ],
+          depth: 0,
+        },
+        {
+          spans: [{ text: "Each article keeps its own conversation." }],
           depth: 0,
         },
         {
           spans: [
             {
-              text: "Copy a note, regenerate it if it missed, or ask a follow-up.",
+              text: "New chat in the sidebar talks with everything you have saved at once.",
             },
           ],
           depth: 0,
         },
-        {
-          spans: [
-            { text: "Click a marked passage to bring its note forward." },
-          ],
-          depth: 0,
-        },
       ],
     },
-    { type: "heading", level: 2, text: "Or ask about the whole article" },
+    {
+      type: "heading",
+      level: 2,
+      text: "Collections keep your reading in order",
+    },
     {
       type: "paragraph",
       spans: [
         {
-          text: "With nothing selected, the bar asks about the whole article: try Summarize, Key takeaways or Quiz me. Switch it to Library to ask across everything you have saved. These answers open in a sheet above the bar, and ",
-        },
-        { text: "Cmd+J", code: true },
-        { text: " jumps to the bar from anywhere." },
-      ],
-    },
-    { type: "heading", level: 2, text: "Spaces keep your reading in order" },
-    {
-      type: "paragraph",
-      spans: [
-        {
-          text: "Group articles into spaces, such as Rust or Web, from the library. Press ",
+          text: "Group blogs into collections, such as Rust or Web, with the folder button on an article or on its card in Home. Create one from New collection in the sidebar. Press ",
         },
         { text: "Cmd+K", code: true },
         {
@@ -107,14 +103,10 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
     {
       type: "paragraph",
       spans: [
-        { text: "The " },
-        { text: "Aa", code: true },
-        {
-          text: " menu changes the typeface, size and width. Focus mode (",
-        },
+        { text: "Click any image to zoom in on it. Focus mode (" },
         { text: "Cmd+.", code: true },
         {
-          text: ") hides everything except the article. Your articles are saved on this computer, and images are kept for offline reading.",
+          text: ") hides everything except the article, and the moon button in the top bar switches between the light and dark themes.",
         },
       ],
     },
@@ -122,14 +114,14 @@ export const SAMPLE_ARTICLE: ScrapedArticle = {
       type: "paragraph",
       spans: [
         {
-          text: "That is the whole tour. Go back to the library, paste a link and read something you actually want to understand.",
+          text: "That is the whole tour. Go back to Home, paste a link and read something you actually want to understand.",
         },
       ],
     },
   ],
 };
 
-/** Saves the sample article (once) and opens it in a tab. */
+/** Saves the sample article (once) and opens it. */
 export async function openSampleArticle(): Promise<void> {
   const saved = await upsertArticle({
     ...SAMPLE_ARTICLE,
@@ -137,5 +129,5 @@ export async function openSampleArticle(): Promise<void> {
     publishedAt: null,
   });
   await useLibraryStore.getState().refresh();
-  await useTabsStore.getState().openArticle(saved.id);
+  await openSavedArticle(saved.id);
 }

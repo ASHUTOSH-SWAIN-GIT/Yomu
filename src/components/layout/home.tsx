@@ -4,12 +4,15 @@ import {
   ArchiveRestore,
   ArrowRight,
   CornerDownLeft,
+  FolderPlus,
   Link as LinkIcon,
   Loader2,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LibraryChat } from "@/components/chat/library-chat";
 import { NewCollection } from "@/components/layout/new-collection";
+import { CollectionPicker } from "@/components/layout/collection-picker";
 import { ArticleCover, SiteMark } from "@/components/layout/article-cover";
 import { formatRelativeTime } from "@/lib/format";
 import {
@@ -23,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
-import { useTabsStore } from "@/stores/tabs-store";
+import { deleteArticle, openSavedArticle } from "@/lib/navigate";
 import type { ArticleSummary } from "@/types/library";
 
 /** Home is just the box where you paste a link (with a loader while the page
@@ -37,6 +40,7 @@ export function Home() {
   const slots = useSpacesStore((s) => s.slots);
   const showArchive = useSpacesStore((s) => s.showArchive);
   const creating = useSpacesStore((s) => s.creating);
+  const libraryChat = useSpacesStore((s) => s.libraryChat);
 
   const [input, setInput] = useState("");
   const loading = state.status === "loading";
@@ -67,6 +71,7 @@ export function Home() {
       ? `var(--sp-${slots[active]})`
       : null;
 
+  if (libraryChat) return <LibraryChat />;
   if (creating) return <NewCollection />;
 
   return (
@@ -254,8 +259,6 @@ function LibraryList({
   cards: boolean;
   slots: Record<string, number>;
 }) {
-  const openArticle = useTabsStore((s) => s.openArticle);
-  const deleteArticle = useTabsStore((s) => s.deleteArticle);
   const setArchived = useLibraryStore((s) => s.setArchived);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
@@ -263,7 +266,7 @@ function LibraryList({
     article: a,
     color: articleColor(a, slots),
     confirming: confirmingId === a.id,
-    onOpen: () => void openArticle(a.id),
+    onOpen: () => void openSavedArticle(a.id),
     onArchive: () => void setArchived(a.id, !a.archived),
     onDelete: () => setConfirmingId(a.id),
     onConfirm: (yes: boolean) => {
@@ -285,7 +288,13 @@ function LibraryList({
   if (cards) {
     return (
       <div onKeyDown={moveFocus}>
-        <ul className="mt-10 grid grid-cols-[repeat(auto-fill,minmax(14.5rem,1fr))] gap-4">
+        <h2 className="mt-10 text-[0.8125rem] font-medium">
+          All blogs
+          <span className="text-muted-foreground ml-2 font-normal">
+            {reading.length + fresh.length + done.length}
+          </span>
+        </h2>
+        <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(14.5rem,1fr))] gap-4">
           {[...reading, ...fresh, ...done].map((a) => (
             <Card key={a.id} {...props(a)} />
           ))}
@@ -490,13 +499,32 @@ function Actions({
   onDelete: () => void;
   className?: string;
 }) {
+  // The collection list opens in a popover outside this bar, so keep the bar
+  // showing while it is open.
+  const [picking, setPicking] = useState(false);
   return (
     <span
       className={cn(
-        "bg-card absolute hidden gap-0.5 rounded-lg p-0.5 shadow-[var(--shadow-card)] group-focus-within:flex group-hover:flex",
+        "bg-card absolute gap-0.5 rounded-lg p-0.5 shadow-[var(--shadow-card)] group-focus-within:flex group-hover:flex",
+        picking ? "flex" : "hidden",
         className,
       )}
     >
+      <CollectionPicker
+        articleId={article.id}
+        open={picking}
+        onOpenChange={setPicking}
+        trigger={
+          <button
+            type="button"
+            aria-label="Save to a collection"
+            title="Save to a collection"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 grid size-7 place-items-center rounded-md outline-none focus-visible:ring-2 [&>svg]:size-3.5"
+          >
+            <FolderPlus />
+          </button>
+        }
+      />
       <IconButton
         label={article.archived ? "Move out of archive" : "Archive"}
         onClick={onArchive}

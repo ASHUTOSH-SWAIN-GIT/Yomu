@@ -12,13 +12,9 @@ const key = (k: string, over: Partial<KeyLike> = {}): KeyLike => ({
 describe("shortcutFor", () => {
   it.each([
     ["k", "palette"],
-    ["t", "new-tab"],
-    ["w", "close-tab"],
     ["b", "toggle-sidebar"],
     ["j", "focus-ask"],
     [".", "focus-mode"],
-    ["1", "tab-1"],
-    ["9", "tab-9"],
   ])("Cmd+%s is %s", (k, id) => {
     expect(shortcutFor(key(k))).toBe(id);
   });

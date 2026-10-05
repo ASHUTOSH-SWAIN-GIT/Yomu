@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildArticlePrompt,
+  buildInventoryPrompt,
   buildLibraryPrompt,
   buildPrompt,
 } from "@/lib/prompt";
@@ -335,5 +336,29 @@ describe("buildLibraryPrompt", () => {
     expect(prompt.indexOf("Question: q")).toBeLessThan(
       prompt.indexOf("Be concise."),
     );
+  });
+});
+
+describe("buildInventoryPrompt", () => {
+  it("lists every saved title, the matching passages and the message", () => {
+    const prompt = buildInventoryPrompt(
+      "what about sqlite?",
+      [{ articleId: "1", title: "Fast SQLite", snippet: "WAL mode helps" }],
+      [
+        { title: "Fast SQLite", site: "a.dev" },
+        { title: "Rust ownership", site: "" },
+      ],
+    );
+    expect(prompt).toContain("Saved articles (2):");
+    expect(prompt).toContain('- "Fast SQLite" (a.dev)');
+    expect(prompt).toContain('- "Rust ownership"');
+    expect(prompt).toContain('- "Fast SQLite": WAL mode helps');
+    expect(prompt.trim().endsWith("Message: what about sqlite?")).toBe(true);
+  });
+
+  it("says so when nothing matched and the library is empty", () => {
+    const prompt = buildInventoryPrompt("hi", [], []);
+    expect(prompt).toContain("(none yet)");
+    expect(prompt).toContain("No saved article text matched");
   });
 });

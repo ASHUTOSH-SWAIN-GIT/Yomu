@@ -203,6 +203,41 @@ export function buildArticlePrompt(
   ].join("\n");
 }
 
+/** Prompt for the universal chat: the whole inventory of saved articles (so
+ * the model knows what exists) plus the passages that best match this
+ * question (so it has real text to answer from). */
+export function buildInventoryPrompt(
+  question: string,
+  passages: RelatedArticle[],
+  inventory: { title: string; site: string }[],
+  personalizationNotes: string[] = [],
+): string {
+  const MAX_LISTED = 150;
+  const listed = inventory
+    .slice(0, MAX_LISTED)
+    .map((a) => `- "${a.title}"${a.site ? ` (${a.site})` : ""}`)
+    .join("\n");
+  const more =
+    inventory.length > MAX_LISTED
+      ? `\n(and ${inventory.length - MAX_LISTED} more)`
+      : "";
+  const found =
+    passages.length > 0
+      ? passages.map((r) => `- "${r.title}": ${r.snippet}`).join("\n")
+      : "(No saved article text matched this message.)";
+  return [
+    "You are helping a developer talk with the blogs they have saved. Below are the titles of everything they have saved, then passages from the articles that best match their latest message. Answer from this material and the conversation so far. Cite an article by its title in quotes whenever you use it, and never cite a title that is not listed. If their saved blogs do not cover something, say so plainly instead of guessing. Do not use tools, read files, or browse. Reply in Markdown.",
+    "",
+    `Saved articles (${inventory.length}):`,
+    (listed || "(none yet)") + more,
+    "",
+    "Passages matching the latest message:",
+    found,
+    "",
+    [`Message: ${question}`, ...personalizationNotes].join("\n"),
+  ].join("\n");
+}
+
 /** Prompt for a question across the developer's saved library. The model
  * may only draw on the passages supplied, and may only cite titles that are
  * in them, so the UI can trust and link every citation it shows. */

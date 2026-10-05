@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { ImageOff, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ImageLightbox } from "@/components/reader/image-lightbox";
 import { isRemoteImage, isSvgUrl, resolveImageUrl } from "@/lib/images";
 import { useChatStore } from "@/stores/chat-store";
 import { useImageStore } from "@/stores/image-store";
@@ -36,6 +37,10 @@ export function ImageBlock({
   // fails too, show a placeholder.
   const [localBroken, setLocalBroken] = useState(false);
   const [failed, setFailed] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  // Set while the picture is zoomed; the in-page copy hides meanwhile so it
+  // looks like the same picture lifting off the page.
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
 
   // A cached copy is local: no network, so the block setting can't apply.
   const src =
@@ -79,15 +84,42 @@ export function ImageBlock({
 
   return (
     <figure className="group relative my-[1em]">
-      <img
-        src={src}
-        onError={() => (isLocal ? setLocalBroken(true) : setFailed(true))}
-        alt={alt ?? ""}
-        loading="lazy"
-        // Don't tell the image host which article you're reading.
-        referrerPolicy="no-referrer"
-        className="mx-auto max-w-full rounded-lg shadow-[var(--shadow-card)]"
-      />
+      <button
+        type="button"
+        aria-label={alt ? `Zoom in: ${alt}` : "Zoom in on this image"}
+        onClick={() => {
+          const img = imgRef.current;
+          if (!img) return;
+          setNatural({
+            w: img.naturalWidth || img.clientWidth,
+            h: img.naturalHeight || img.clientHeight,
+          });
+        }}
+        className="focus-visible:ring-ring/60 mx-auto block max-w-full cursor-zoom-in rounded-lg outline-none focus-visible:ring-2"
+      >
+        <img
+          ref={imgRef}
+          src={src}
+          onError={() => (isLocal ? setLocalBroken(true) : setFailed(true))}
+          alt={alt ?? ""}
+          loading="lazy"
+          // Don't tell the image host which article you're reading.
+          referrerPolicy="no-referrer"
+          className="mx-auto max-w-full rounded-lg shadow-[var(--shadow-card)]"
+          style={{ visibility: natural ? "hidden" : "visible" }}
+        />
+      </button>
+      {natural && (
+        <ImageLightbox
+          src={src}
+          alt={alt}
+          natural={natural}
+          getOrigin={() =>
+            imgRef.current?.getBoundingClientRect() ?? new DOMRect()
+          }
+          onClosed={() => setNatural(null)}
+        />
+      )}
       {article && !isSvgUrl(remote) && (
         <Button
           size="sm"

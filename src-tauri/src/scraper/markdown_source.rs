@@ -27,7 +27,7 @@ const MIN_BODY_LEN: usize = 40;
 /// one that fetches and looks like real Markdown, parsed into blocks.
 pub async fn try_fetch(client: &reqwest::Client, canonical: &Url) -> Option<ScrapedArticle> {
     for candidate in candidate_urls(canonical) {
-        let Some((final_url, markdown)) = fetch_markdown(client, candidate.as_str()).await else {
+        let Some((_, markdown)) = fetch_markdown(client, candidate.as_str()).await else {
             continue;
         };
         let mut blocks = markdown_to_blocks(&markdown);
@@ -36,7 +36,9 @@ pub async fn try_fetch(client: &reqwest::Client, canonical: &Url) -> Option<Scra
         }
         let title = extract_title(&mut blocks, canonical);
         return Some(ScrapedArticle {
-            url: final_url,
+            // The page itself, not the raw file: that is what the reader
+            // links to and what a re-fetch should read.
+            url: canonical.to_string(),
             canonical_url: canonical.to_string(),
             title,
             // A bare Markdown file carries no byline/date/site metadata the

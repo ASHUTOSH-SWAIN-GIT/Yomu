@@ -4,8 +4,8 @@ vi.mock("@/lib/db", () => ({ upsertArticle: vi.fn() }));
 vi.mock("@/stores/library-store", () => ({
   useLibraryStore: { getState: () => ({ refresh: vi.fn() }) },
 }));
-vi.mock("@/stores/tabs-store", () => ({
-  useTabsStore: { getState: () => ({ openArticle: vi.fn() }) },
+vi.mock("@/lib/navigate", () => ({
+  openSavedArticle: vi.fn(),
 }));
 
 import { SAMPLE_ARTICLE } from "@/lib/sample-article";
@@ -30,12 +30,12 @@ describe("SAMPLE_ARTICLE", () => {
   it("names the actions it teaches, so it stays in step with the app", () => {
     const text = articleText(SAMPLE_ARTICLE.blocks);
     for (const word of [
-      "Select",
+      "Paste",
+      "Chat",
       "Cmd+K",
       "Cmd+.",
-      "Aa",
       "Focus mode",
-      "space",
+      "collection",
     ]) {
       expect(text).toContain(word);
     }

@@ -1,7 +1,10 @@
 import { useMemo } from "react";
-import { Archive, Home, Plus, X } from "lucide-react";
+import { Archive, Home, MessageSquarePlus, Plus, X } from "lucide-react";
 import { buildSpaces, INBOX } from "@/lib/spaces";
 import { cn } from "@/lib/utils";
+import { goHome } from "@/lib/navigate";
+import { useReaderStore } from "@/stores/reader-store";
+import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useAgentStore } from "@/stores/agent-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useSpacesStore } from "@/stores/spaces-store";
@@ -18,6 +21,15 @@ export function LibrarySidebar() {
   const showArchive = useSpacesStore((s) => s.showArchive);
   const setShowArchive = useSpacesStore((s) => s.setShowArchive);
   const creating = useSpacesStore((s) => s.creating);
+  const libraryChat = useSpacesStore((s) => s.libraryChat);
+  const setLibraryChat = useSpacesStore((s) => s.setLibraryChat);
+  const resetChat = useLibraryChatStore((s) => s.reset);
+  const reading = useReaderStore((s) => s.state.status === "ready");
+
+  // Picking anything here while reading a blog leaves the blog for it.
+  const leave = () => {
+    if (reading) void goHome();
+  };
   const setCreating = useSpacesStore((s) => s.setCreating);
   const deleteSpace = useSpacesStore((s) => s.deleteSpace);
   const removeTag = useLibraryStore((s) => s.removeTag);
@@ -64,24 +76,64 @@ export function LibrarySidebar() {
       )}
     >
       <Item
-        on={!showArchive && !creating && active === INBOX}
-        onClick={() => setActive(INBOX)}
+        on={
+          !reading &&
+          !showArchive &&
+          !creating &&
+          !libraryChat &&
+          active === INBOX
+        }
+        onClick={() => {
+          setActive(INBOX);
+          leave();
+        }}
         icon={<Home />}
       >
         Home
       </Item>
 
       <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
+        Chat
+      </h2>
+      <Item
+        on={!reading && libraryChat}
+        onClick={() => {
+          void resetChat();
+          setLibraryChat(true);
+          leave();
+        }}
+        icon={<MessageSquarePlus />}
+      >
+        New chat
+      </Item>
+
+      <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
         My collection
       </h2>
-      <Item on={creating} onClick={() => setCreating(true)} icon={<Plus />}>
+      <Item
+        on={!reading && creating}
+        onClick={() => {
+          setCreating(true);
+          leave();
+        }}
+        icon={<Plus />}
+      >
         New collection
       </Item>
       {named.map((space) => (
         <div key={space.id} className="group relative flex flex-col">
           <Item
-            on={!showArchive && !creating && active === space.id}
-            onClick={() => setActive(space.id)}
+            on={
+              !reading &&
+              !showArchive &&
+              !creating &&
+              !libraryChat &&
+              active === space.id
+            }
+            onClick={() => {
+              setActive(space.id);
+              leave();
+            }}
             icon={
               <i
                 className="mx-[3px] block size-2.5 rounded-full"
@@ -113,8 +165,11 @@ export function LibrarySidebar() {
         <>
           <div className="mt-5" />
           <Item
-            on={showArchive}
-            onClick={() => setShowArchive(true)}
+            on={!reading && showArchive}
+            onClick={() => {
+              setShowArchive(true);
+              leave();
+            }}
             icon={<Archive />}
             count={archived}
           >

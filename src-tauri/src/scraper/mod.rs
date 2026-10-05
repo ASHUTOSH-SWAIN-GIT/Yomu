@@ -4,6 +4,7 @@ mod images;
 mod jsonld;
 mod lang_detect;
 mod markdown_source;
+mod merge;
 mod meta;
 mod normalize;
 mod paywall;
@@ -102,7 +103,8 @@ pub async fn scrape(
 
     // Many docs sites publish raw Markdown alongside their rendered HTML;
     // fetching that directly is faster and more faithful when available.
-    if let Some(article) = markdown_source::try_fetch(&client, &canonical).await {
+    if let Some(mut article) = markdown_source::try_fetch(&client, &canonical).await {
+        enrich_from_page(&client, &canonical, &mut article).await;
         return Ok(article);
     }
 
@@ -158,6 +160,27 @@ pub async fn scrape(
             })
         }
     }
+}
+
+/// A Markdown copy lacks what the page itself has: images added by page
+/// components, and the byline and date. Reads the page too and fills those
+/// in. A page that can't be fetched or read changes nothing.
+async fn enrich_from_page(
+    client: &reqwest::Client,
+    canonical: &url::Url,
+    article: &mut ScrapedArticle,
+) {
+    merge::absolutize_images(&mut article.blocks, canonical);
+    let Ok(fetched) = fetch::fetch_html(client, canonical.as_str()).await else {
+        return;
+    };
+    let Ok(page) = extract(&fetched.html, &fetched.final_url, canonical) else {
+        return;
+    };
+    merge::add_missing_images(&mut article.blocks, &page.blocks);
+    merge::absolutize_images(&mut article.blocks, canonical);
+    article.author = article.author.take().or(page.author);
+    article.published_at = article.published_at.or(page.published_at);
 }
 
 /// Turns fetched or rendered HTML into an article.

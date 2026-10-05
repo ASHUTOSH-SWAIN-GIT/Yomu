@@ -59,6 +59,9 @@ interface UiState {
   /** The chat panel on the right of an article. */
   chatOpen: boolean;
   setChatOpen: (open: boolean) => void;
+  /** The chat panel fills the whole page instead of sitting beside it. */
+  chatFull: boolean;
+  setChatFull: (full: boolean) => void;
   /** The Codex setup checklist dialog. */
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
@@ -106,6 +109,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   pastTitle: false,
   setPastTitle: (pastTitle) => set({ pastTitle }),
+  chatFull: false,
+  setChatFull: (chatFull) => set({ chatFull }),
   chatOpen: false,
   setChatOpen: (chatOpen) => set({ chatOpen }),
   notesInMargin: false,

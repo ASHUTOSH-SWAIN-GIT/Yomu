@@ -1,14 +1,7 @@
 /** Global keyboard shortcuts. A pure mapping from a key event to a named
  * command, so it can be tested without a DOM. Cmd on macOS, Ctrl elsewhere. */
 export type ShortcutId =
-  | "palette"
-  | "new-tab"
-  | "close-tab"
-  | "toggle-sidebar"
-  | "focus-ask"
-  | "focus-mode"
-  | "paste-link"
-  | `tab-${number}`;
+  "palette" | "toggle-sidebar" | "focus-ask" | "focus-mode" | "paste-link";
 
 export interface KeyLike {
   key: string;
@@ -24,11 +17,8 @@ export function shortcutFor(e: KeyLike): ShortcutId | null {
 
   if (e.shiftKey) return key === "v" ? "paste-link" : null;
   if (key === "k") return "palette";
-  if (key === "t") return "new-tab";
-  if (key === "w") return "close-tab";
   if (key === "b") return "toggle-sidebar";
   if (key === "j") return "focus-ask";
   if (key === ".") return "focus-mode";
-  if (/^[1-9]$/.test(key)) return `tab-${Number(key)}`;
   return null;
 }
