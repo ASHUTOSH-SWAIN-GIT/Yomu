@@ -363,20 +363,15 @@
     opacity: 0;
   }
 }
-@keyframes yomu-load {
+@keyframes yomu-slide {
   from {
-    transform: scaleX(0);
-    opacity: 1;
-  }
-  70% {
-    transform: scaleX(1);
-    opacity: 1;
+    transform: translateX(-100%);
   }
   to {
-    transform: scaleX(1);
-    opacity: 0;
+    transform: translateX(300%);
   }
 }
+
 .pop-in,
 [data-slot="popover-content"][data-state="open"] {
   animation: yomu-pop var(--dur) var(--ease);

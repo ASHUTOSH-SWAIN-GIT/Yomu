@@ -1,4 +1,4 @@
-import { FileText, PanelLeft, Plus, X } from "lucide-react";
+import { FileText, Moon, PanelLeft, Plus, Sun, X } from "lucide-react";
 import { usesOverlayTitleBar } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useLibraryStore } from "@/stores/library-store";
@@ -17,12 +17,17 @@ export function TabStrip() {
   const newTab = useTabsStore((s) => s.newTab);
   const articles = useLibraryStore((s) => s.articles);
 
-  const onHome = useReaderStore(
-    (s) => s.state.status === "empty" || s.state.status === "error",
-  );
+  const onHome = useReaderStore((s) => s.state.status !== "ready");
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const peekSidebar = useUiStore((s) => s.peekSidebar);
+
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
+  const dark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   const titleOf = (articleId: string | null) =>
     articleId
@@ -92,6 +97,15 @@ export function TabStrip() {
         className="text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-ring/60 grid w-9 shrink-0 place-items-center outline-none focus-visible:ring-2 focus-visible:ring-inset"
       >
         <Plus className="size-4" aria-hidden />
+      </button>
+      <button
+        type="button"
+        onClick={() => setTheme(dark ? "light" : "dark")}
+        aria-label={dark ? "Use the light theme" : "Use the dark theme"}
+        title={dark ? "Light theme" : "Dark theme"}
+        className="text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-ring/60 ml-auto grid w-9 shrink-0 place-items-center outline-none focus-visible:ring-2 focus-visible:ring-inset"
+      >
+        {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
       </button>
     </div>
   );

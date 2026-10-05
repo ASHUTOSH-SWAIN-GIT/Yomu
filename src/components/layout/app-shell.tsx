@@ -28,9 +28,7 @@ export function AppShell() {
   useThemeEffect();
   useSpaceAccent();
   const focusMode = useUiStore((s) => s.focusMode);
-  const onHome = useReaderStore(
-    (s) => s.state.status === "empty" || s.state.status === "error",
-  );
+  const onHome = useReaderStore((s) => s.state.status !== "ready");
   const setFocusMode = useUiStore((s) => s.setFocusMode);
   const articles = useLibraryStore((s) => s.articles);
   const refreshLibrary = useLibraryStore((s) => s.refresh);

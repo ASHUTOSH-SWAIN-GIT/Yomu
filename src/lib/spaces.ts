@@ -45,7 +45,7 @@ const ACRONYMS = new Set([
 
 /** "reading-list" becomes "Reading list"; known acronyms are upper-cased. */
 export function displaySpaceName(id: string): string {
-  if (id === INBOX) return "Inbox";
+  if (id === INBOX) return "Home";
   if (ACRONYMS.has(id)) return id.toUpperCase();
   const spaced = id.replace(/-/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
@@ -116,7 +116,7 @@ export function buildSpaces(
   const inboxCount = articlesInSpace(articles, INBOX).length;
   const inbox: SpaceInfo[] =
     inboxCount > 0 || active === INBOX
-      ? [{ id: INBOX, name: "Inbox", count: inboxCount, slot: null }]
+      ? [{ id: INBOX, name: "Home", count: inboxCount, slot: null }]
       : [];
   return [...inbox, ...spaces];
 }

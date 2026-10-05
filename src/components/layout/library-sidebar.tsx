@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Archive, BookOpen, Inbox, Plus } from "lucide-react";
+import { Archive, BookOpen, Home, Plus } from "lucide-react";
 import { buildSpaces, INBOX } from "@/lib/spaces";
 import { openSampleArticle } from "@/lib/sample-article";
 import { cn } from "@/lib/utils";
@@ -8,8 +8,8 @@ import { useLibraryStore } from "@/stores/library-store";
 import { useSpacesStore } from "@/stores/spaces-store";
 import { useUiStore } from "@/stores/ui-store";
 
-/** The library's spaces, on the window frame beside the sheet: Inbox, your
- * spaces with their colours, the archive, and the way to add a space. */
+/** The library's navigation, on the window frame beside the page: Home, your
+ * collections, the archive, and the way to add a collection. */
 export function LibrarySidebar() {
   const articles = useLibraryStore((s) => s.articles);
   const active = useSpacesStore((s) => s.active);
@@ -32,12 +32,11 @@ export function LibrarySidebar() {
     [articles, extra, slots, active],
   );
   const archived = articles.filter((a) => a.archived).length;
-  const inbox = spaces.find((s) => s.id === INBOX);
   const named = spaces.filter((s) => s.id !== INBOX);
 
   return (
     <nav
-      aria-label="Spaces"
+      aria-label="Collections"
       inert={!shown}
       onMouseEnter={() => !sidebarOpen && peekSidebar(true)}
       onMouseLeave={() => peekSidebar(false)}
@@ -66,15 +65,31 @@ export function LibrarySidebar() {
       <Item
         on={!showArchive && active === INBOX}
         onClick={() => setActive(INBOX)}
-        icon={<Inbox />}
-        count={inbox?.count ?? 0}
+        icon={<Home />}
       >
-        Inbox
+        Home
       </Item>
 
-      <h2 className="text-muted-foreground mt-5 mb-1 px-2.5 text-[0.75rem] font-medium">
-        Spaces
+      <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
+        My collection
       </h2>
+      {naming ? (
+        <NewSpace
+          onDone={(name) => {
+            setNaming(false);
+            if (name) createSpace(name);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setNaming(true)}
+          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4"
+        >
+          <Plus aria-hidden />
+          New collection
+        </button>
+      )}
       {named.map((space) => (
         <Item
           key={space.id}
@@ -96,23 +111,6 @@ export function LibrarySidebar() {
           {space.name}
         </Item>
       ))}
-      {naming ? (
-        <NewSpace
-          onDone={(name) => {
-            setNaming(false);
-            if (name) createSpace(name);
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setNaming(true)}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4"
-        >
-          <Plus aria-hidden />
-          New space
-        </button>
-      )}
 
       {archived > 0 && (
         <>
@@ -215,8 +213,8 @@ function NewSpace({ onDone }: { onDone: (name: string | null) => void }) {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && onDone(null)}
         onBlur={() => onDone(value.trim() || null)}
-        placeholder="Name your space"
-        aria-label="New space name"
+        placeholder="Name your collection"
+        aria-label="New collection name"
         maxLength={32}
         className="bg-muted placeholder:text-muted-foreground focus:ring-ring/60 h-8 w-full rounded-md px-2 outline-none focus:ring-2"
       />

@@ -28,7 +28,7 @@ describe("displaySpaceName", () => {
   it("prettifies tags and names the inbox", () => {
     expect(displaySpaceName("reading-list")).toBe("Reading list");
     expect(displaySpaceName("rust")).toBe("Rust");
-    expect(displaySpaceName(INBOX)).toBe("Inbox");
+    expect(displaySpaceName(INBOX)).toBe("Home");
     expect(displaySpaceName("ai")).toBe("AI");
     expect(displaySpaceName("web")).toBe("Web");
   });

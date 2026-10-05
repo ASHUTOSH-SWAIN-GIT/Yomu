@@ -25,8 +25,9 @@ import { useSpacesStore } from "@/stores/spaces-store";
 import { useTabsStore } from "@/stores/tabs-store";
 import type { ArticleSummary } from "@/types/library";
 
-/** The library: paste a link, pick up where you left off (cards), then what
- * is waiting and what you finished (lists). The spaces live in the sidebar. */
+/** Home is just the box where you paste a link (with a loader while the page
+ * is fetched). A collection shows its articles: in progress, waiting and
+ * finished. The collections live in the sidebar. */
 export function Home() {
   const state = useReaderStore((s) => s.state);
   const openUrl = useReaderStore((s) => s.openUrl);
@@ -50,9 +51,10 @@ export function Home() {
     if (url && !loading) void openUrl(url);
   }
 
+  const isHome = !showArchive && active === INBOX;
   const title = showArchive
     ? "Archive"
-    : articles.length === 0
+    : isHome
       ? "Read anything. Ask about any line."
       : displaySpaceName(active);
   const color =
@@ -74,14 +76,14 @@ export function Home() {
           )}
           {title}
         </h1>
-        {articles.length > 0 && (
+        {!isHome && articles.length > 0 && (
           <p className="text-muted-foreground mt-2 text-[0.8125rem]">
             {summary(reading.length, fresh.length, done.length, showArchive)}
           </p>
         )}
       </header>
 
-      {!showArchive && (
+      {isHome && (
         <form
           onSubmit={submit}
           className="bg-card focus-within:ring-honey/35 mt-7 flex h-14 items-center gap-3 rounded-xl pr-2 pl-4 shadow-[var(--shadow-card)] transition-shadow duration-[var(--dur)] focus-within:shadow-[var(--shadow-card-hover)] focus-within:ring-2"
@@ -117,6 +119,7 @@ export function Home() {
           </Button>
         </form>
       )}
+      {state.status === "loading" && <Fetching url={state.url} />}
       {state.status === "error" && (
         <p
           role="alert"
@@ -126,13 +129,13 @@ export function Home() {
         </p>
       )}
 
-      {articles.length === 0 ? (
-        <Welcome />
+      {isHome ? (
+        articles.length === 0 && !loading && <Welcome />
       ) : list.length === 0 ? (
         <p className="text-muted-foreground mt-14 text-center text-[0.8125rem]">
           {showArchive
             ? "Nothing archived."
-            : "Nothing here yet. Open an article and add it to this space from its page."}
+            : "Nothing here yet. Open an article and add it to this collection from its page."}
         </p>
       ) : (
         <LibraryList
@@ -143,6 +146,27 @@ export function Home() {
           slots={slots}
         />
       )}
+    </div>
+  );
+}
+
+/** While a link is fetched: a bar that keeps sliding (the wait has no known
+ * length, so it never claims a percentage) and what is being fetched. */
+function Fetching({ url }: { url: string }) {
+  let host = url;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    // Not a URL; show it as typed.
+  }
+  return (
+    <div role="status" aria-live="polite" className="mt-4">
+      <div className="bg-secondary relative h-[3px] w-full overflow-hidden rounded-full">
+        <div className="bg-foreground absolute inset-y-0 left-0 w-1/3 animate-[yomu-slide_1.3s_cubic-bezier(0.4,0,0.2,1)_infinite] rounded-full" />
+      </div>
+      <p className="text-muted-foreground mt-2.5 text-[0.8125rem]">
+        Fetching {host}…
+      </p>
     </div>
   );
 }

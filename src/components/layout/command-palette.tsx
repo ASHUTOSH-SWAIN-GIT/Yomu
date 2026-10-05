@@ -15,12 +15,7 @@ import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { openSampleArticle } from "@/lib/sample-article";
 import { filterByQuery } from "@/lib/palette";
-import {
-  INBOX,
-  displaySpaceName,
-  buildSpaces,
-  spaceOfArticle,
-} from "@/lib/spaces";
+import { displaySpaceName, buildSpaces, spaceOfArticle } from "@/lib/spaces";
 import { cn } from "@/lib/utils";
 import { SUMMARY_LABEL } from "@/lib/scope";
 import { useChatStore } from "@/stores/chat-store";
@@ -296,7 +291,7 @@ function PaletteBody({ close }: { close: () => void }) {
         )}
 
         {spaces.length > 0 && (
-          <Group label="Spaces">
+          <Group label="Collections">
             {spaces.map((s) => (
               <Row
                 key={`s-${s.id}`}
@@ -319,7 +314,7 @@ function PaletteBody({ close }: { close: () => void }) {
                   close();
                 }}
               >
-                <span>{s.id === INBOX ? "Inbox" : displaySpaceName(s.id)}</span>
+                <span>{displaySpaceName(s.id)}</span>
                 <span className="text-muted-foreground ml-auto text-[0.6875rem]">
                   {s.count}
                 </span>
