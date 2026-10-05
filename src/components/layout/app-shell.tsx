@@ -5,6 +5,7 @@ import { CommandPalette } from "@/components/layout/command-palette";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { ReaderView } from "@/components/layout/reader-view";
 import { SetupDialog } from "@/components/layout/setup-dialog";
+import { TabStrip } from "@/components/layout/tab-strip";
 import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
 import { useThemeEffect } from "@/hooks/use-theme";
@@ -18,10 +19,10 @@ import { useTabsStore } from "@/stores/tabs-store";
 import { useUiStore } from "@/stores/ui-store";
 
 /**
- * The window: a warm frame holding a thin top bar and, on the library page,
- * the spaces sidebar. What you read (the library or an article with its
- * margin notes) sits on a raised sheet inside the frame, with the Ask bar
- * floating over it, plus the overlays (command palette, setup).
+ * The window: a tab strip across the top and, on the library page, the
+ * spaces sidebar on the frame. What you read (the library or an article with
+ * its margin notes) is a flat page beside it with its own top bar, the Ask
+ * bar floating over it, plus the overlays (command palette, setup).
  */
 export function AppShell() {
   useThemeEffect();
@@ -80,21 +81,17 @@ export function AppShell() {
 
   return (
     <div className="bg-frame text-foreground flex h-screen w-screen flex-col">
-      {!focusMode && <TopBar />}
-      <div className="flex min-h-0 flex-1">
+      {!focusMode && <TabStrip />}
+      <div className="relative flex min-h-0 flex-1">
         {!focusMode && onHome && <LibrarySidebar />}
-        {/* Where you read: a sheet lifted off the frame. The Ask bar floats
-            over its bottom. */}
-        <div
-          className={
-            focusMode
-              ? "bg-background relative min-h-0 flex-1 overflow-hidden"
-              : "bg-background relative mr-2 mb-2 min-h-0 flex-1 overflow-hidden rounded-xl shadow-[var(--shadow-sheet)] " +
-                (onHome ? "" : "ml-2")
-          }
-        >
-          <ReaderView />
-          <AskBar />
+        {/* Where you read: the page, flat against the frame. The Ask bar
+            floats over its bottom. */}
+        <div className="bg-background relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {!focusMode && <TopBar />}
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <ReaderView />
+            <AskBar />
+          </div>
         </div>
       </div>
 

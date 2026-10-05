@@ -1,0 +1,34 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open sidebar" [ref=e5]
+    - tablist [ref=e8]:
+      - tab "Library" [selected] [ref=e10]
+    - button "New tab" [ref=e15]
+  - generic [ref=e18]:
+    - banner [ref=e19]:
+      - generic [ref=e20]: Library
+      - paragraph
+      - generic [ref=e22]:
+        - button "Search or jump to… ⌘K" [ref=e23]:
+          - text: Search or jump to…
+          - generic [ref=e27]: ⌘K
+        - button "Use the dark theme" [ref=e28]
+        - button "Reading settings" [ref=e31]:
+          - generic [ref=e32]: A
+          - generic [ref=e33]: a
+    - main [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Good afternoon
+          - heading "Read anything. Ask about any line." [level=1] [ref=e39]
+        - generic [ref=e40]:
+          - textbox "Article URL" [active] [ref=e44]:
+            - /placeholder: Paste a link to read it here
+          - button "Open" [disabled]
+        - generic [ref=e45]:
+          - paragraph [ref=e46]: Paste a link and it opens as a clean page. Select any passage to ask your local Codex about it, and the answer is written in the margin, right beside the words.
+          - button "How to read with Yomu A two minute tour" [ref=e47]:
+            - generic [ref=e49]: "Y"
+            - generic [ref=e54]:
+              - generic [ref=e55]: How to read with Yomu
+              - generic [ref=e56]: A two minute tour

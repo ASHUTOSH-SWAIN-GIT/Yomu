@@ -18,6 +18,9 @@ import { readStorage as read, writeStorage as write } from "@/lib/storage";
 
 export type { Theme } from "@/lib/appearance";
 
+const SIDEBAR_KEY = "yomu-sidebar";
+let peekTimer: ReturnType<typeof setTimeout>;
+
 interface UiState {
   theme: Theme;
   setTheme: (theme: Theme) => void;
@@ -27,6 +30,13 @@ interface UiState {
   /** Hides everything except the article (Cmd/Ctrl+.). */
   focusMode: boolean;
   setFocusMode: (on: boolean) => void;
+  /** The spaces sidebar is docked (true) or collapsed (false). */
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  /** While collapsed, the sidebar slides over the page as long as the
+   * pointer is on the toggle or the sidebar. */
+  sidebarPeek: boolean;
+  peekSidebar: (on: boolean) => void;
   /** Don't fetch images from remote hosts (they can track the reader). */
   blockRemoteImages: boolean;
   setBlockRemoteImages: (block: boolean) => void;
@@ -71,6 +81,19 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   focusMode: false,
   setFocusMode: (focusMode) => set({ focusMode }),
+  sidebarOpen: read(SIDEBAR_KEY) !== "0",
+  setSidebarOpen: (sidebarOpen) => {
+    write(SIDEBAR_KEY, sidebarOpen ? "1" : "0");
+    set({ sidebarOpen, sidebarPeek: false });
+  },
+  sidebarPeek: false,
+  peekSidebar: (on) => {
+    // A short delay on leaving lets the pointer travel from the toggle to
+    // the sidebar without it closing in between.
+    clearTimeout(peekTimer);
+    if (on) set({ sidebarPeek: true });
+    else peekTimer = setTimeout(() => set({ sidebarPeek: false }), 200);
+  },
   blockRemoteImages: read(BLOCK_IMAGES_KEY) === "1",
   setBlockRemoteImages: (block) => {
     write(BLOCK_IMAGES_KEY, block ? "1" : "0");

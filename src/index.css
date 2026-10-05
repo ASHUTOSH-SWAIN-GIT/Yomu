@@ -114,25 +114,25 @@
 
 /* Night: a proper neutral dark, not warm. Honey stays as the one accent. */
 :root.dark {
-  --frame-base: #0c0c0d;
-  --background: #161618;
+  --frame-base: #202020;
+  --background: #191919;
   --foreground: #ededee;
-  --muted: #1e1e20;
+  --muted: #252525;
   --muted-foreground: #9b9b9f;
-  --card: #1c1c1e;
+  --card: #202020;
   --card-foreground: #ededee;
-  --popover: #1f1f22;
+  --popover: #252525;
   --popover-foreground: #ededee;
-  --border: #2a2a2d;
+  --border: #2f2f2f;
   --input: #68686d;
   --primary: #ededee;
-  --primary-foreground: #161618;
-  --secondary: #262629;
+  --primary-foreground: #191919;
+  --secondary: #2c2c2c;
   --secondary-foreground: #ededee;
-  --accent: #26262a;
+  --accent: #2c2c2c;
   --accent-foreground: #ededee;
   --destructive: #f0766a;
-  --destructive-foreground: #161618;
+  --destructive-foreground: #191919;
 
   --honey: #e0a94a;
   --honey-ink: #e7b45e;

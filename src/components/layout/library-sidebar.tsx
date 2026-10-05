@@ -22,6 +22,10 @@ export function LibrarySidebar() {
   const agentStatus = useAgentStore((s) => s.status);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const [naming, setNaming] = useState(false);
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const peek = useUiStore((s) => s.sidebarPeek);
+  const peekSidebar = useUiStore((s) => s.peekSidebar);
+  const shown = sidebarOpen || peek;
 
   const spaces = useMemo(
     () => buildSpaces(articles, extra, slots, active),
@@ -34,8 +38,31 @@ export function LibrarySidebar() {
   return (
     <nav
       aria-label="Spaces"
-      className="flex w-[13.5rem] shrink-0 flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-3 text-[0.8125rem]"
+      inert={!shown}
+      onMouseEnter={() => !sidebarOpen && peekSidebar(true)}
+      onMouseLeave={() => peekSidebar(false)}
+      className={cn(
+        "bg-frame border-border flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r px-2 pt-3 pb-3 text-[0.8125rem]",
+        // Collapsed: parked off-screen over the page, slid in on hover. The
+        // shadow rides the same transition so it fades with the slide.
+        !sidebarOpen &&
+          "absolute inset-y-0 left-0 z-30 transition-[translate,box-shadow,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[translate]",
+        !sidebarOpen &&
+          (peek
+            ? "shadow-[var(--shadow-float)]"
+            : "invisible -translate-x-full shadow-none"),
+      )}
     >
+      <div className="mb-2 flex items-center gap-2 px-2.5">
+        <span
+          aria-hidden
+          className="bg-primary text-primary-foreground grid size-5 place-items-center rounded-[5px] font-serif text-[0.6875rem] font-semibold"
+        >
+          読
+        </span>
+        <span className="font-medium">Yomu</span>
+      </div>
+
       <Item
         on={!showArchive && active === INBOX}
         onClick={() => setActive(INBOX)}
@@ -45,7 +72,7 @@ export function LibrarySidebar() {
         Inbox
       </Item>
 
-      <h2 className="text-muted-foreground mt-5 mb-1 px-2.5 text-[0.6875rem] font-medium">
+      <h2 className="text-muted-foreground mt-5 mb-1 px-2.5 text-[0.75rem] font-medium">
         Spaces
       </h2>
       {named.map((space) => (
@@ -80,7 +107,7 @@ export function LibrarySidebar() {
         <button
           type="button"
           onClick={() => setNaming(true)}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4"
+          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4"
         >
           <Plus aria-hidden />
           New space
@@ -112,7 +139,7 @@ export function LibrarySidebar() {
         <button
           type="button"
           onClick={() => setSetupOpen(true)}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-left text-[0.75rem] outline-none focus-visible:ring-2"
+          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left text-[0.75rem] outline-none focus-visible:ring-2"
         >
           <span
             aria-hidden
@@ -155,9 +182,9 @@ function Item({
       onClick={onClick}
       aria-current={on ? "page" : undefined}
       className={cn(
-        "focus-visible:ring-ring/60 flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         on
-          ? "bg-background text-foreground font-medium shadow-[var(--shadow-card)]"
+          ? "bg-accent text-foreground font-medium"
           : "text-foreground/80 hover:bg-accent/70 hover:text-foreground [&>svg]:text-muted-foreground",
       )}
     >
@@ -191,7 +218,7 @@ function NewSpace({ onDone }: { onDone: (name: string | null) => void }) {
         placeholder="Name your space"
         aria-label="New space name"
         maxLength={32}
-        className="bg-background placeholder:text-muted-foreground focus:ring-ring/60 h-8 w-full rounded-lg px-2 shadow-[var(--shadow-card)] outline-none focus:ring-2"
+        className="bg-muted placeholder:text-muted-foreground focus:ring-ring/60 h-8 w-full rounded-md px-2 outline-none focus:ring-2"
       />
     </form>
   );
