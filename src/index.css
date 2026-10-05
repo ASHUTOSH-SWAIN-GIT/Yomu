@@ -3,14 +3,13 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens: "warm editorial".
+ * Design tokens: monochrome, Notion-like.
  *
- * The window is a warm frame; what you read sits on a lighter sheet lifted
- * from it by a hairline and a soft shadow (layered paper, not flat black).
- * Ink is a warm near-black, never pure. The one accent is honey: it marks
- * what you selected or asked about, like a highlighter on a page. Primary
- * buttons are ink, so honey stays special. Spaces get eight muted, earthy
- * colours, used for small dots and article covers only.
+ * Only shades of black and white. The tab strip and sidebar sit on the frame,
+ * the page on a slightly different shade. The "honey" tokens (selection, asked
+ * about passages, note numbers, focus) are a light grey in Night and a dark
+ * grey elsewhere, so they stay distinct from the ink without adding a hue.
+ * Spaces get eight grey steps, used for small dots and article covers only.
  *
  * Three themes: Page (light, default), Paper (sepia) and Night (dark).
  * Token names follow shadcn so components keep working; contrast is checked
@@ -41,22 +40,22 @@
   --destructive-foreground: #ffffff;
 
   /* Honey: selection, asked-about passages, note numbers, focus. */
-  --honey: #e7a93a;
-  --honey-ink: #8a5a0c;
-  --ring: #a8700f;
-  --mark-fill: rgb(231 169 58 / 0.22);
-  --mark-active: rgb(231 169 58 / 0.42);
-  --selection: rgb(231 169 58 / 0.32);
+  --honey: #2b2b2b;
+  --honey-ink: #3d3d3d;
+  --ring: #6b6b6b;
+  --mark-fill: rgb(0 0 0 / 0.08);
+  --mark-active: rgb(0 0 0 / 0.16);
+  --selection: rgb(0 0 0 / 0.14);
 
-  --sp-0: #b4532f;
-  --sp-1: #4c7848;
-  --sp-2: #3e6c97;
-  --sp-3: #87589b;
-  --sp-4: #9a6f0f;
-  --sp-5: #2c7a73;
-  --sp-6: #ad4768;
-  --sp-7: #676c29;
-  --sp-inbox: #857d71;
+  --sp-0: #262626;
+  --sp-1: #3d3d3d;
+  --sp-2: #525252;
+  --sp-3: #666666;
+  --sp-4: #333333;
+  --sp-5: #474747;
+  --sp-6: #5c5c5c;
+  --sp-7: #707070;
+  --sp-inbox: #808080;
   --space: var(--sp-inbox);
   --frame: var(--frame-base);
 
@@ -107,8 +106,9 @@
   --accent-foreground: #2a231a;
   --destructive: #a92f1b;
   --destructive-foreground: #ffffff;
-  --honey-ink: #80520a;
-  --ring: #9a650c;
+  --honey: #2b2b2b;
+  --honey-ink: #3d3d3d;
+  --ring: #6b6b6b;
   --reader-ink: #33291e;
 }
 
@@ -134,22 +134,22 @@
   --destructive: #f0766a;
   --destructive-foreground: #191919;
 
-  --honey: #e0a94a;
-  --honey-ink: #e7b45e;
-  --ring: #e0a94a;
-  --mark-fill: rgb(224 169 74 / 0.15);
-  --mark-active: rgb(224 169 74 / 0.3);
-  --selection: rgb(224 169 74 / 0.26);
+  --honey: #d4d4d4;
+  --honey-ink: #d4d4d4;
+  --ring: #a3a3a3;
+  --mark-fill: rgb(255 255 255 / 0.1);
+  --mark-active: rgb(255 255 255 / 0.2);
+  --selection: rgb(255 255 255 / 0.18);
 
-  --sp-0: #e38c66;
-  --sp-1: #8dbb82;
-  --sp-2: #86addb;
-  --sp-3: #c69adb;
-  --sp-4: #d9ae4a;
-  --sp-5: #6fc2b8;
-  --sp-6: #e78ba7;
-  --sp-7: #b6bb6b;
-  --sp-inbox: #908f93;
+  --sp-0: #f0f0f0;
+  --sp-1: #e0e0e0;
+  --sp-2: #d0d0d0;
+  --sp-3: #c0c0c0;
+  --sp-4: #b0b0b0;
+  --sp-5: #a0a0a0;
+  --sp-6: #949494;
+  --sp-7: #8a8a8a;
+  --sp-inbox: #8c8c8c;
 
   --shadow-sheet: 0 0 0 1px var(--border), 0 8px 24px -12px rgb(0 0 0 / 0.6);
   --shadow-card: 0 0 0 1px var(--border), 0 1px 2px rgb(0 0 0 / 0.3);
@@ -249,11 +249,11 @@
    @theme (not `inline`) so `font-sans` etc. resolve to these stacks. */
 @theme {
   --font-sans:
-    "Hanken Grotesk Variable", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", sans-serif;
-  --font-serif:
-    "Literata Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-display: "Fraunces Variable", "Literata Variable", Georgia, serif;
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  /* One typeface throughout: the serif and display slots are Inter too. */
+  --font-serif: var(--font-sans);
+  --font-display: var(--font-sans);
   --font-mono:
     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

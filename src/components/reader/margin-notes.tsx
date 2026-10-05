@@ -171,7 +171,7 @@ export function MarginNotes({
         <sup
           key={m.key}
           aria-hidden
-          className="bg-honey pointer-events-none absolute grid h-[14px] min-w-[14px] place-items-center rounded-full px-1 font-sans text-[0.5625rem] leading-none font-bold text-[#2a1d05]"
+          className="bg-honey text-primary-foreground pointer-events-none absolute grid h-[14px] min-w-[14px] place-items-center rounded-full px-1 font-sans text-[0.5625rem] leading-none font-bold"
           style={{ left: m.x + 1, top: m.y - 9 }}
         >
           {m.n}
@@ -291,7 +291,7 @@ function Note({
       style={{ top: top ?? 0 }}
     >
       <p className="text-muted-foreground mb-2 flex items-center gap-2 font-sans text-[0.6875rem] font-medium">
-        <span className="bg-honey grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[0.625rem] font-bold text-[#2a1d05] tabular-nums">
+        <span className="bg-honey text-primary-foreground grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[0.625rem] font-bold tabular-nums">
           {number ?? "·"}
         </span>
         {isImage ? "About this image" : "Note"}

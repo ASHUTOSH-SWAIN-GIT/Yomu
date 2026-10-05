@@ -1,13 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-// Self-hosted fonts (no network, CSP-safe): Literata for reading, Hanken
-// Grotesk for the interface, Fraunces for display headlines, IBM Plex Mono
-// for code.
-import "@fontsource-variable/literata/wght.css";
-import "@fontsource-variable/literata/wght-italic.css";
-import "@fontsource-variable/hanken-grotesk/wght.css";
-import "@fontsource-variable/fraunces/wght.css";
+// Self-hosted fonts (no network, CSP-safe): Inter for everything you read
+// and use, IBM Plex Mono for code.
+import "@fontsource-variable/inter/wght.css";
+import "@fontsource-variable/inter/wght-italic.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "./index.css";

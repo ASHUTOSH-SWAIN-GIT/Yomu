@@ -26,3 +26,6 @@ src-tauri/gen
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright MCP screenshots and logs
+.playwright-mcp/
