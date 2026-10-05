@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { FileText, Moon, PanelLeft, Plus, Sun, X } from "lucide-react";
-import { usesOverlayTitleBar } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
@@ -39,7 +38,6 @@ export function TabStrip() {
     <div
       data-tauri-drag-region
       className="bg-frame border-border flex h-9 shrink-0 items-stretch border-b"
-      style={{ paddingLeft: usesOverlayTitleBar() ? "5.5rem" : 0 }}
     >
       {onHome && (
         <button

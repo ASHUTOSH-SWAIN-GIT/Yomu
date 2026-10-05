@@ -50,15 +50,17 @@ export function LibrarySidebar() {
       onMouseEnter={() => !sidebarOpen && peekSidebar(true)}
       onMouseLeave={() => peekSidebar(false)}
       className={cn(
-        "bg-frame border-border flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r px-2 pt-2 pb-3 text-[0.8125rem]",
-        // Collapsed: parked off-screen over the page, slid in on hover. The
-        // shadow rides the same transition so it fades with the slide.
+        "bg-frame border-border flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto px-2 pt-2 pb-3 text-[0.8125rem]",
+        sidebarOpen && "border-r",
+        // Collapsed: a small panel floating over the page, parked off-screen
+        // and slid in on hover. The shadow rides the same transition so it
+        // fades with the slide. Clicking the toggle docks it full height.
         !sidebarOpen &&
-          "absolute inset-y-0 left-0 z-30 transition-[translate,box-shadow,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[translate]",
+          "absolute top-2 left-2 z-30 h-fit max-h-[calc(100%-1rem)] rounded-md border transition-[translate,box-shadow,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[translate]",
         !sidebarOpen &&
           (peek
             ? "shadow-[var(--shadow-float)]"
-            : "invisible -translate-x-full shadow-none"),
+            : "invisible -translate-x-[calc(100%+1rem)] shadow-none"),
       )}
     >
       <Item
