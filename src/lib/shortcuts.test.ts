@@ -12,6 +12,7 @@ const key = (k: string, over: Partial<KeyLike> = {}): KeyLike => ({
 describe("shortcutFor", () => {
   it.each([
     ["k", "palette"],
+    [",", "settings"],
     ["b", "toggle-sidebar"],
     ["j", "focus-ask"],
     [".", "focus-mode"],

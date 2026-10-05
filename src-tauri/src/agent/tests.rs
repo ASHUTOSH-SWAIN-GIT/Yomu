@@ -284,3 +284,94 @@ async fn a_picked_model_applies_to_the_session() {
     let events = until_done(&mut f.events).await;
     assert_eq!(joined_tokens(&events).trim(), "model backup[low]");
 }
+
+#[tokio::test]
+async fn a_custom_agent_that_cannot_start_is_reported_at_once() {
+    use super::config::AgentConfig;
+    // The real launcher (the fixtures use a mock), so the configured
+    // command is the one that runs.
+    let (tx, _events) = mpsc::unbounded_channel();
+    let harness = AgentHarness::new(tx);
+    let started = harness.use_agent(AgentConfig::Custom {
+        command: "definitely-not-a-real-program-xyz".into(),
+        args: vec![],
+        data_dirs: vec![],
+    });
+    let result = timeout(Duration::from_secs(10), started)
+        .await
+        .expect("should fail, not hang");
+    assert!(result.is_err(), "{result:?}");
+    // And an empty command is refused outright.
+    let empty = harness
+        .use_agent(AgentConfig::Custom {
+            command: "  ".into(),
+            args: vec![],
+            data_dirs: vec![],
+        })
+        .await;
+    assert!(empty.is_err());
+}
+
+#[tokio::test]
+async fn a_custom_agent_runs_a_session_end_to_end() {
+    use super::config::AgentConfig;
+    // The mock agent started through the custom-agent path (and, on macOS,
+    // the same sandbox as Codex), with its script in a folder the sandbox
+    // would otherwise hide.
+    let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("scripts/mock-acp-agent.mjs");
+    let (tx, mut events) = mpsc::unbounded_channel();
+    let harness = AgentHarness::new(tx);
+    harness
+        .use_agent(AgentConfig::Custom {
+            command: "node".into(),
+            args: vec![script.to_string_lossy().into_owned()],
+            data_dirs: vec![],
+        })
+        .await
+        .expect("the custom agent should start");
+    let cwd = std::env::temp_dir().join("yomu-test-custom-e2e");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+    let session = harness.new_session(&cwd).await.unwrap();
+    harness.prompt(&session, "hello custom").await.unwrap();
+    let got = until_done(&mut events).await;
+    assert!(joined_tokens(&got).contains("hello custom"));
+    harness.shutdown().await;
+}
+
+/// Needs OpenCode installed and signed in: cargo test -- --ignored real_opencode
+#[tokio::test]
+#[ignore]
+async fn real_opencode_streams_through_the_sandbox() {
+    use super::config::AgentConfig;
+    let (tx, mut events) = mpsc::unbounded_channel();
+    let harness = AgentHarness::new(tx);
+    harness
+        .use_agent(AgentConfig::Custom {
+            command: "opencode".into(),
+            args: vec!["acp".into()],
+            data_dirs: vec![
+                "~/.local/share/opencode".into(),
+                "~/.local/state/opencode".into(),
+                "~/.cache/opencode".into(),
+                "~/.config/opencode".into(),
+            ],
+        })
+        .await
+        .expect("opencode should start");
+    let cwd = std::env::temp_dir().join("yomu-test-opencode");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+    let models = harness.list_models(&cwd).await.unwrap();
+    println!("OPENCODE models: {}", models.len());
+    let session = harness.new_session(&cwd).await.unwrap();
+    harness
+        .prompt(&session, "Reply with exactly one word: ok")
+        .await
+        .unwrap();
+    let got = until_done(&mut events).await;
+    println!("OPENCODE reply: {:?}", joined_tokens(&got));
+    assert!(!joined_tokens(&got).trim().is_empty());
+    harness.shutdown().await;
+}

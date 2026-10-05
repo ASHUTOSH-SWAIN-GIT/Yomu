@@ -1,7 +1,8 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { BlockRenderer } from "@/components/reader/block-renderer";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { ChatResizeHandle } from "@/components/chat/chat-resize-handle";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
@@ -14,6 +15,9 @@ export function ReaderView() {
   const state = useReaderStore((s) => s.state);
   const chatOpen = useUiStore((s) => s.chatOpen);
   const chatFull = useUiStore((s) => s.chatFull);
+  const chatWidth = useUiStore((s) => s.chatWidth);
+  const [resizing, setResizing] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   const focusMode = useUiStore((s) => s.focusMode);
   const scrollRef = useRef<HTMLElement>(null);
 
@@ -27,7 +31,7 @@ export function ReaderView() {
   }, []);
 
   return (
-    <div className="flex h-full">
+    <div ref={rowRef} className="flex h-full">
       <main
         ref={scrollRef}
         className="flex h-full min-w-0 flex-1 flex-col overflow-y-auto"
@@ -44,14 +48,25 @@ export function ReaderView() {
         <div
           inert={!chatOpen || focusMode}
           className={cn(
-            "shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            "relative shrink-0 overflow-hidden",
+            // No easing while dragging, or the edge would trail the cursor.
+            !resizing &&
+              "transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
             !chatOpen || focusMode
               ? "w-0"
               : chatFull
                 ? "w-full"
-                : "w-[26rem] max-w-[45%]",
+                : "max-w-[70%]",
           )}
+          style={
+            chatOpen && !focusMode && !chatFull
+              ? { width: chatWidth }
+              : undefined
+          }
         >
+          {chatOpen && !focusMode && !chatFull && (
+            <ChatResizeHandle containerRef={rowRef} onResizing={setResizing} />
+          )}
           <ChatPanel />
         </div>
       )}

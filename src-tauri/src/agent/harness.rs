@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use tokio::process::Command;
 use tokio::sync::{mpsc, Mutex};
 
+use super::config::AgentConfig;
 use super::events::AgentEvent;
 use super::rpc::{NotificationSender, RpcClient};
 
@@ -49,6 +50,68 @@ fn default_command() -> Option<Command> {
     }
 }
 
+/// Builds the command for an agent the user set up, in the same sandbox as
+/// Codex on macOS: writes denied everywhere except its own data folder, and
+/// reads of home limited to the program's folder and that data folder.
+fn custom_command(command: &str, args: &[String], data_dirs: &[String]) -> Option<Command> {
+    let command = command.trim();
+    if command.is_empty() {
+        return None;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+        let expand = |p: &str| match (p.strip_prefix("~/"), &home) {
+            (Some(rest), Some(h)) => h.join(rest),
+            _ => std::path::PathBuf::from(p),
+        };
+        let program_dir = super::status::resolve_command(command)
+            .and_then(|p| p.parent().map(std::path::Path::to_path_buf));
+        // An argument that is itself a file (`node ~/agents/my-agent.js`) is
+        // part of the program, so its folder is readable too -- unless that
+        // folder is the home folder itself, which would unlock everything.
+        let script_dirs = args
+            .iter()
+            .map(|a| expand(a))
+            .filter(|p| p.is_file())
+            .filter_map(|p| p.parent().map(std::path::Path::to_path_buf))
+            .filter(|dir| Some(dir) != home.as_ref());
+        let read: Vec<_> = program_dir.into_iter().chain(script_dirs).collect();
+        let write: Vec<_> = data_dirs
+            .iter()
+            .map(|d| d.trim())
+            .filter(|d| !d.is_empty())
+            .map(expand)
+            .collect();
+        let mut cmd = Command::new("sandbox-exec");
+        cmd.current_dir(std::env::temp_dir())
+            .arg("-p")
+            .arg(super::sandbox::profile_with(&read, &write))
+            .arg("--")
+            .arg(command)
+            .args(args);
+        Some(cmd)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = data_dirs;
+        let mut cmd = Command::new(command);
+        cmd.args(args);
+        Some(cmd)
+    }
+}
+
+fn command_for(config: &AgentConfig) -> Option<Command> {
+    match config {
+        AgentConfig::Codex => default_command(),
+        AgentConfig::Custom {
+            command,
+            args,
+            data_dirs,
+        } => custom_command(command, args, data_dirs),
+    }
+}
+
 /// Synthetic notification the harness injects after a prompt resolves.
 /// Real ACP has no "done" notification (the prompt response carries the
 /// stop reason), and sending it through the same channel as the chunks
@@ -69,6 +132,8 @@ pub struct AgentHarness {
     // Which models the account offers, and which it turned down this run.
     // Held only for short, non-async updates.
     models: StdMutex<ModelState>,
+    /// Which agent to start; changed from the settings.
+    config: Arc<StdMutex<AgentConfig>>,
 }
 
 /// A model the account can use, for the picker in the chat.
@@ -101,11 +166,14 @@ struct Connection {
 
 impl AgentHarness {
     pub fn new(event_tx: mpsc::UnboundedSender<AgentEvent>) -> Self {
+        let config = Arc::new(StdMutex::new(AgentConfig::default()));
+        let for_factory = Arc::clone(&config);
         Self {
             client: Mutex::new(None),
             event_tx,
-            command_factory: Box::new(default_command),
+            command_factory: Box::new(move || command_for(&for_factory.lock().unwrap())),
             models: StdMutex::default(),
+            config,
         }
     }
 
@@ -119,7 +187,27 @@ impl AgentHarness {
             event_tx,
             command_factory: Box::new(command_factory),
             models: StdMutex::default(),
+            config: Arc::new(StdMutex::new(AgentConfig::default())),
         }
+    }
+
+    /// Switches to another agent: stops the current one and forgets what it
+    /// knew about models. The next call starts the new one.
+    pub async fn set_agent(&self, config: AgentConfig) {
+        *self.config.lock().unwrap() = config;
+        self.shutdown().await;
+        *self.models.lock().unwrap() = ModelState::default();
+    }
+
+    /// Switches to `config` and starts it, so a wrong command or a program
+    /// that does not speak ACP shows up now, not at the first question.
+    pub async fn use_agent(&self, config: AgentConfig) -> Result<(), String> {
+        self.set_agent(config).await;
+        self.warm().await
+    }
+
+    fn is_codex(&self) -> bool {
+        self.config.lock().unwrap().is_codex()
     }
 
     /// Returns the current connection, starting (or restarting, if the
@@ -172,7 +260,7 @@ impl AgentHarness {
             .map(str::to_string)
             .ok_or_else(|| "agent did not return a sessionId".to_string())?;
 
-        lock_down(&conn.client, &session_id).await?;
+        lock_down(&conn.client, &session_id, self.is_codex()).await?;
         self.use_supported_model(&conn.client, &session_id, &result)
             .await;
         Ok(session_id)
@@ -194,7 +282,7 @@ impl AgentHarness {
                 }),
             )
             .await?;
-        lock_down(&conn.client, session_id).await?;
+        lock_down(&conn.client, session_id, self.is_codex()).await?;
         self.use_supported_model(&conn.client, session_id, &result)
             .await;
         Ok(())
@@ -278,55 +366,40 @@ impl AgentHarness {
 }
 
 /// Codex's default mode auto-approves actions; explain sessions must be
-/// read-only (ROADMAP.md M4 Safety). Failing here fails the session
-/// rather than running it unrestricted.
-async fn lock_down(client: &RpcClient, session_id: &str) -> Result<(), String> {
-    client
+/// read-only (ROADMAP.md M4 Safety). For Codex, failing here fails the
+/// session rather than running it unrestricted. Another agent may not have a
+/// mode by that name, so there it is requested but not required: the OS
+/// sandbox around its process is what actually keeps it from writing.
+async fn lock_down(client: &RpcClient, session_id: &str, required: bool) -> Result<(), String> {
+    let result = client
         .request(
             "session/set_mode",
             json!({ "sessionId": session_id, "modeId": "read-only" }),
         )
-        .await
-        .map(|_| ())
-        .map_err(|e| format!("could not switch the session to read-only: {e}"))
+        .await;
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) if required => Err(format!("could not switch the session to read-only: {e}")),
+        Err(e) => {
+            log::warn!("the agent has no read-only mode ({e}); relying on the sandbox");
+            Ok(())
+        }
+    }
 }
 
 impl AgentHarness {
-    fn record_models(&self, models: &Value) {
-        let available: Vec<String> = models
-            .get("availableModels")
-            .and_then(Value::as_array)
-            .map(|list| {
-                list.iter()
-                    .filter_map(|m| m.get("modelId").and_then(Value::as_str))
-                    .map(str::to_string)
-                    .collect()
-            })
-            .unwrap_or_default();
-        if available.is_empty() {
+    /// Remembers the models a new or resumed session reports.
+    fn record_models(&self, session: &Value) {
+        let models = models_in(session);
+        if models.is_empty() {
             return;
         }
-        let labels = models
-            .get("availableModels")
-            .and_then(Value::as_array)
-            .map(|list| {
-                list.iter()
-                    .filter_map(|m| {
-                        let id = m.get("modelId").and_then(Value::as_str)?;
-                        let text = |key: &str| {
-                            m.get(key)
-                                .and_then(Value::as_str)
-                                .unwrap_or_default()
-                                .to_string()
-                        };
-                        Some((id.to_string(), (text("name"), text("description"))))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
         let mut state = self.models.lock().unwrap();
-        state.available = available;
-        state.labels = labels;
+        state.available = models.iter().map(|m| m.id.clone()).collect();
+        state.labels = models
+            .into_iter()
+            .map(|m| (m.id, (m.name, m.description)))
+            .collect();
     }
 
     /// The models the account offers (minus any it turned down), for the
@@ -354,13 +427,20 @@ impl AgentHarness {
     /// Moves a session to a model the user picked.
     pub async fn select_model(&self, session_id: &str, model_id: &str) -> Result<(), String> {
         let conn = self.connection().await?;
-        conn.client
-            .request(
+        // Codex takes `session/set_model`; other agents (OpenCode, ...) list
+        // their models as a config option and change it that way.
+        let (method, params) = if self.is_codex() {
+            (
                 "session/set_model",
                 json!({ "sessionId": session_id, "modelId": model_id }),
             )
-            .await
-            .map(|_| ())
+        } else {
+            (
+                "session/set_config_option",
+                json!({ "sessionId": session_id, "configId": "model", "value": model_id }),
+            )
+        };
+        conn.client.request(method, params).await.map(|_| ())
     }
 
     /// The offered models minus any the account rejected this run.
@@ -397,10 +477,10 @@ impl AgentHarness {
     /// second, switch to one that is. A failed switch is only logged: the
     /// prompt then reports the real error.
     async fn use_supported_model(&self, client: &RpcClient, session_id: &str, session: &Value) {
+        self.record_models(session);
         let Some(models) = session.get("models") else {
             return;
         };
-        self.record_models(models);
         let current = models.get("currentModelId").and_then(Value::as_str);
         let usable = self.usable_models();
         let usable: Vec<&str> = usable.iter().map(String::as_str).collect();
@@ -436,6 +516,57 @@ impl AgentHarness {
         log::warn!("model turned down for this account; trying {pick}");
         self.set_model(client, session_id, &pick).await
     }
+}
+
+/// The models a session response offers, in the agent's order. Codex puts
+/// them in `models.availableModels`; other ACP agents in the `model` entry of
+/// `configOptions`.
+fn models_in(session: &Value) -> Vec<ModelInfo> {
+    let text = |m: &Value, key: &str| {
+        m.get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string()
+    };
+    if let Some(list) = session
+        .pointer("/models/availableModels")
+        .and_then(Value::as_array)
+    {
+        return list
+            .iter()
+            .filter_map(|m| {
+                let id = m.get("modelId").and_then(Value::as_str)?;
+                Some(ModelInfo {
+                    id: id.to_string(),
+                    name: text(m, "name"),
+                    description: text(m, "description"),
+                })
+            })
+            .collect();
+    }
+    session
+        .get("configOptions")
+        .and_then(Value::as_array)
+        .and_then(|options| {
+            options.iter().find(|o| {
+                o.get("category").and_then(Value::as_str) == Some("model")
+                    || o.get("id").and_then(Value::as_str) == Some("model")
+            })
+        })
+        .and_then(|o| o.get("options").and_then(Value::as_array))
+        .map(|list| {
+            list.iter()
+                .filter_map(|m| {
+                    let id = m.get("value").and_then(Value::as_str)?;
+                    Some(ModelInfo {
+                        id: id.to_string(),
+                        name: text(m, "name"),
+                        description: text(m, "description"),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn model_name(id: &str) -> &str {
@@ -536,7 +667,30 @@ fn parse_notification(method: &str, params: &Value) -> Option<AgentEvent> {
 
 #[cfg(test)]
 mod model_tests {
-    use super::pick_model;
+    use super::{models_in, pick_model};
+    use serde_json::json;
+
+    #[test]
+    fn reads_models_from_either_shape() {
+        let codex = json!({ "models": { "availableModels": [
+            { "modelId": "gpt-5.5[low]", "name": "5.5 (low)", "description": "d" }
+        ]}});
+        let m = models_in(&codex);
+        assert_eq!(
+            (m[0].id.as_str(), m[0].name.as_str()),
+            ("gpt-5.5[low]", "5.5 (low)")
+        );
+
+        let other = json!({ "configOptions": [
+            { "id": "mode", "category": "mode", "options": [{ "value": "x", "name": "X" }] },
+            { "id": "model", "category": "model", "options": [
+                { "value": "p/a", "name": "A" }, { "value": "p/b", "name": "B" }
+            ]}
+        ]});
+        let ids: Vec<_> = models_in(&other).into_iter().map(|m| m.id).collect();
+        assert_eq!(ids, ["p/a", "p/b"]);
+        assert!(models_in(&json!({ "sessionId": "s" })).is_empty());
+    }
 
     const OFFERED: [&str; 4] = ["luna[low]", "luna[high]", "gpt-5.5[low]", "gpt-5.5[high]"];
 

@@ -14,16 +14,10 @@ import { LibraryChat } from "@/components/chat/library-chat";
 import { CollectionPicker } from "@/components/layout/collection-picker";
 import {
   ArticleCover,
-  SiteLogoBanner,
   SiteLogoTile,
   SiteMark,
 } from "@/components/layout/article-cover";
-import {
-  articleColor,
-  articlesInSpace,
-  displaySpaceName,
-  INBOX,
-} from "@/lib/spaces";
+import { articleColor } from "@/lib/spaces";
 import { openSampleArticle } from "@/lib/sample-article";
 import { cn } from "@/lib/utils";
 import { useLibraryStore } from "@/stores/library-store";
@@ -32,30 +26,21 @@ import { useSpacesStore } from "@/stores/spaces-store";
 import { deleteArticle, openSavedArticle } from "@/lib/navigate";
 import type { ArticleSummary } from "@/types/library";
 
-/** Home is just the box where you paste a link (with a loader while the page
- * is fetched). A collection shows its articles: in progress, waiting and
- * finished. The collections live in the sidebar. */
+/** Home: the box where you paste a link (with a loader while the page is
+ * fetched) and the list of every saved blog. The Archive page reuses it.
+ * Collections live in the sidebar, with their blogs under them. */
 export function Home() {
   const state = useReaderStore((s) => s.state);
   const openUrl = useReaderStore((s) => s.openUrl);
   const articles = useLibraryStore((s) => s.articles);
-  const active = useSpacesStore((s) => s.active);
   const slots = useSpacesStore((s) => s.slots);
   const showArchive = useSpacesStore((s) => s.showArchive);
   const libraryChat = useSpacesStore((s) => s.libraryChat);
 
   const [input, setInput] = useState("");
   const loading = state.status === "loading";
-  const isHome = !showArchive && active === INBOX;
-  // Home lists every saved article as cards; a collection lists its own.
-  const list = showArchive
-    ? articles.filter((a) => a.archived)
-    : isHome
-      ? articles.filter((a) => !a.archived)
-      : articlesInSpace(articles, active);
-  const reading = list.filter((a) => a.progress > 0 && a.progress < 0.95);
-  const fresh = list.filter((a) => a.progress === 0);
-  const done = list.filter((a) => a.progress >= 0.95);
+  const isHome = !showArchive;
+  const list = articles.filter((a) => a.archived === showArchive);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -63,15 +48,7 @@ export function Home() {
     if (url && !loading) void openUrl(url);
   }
 
-  const title = showArchive
-    ? "Archive"
-    : isHome
-      ? "Read anything. Ask about any line."
-      : displaySpaceName(active);
-  const color =
-    !showArchive && active !== INBOX && slots[active] !== undefined
-      ? `var(--sp-${slots[active]})`
-      : null;
+  const title = showArchive ? "Archive" : "Read anything. Ask about any line.";
 
   if (libraryChat) return <LibraryChat />;
 
@@ -79,19 +56,12 @@ export function Home() {
     <div className="mx-auto w-full max-w-[62rem] px-10 pt-14 pb-32">
       <header>
         <p className="text-muted-foreground text-[0.8125rem]">{greeting()}</p>
-        <h1 className="font-display mt-1.5 flex items-center gap-3 text-[2.25rem] leading-[1.12] font-semibold tracking-[-0.025em] text-balance">
-          {color && (
-            <i
-              aria-hidden
-              className="size-3 shrink-0 rounded-full"
-              style={{ background: color }}
-            />
-          )}
+        <h1 className="font-display mt-1.5 text-[2.25rem] leading-[1.12] font-semibold tracking-[-0.025em] text-balance">
           {title}
         </h1>
-        {!isHome && articles.length > 0 && (
+        {showArchive && list.length > 0 && (
           <p className="text-muted-foreground mt-2 text-[0.8125rem]">
-            {summary(reading.length, fresh.length, done.length, showArchive)}
+            {list.length} archived
           </p>
         )}
       </header>
@@ -146,19 +116,10 @@ export function Home() {
         !loading && <Welcome />
       ) : list.length === 0 ? (
         <p className="text-muted-foreground mt-14 text-center text-[0.8125rem]">
-          {showArchive
-            ? "Nothing archived."
-            : "Nothing here yet. Open an article and add it to this collection from its page."}
+          {showArchive ? "Nothing archived." : "Nothing here yet."}
         </p>
       ) : (
-        <LibraryList
-          reading={reading}
-          fresh={fresh}
-          done={done}
-          archive={showArchive}
-          cards={isHome}
-          slots={slots}
-        />
+        <LibraryList list={list} archive={showArchive} slots={slots} />
       )}
     </div>
   );
@@ -196,21 +157,6 @@ function greeting(): string {
         : "Good evening";
 }
 
-function summary(
-  reading: number,
-  fresh: number,
-  done: number,
-  archive: boolean,
-) {
-  if (archive) return `${reading + fresh + done} archived`;
-  const parts = [
-    reading && `${reading} in progress`,
-    fresh && `${fresh} waiting`,
-    done && `${done} finished`,
-  ].filter(Boolean);
-  return parts.length ? parts.join(", ") : "Nothing here yet";
-}
-
 /** First run: what Yomu does, and the tour as the first thing to read. */
 function Welcome() {
   return (
@@ -245,19 +191,12 @@ function Welcome() {
 }
 
 function LibraryList({
-  reading,
-  fresh,
-  done,
+  list,
   archive,
-  cards,
   slots,
 }: {
-  reading: ArticleSummary[];
-  fresh: ArticleSummary[];
-  done: ArticleSummary[];
+  list: ArticleSummary[];
   archive: boolean;
-  /** Home: one grid of cards, newest first, no groups. */
-  cards: boolean;
   slots: Record<string, number>;
 }) {
   const setArchived = useLibraryStore((s) => s.setArchived);
@@ -279,61 +218,27 @@ function LibraryList({
   if (archive) {
     return (
       <Rows label={null}>
-        {[...reading, ...fresh, ...done].map((a) => (
+        {list.map((a) => (
           <Row key={a.id} {...props(a)} />
         ))}
       </Rows>
     );
   }
 
-  if (cards) {
-    const all = [...reading, ...fresh, ...done];
-    return (
-      <div onKeyDown={moveFocus}>
-        <div className="mt-14 flex items-baseline gap-2">
-          <h2 className="text-[0.9375rem] font-semibold">All blogs</h2>
-          <span className="text-muted-foreground text-[0.8125rem] tabular-nums">
-            {all.length}
-          </span>
-        </div>
-        <ul className="divide-border mt-3 flex flex-col divide-y">
-          {all.map((a) => (
-            <HomeRow key={a.id} {...props(a)} />
-          ))}
-        </ul>
-      </div>
-    );
-  }
-
   return (
     // Arrow keys (or j/k) move between items, like a list in Linear.
     <div onKeyDown={moveFocus}>
-      {reading.length > 0 && (
-        <section className="mt-12">
-          <h2 className="mb-3 text-[0.8125rem] font-medium">
-            Continue reading
-          </h2>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(14.5rem,1fr))] gap-4">
-            {reading.map((a) => (
-              <Card key={a.id} {...props(a)} />
-            ))}
-          </ul>
-        </section>
-      )}
-      {fresh.length > 0 && (
-        <Rows label="Up next">
-          {fresh.map((a) => (
-            <Row key={a.id} {...props(a)} />
-          ))}
-        </Rows>
-      )}
-      {done.length > 0 && (
-        <Rows label="Finished">
-          {done.map((a) => (
-            <Row key={a.id} {...props(a)} />
-          ))}
-        </Rows>
-      )}
+      <div className="mt-14 flex items-baseline gap-2">
+        <h2 className="text-[0.9375rem] font-semibold">All blogs</h2>
+        <span className="text-muted-foreground text-[0.8125rem] tabular-nums">
+          {list.length}
+        </span>
+      </div>
+      <ul className="divide-border mt-3 flex flex-col divide-y">
+        {list.map((a) => (
+          <HomeRow key={a.id} {...props(a)} />
+        ))}
+      </ul>
     </div>
   );
 }
@@ -363,76 +268,6 @@ interface ItemProps {
   onArchive: () => void;
   onDelete: () => void;
   onConfirm: (yes: boolean) => void;
-}
-
-function Card({
-  article,
-  color,
-  confirming,
-  onOpen,
-  onArchive,
-  onDelete,
-  onConfirm,
-}: ItemProps) {
-  const percent = Math.round(article.progress * 100);
-  const status =
-    article.progress >= 0.95
-      ? "Finished"
-      : article.progress > 0
-        ? `${percent}% read`
-        : "Unread";
-  return (
-    <li className="group relative">
-      <button
-        type="button"
-        data-row
-        onClick={onOpen}
-        title={article.title}
-        className="bg-card border-border hover:border-input focus-visible:ring-ring/60 flex h-full w-full flex-col overflow-hidden rounded-xl border text-left shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] duration-[var(--dur)] ease-[var(--ease)] outline-none hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] focus-visible:ring-2"
-      >
-        <SiteLogoBanner
-          url={article.canonicalUrl}
-          icon={article.icon}
-          site={article.site}
-          color={color}
-          className="h-24 w-full"
-        >
-          {article.progress > 0 && article.progress < 0.95 && (
-            <span className="absolute inset-x-0 bottom-0 h-[3px] bg-black/20">
-              <span
-                className="bg-foreground block h-full"
-                style={{ width: `${percent}%` }}
-              />
-            </span>
-          )}
-        </SiteLogoBanner>
-        <span className="flex flex-1 flex-col gap-1.5 px-3.5 pt-3 pb-3.5">
-          <span className="text-muted-foreground truncate text-[0.6875rem]">
-            {article.site}
-          </span>
-          <span className="line-clamp-2 text-[0.875rem] leading-snug font-semibold tracking-[-0.01em]">
-            {article.title}
-          </span>
-          <span className="text-muted-foreground mt-auto flex items-center gap-1.5 pt-1 text-[0.6875rem]">
-            <span>{status}</span>
-          </span>
-        </span>
-      </button>
-      <Actions
-        article={article}
-        onArchive={onArchive}
-        onDelete={onDelete}
-        className="top-2 right-2"
-      />
-      {confirming && (
-        <Confirm
-          title={article.title}
-          onConfirm={onConfirm}
-          className="bg-card/95 absolute inset-0 flex-col justify-center rounded-xl p-4 backdrop-blur-sm"
-        />
-      )}
-    </li>
-  );
 }
 
 /** One blog in Home's list: its site's logo, the title with the site under
@@ -617,16 +452,24 @@ function Actions({
 
 function Confirm({
   title,
+  keepLabel = "Keep",
+  note,
   onConfirm,
   className,
 }: {
   title: string;
+  keepLabel?: string;
+  /** A short reassurance shown with the question. */
+  note?: string;
   onConfirm: (yes: boolean) => void;
   className?: string;
 }) {
   return (
     <div className={cn("flex items-center gap-3 text-[0.8125rem]", className)}>
-      <span className="line-clamp-2 min-w-0">Delete “{title}”?</span>
+      <span className="line-clamp-2 min-w-0">
+        Delete “{title}”?
+        {note && <span className="text-muted-foreground"> {note}</span>}
+      </span>
       <span className="ml-auto flex shrink-0 gap-1.5">
         <Button
           size="sm"
@@ -642,7 +485,7 @@ function Confirm({
           className="h-7 px-2.5 text-[0.75rem]"
           onClick={() => onConfirm(false)}
         >
-          Keep
+          {keepLabel}
         </Button>
       </span>
     </div>

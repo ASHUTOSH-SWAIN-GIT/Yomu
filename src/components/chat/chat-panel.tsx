@@ -70,12 +70,12 @@ export function ChatPanel() {
   return (
     <aside
       aria-label="Chat about this article"
-      className="bg-background border-border flex h-full w-full min-w-[26rem] flex-col border-l"
+      className="bg-background border-border flex h-full w-full min-w-[20rem] flex-col border-l"
     >
-      <header className="flex h-12 shrink-0 items-center gap-1 pr-2 pl-4">
+      <header className="flex h-16 shrink-0 items-center gap-1 pr-2 pl-5">
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <h2 className="text-[0.875rem] font-semibold">Chat</h2>
-          <span className="text-muted-foreground truncate text-[0.6875rem]">
+          <h2 className="text-[1.25rem] font-bold tracking-[-0.01em]">Chat</h2>
+          <span className="text-muted-foreground truncate text-[0.8125rem]">
             {article.title}
           </span>
         </div>

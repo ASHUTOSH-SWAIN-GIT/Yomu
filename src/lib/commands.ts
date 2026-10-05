@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ScrapedArticle } from "@/types/article";
-import type { AgentModel, Diagnosis } from "@/types/agent";
+import type { AgentConfig, AgentModel, Diagnosis } from "@/types/agent";
 
 /**
  * Thin wrappers around Tauri commands (`src-tauri/src/lib.rs`). Keep all
@@ -51,6 +51,18 @@ export async function agentNewSession(): Promise<string> {
  * no longer has it, in which case the caller opens a new one. */
 export async function agentResumeSession(sessionId: string): Promise<void> {
   return invoke("agent_resume_session", { sessionId });
+}
+
+/** Switches to the chosen agent and starts it; rejects if it cannot start. */
+export async function agentUse(config: AgentConfig): Promise<void> {
+  return invoke("agent_use", { config });
+}
+
+/** Where a command is found on this computer, or null. */
+export async function agentFindCommand(
+  command: string,
+): Promise<string | null> {
+  return invoke<string | null>("agent_find_command", { command });
 }
 
 /** The models the account can use. */

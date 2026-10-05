@@ -7,12 +7,14 @@ import {
   Home,
   MessageSquarePlus,
   Plus,
-  X,
+  Settings,
+  Trash2,
 } from "lucide-react";
 import { SiteFavicon } from "@/components/layout/article-cover";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { articlesInSpace, buildSpaces, INBOX } from "@/lib/spaces";
 import { cn } from "@/lib/utils";
+import { removeCollection } from "@/lib/collections";
 import { goHome, openSavedArticle } from "@/lib/navigate";
 import { useReaderStore } from "@/stores/reader-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
@@ -27,7 +29,6 @@ const FOLDED_KEY = "yomu-sidebar-folded";
  * collections, the archive, and the way to add a collection. */
 export function LibrarySidebar() {
   const articles = useLibraryStore((s) => s.articles);
-  const active = useSpacesStore((s) => s.active);
   const extra = useSpacesStore((s) => s.extra);
   const slots = useSpacesStore((s) => s.slots);
   const setActive = useSpacesStore((s) => s.setActive);
@@ -66,27 +67,21 @@ export function LibrarySidebar() {
   };
   const createSpace = useSpacesStore((s) => s.createSpace);
   const [naming, setNaming] = useState(false);
-  const deleteSpace = useSpacesStore((s) => s.deleteSpace);
-  const removeTag = useLibraryStore((s) => s.removeTag);
+  // The collection last clicked: it is the one whose options show.
+  const [selected, setSelected] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const agentStatus = useAgentStore((s) => s.status);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const peek = useUiStore((s) => s.sidebarPeek);
   const peekSidebar = useUiStore((s) => s.peekSidebar);
   const shown = sidebarOpen || peek;
 
   const spaces = useMemo(
-    () => buildSpaces(articles, extra, slots, active),
-    [articles, extra, slots, active],
+    () => buildSpaces(articles, extra, slots, ""),
+    [articles, extra, slots],
   );
-  // Removing a collection keeps its articles: they just lose the tag and show
-  // on Home again.
-  async function removeCollection(id: string) {
-    const tagged = articles.filter((a) => a.tags.includes(id));
-    await Promise.all(tagged.map((a) => removeTag(a.id, id)));
-    deleteSpace(id);
-  }
-
   const archived = articles.filter((a) => a.archived).length;
   const named = spaces.filter((s) => s.id !== INBOX);
 
@@ -113,9 +108,10 @@ export function LibrarySidebar() {
       )}
     >
       <Item
-        on={!reading && !showArchive && !libraryChat && active === INBOX}
+        on={!reading && !showArchive && !libraryChat}
         onClick={() => {
           setActive(INBOX);
+          setSelected(null);
           leave();
         }}
         icon={<Home />}
@@ -131,6 +127,7 @@ export function LibrarySidebar() {
         onClick={() => {
           void resetChat();
           setLibraryChat(true);
+          setSelected(null);
           leave();
         }}
         icon={<MessageSquarePlus />}
@@ -141,17 +138,21 @@ export function LibrarySidebar() {
       <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
         My collection
       </h2>
-      {naming ? (
-        <NewCollectionName
+      <Item on={false} onClick={() => setNaming(true)} icon={<Plus />}>
+        New collection
+      </Item>
+      {naming && (
+        // A new folder appears in the list, ready to be named.
+        <NewFolder
           onDone={(name) => {
             setNaming(false);
-            if (name && createSpace(name)) leave();
+            const id = name ? createSpace(name) : null;
+            if (id) {
+              setSelected(id);
+              leave();
+            }
           }}
         />
-      ) : (
-        <Item on={false} onClick={() => setNaming(true)} icon={<Plus />}>
-          New collection
-        </Item>
       )}
       {named.map((space) => {
         const blogs = articlesInSpace(articles, space.id);
@@ -177,27 +178,61 @@ export function LibrarySidebar() {
             )}
             <Item
               className="pl-7"
-              on={
-                !reading && !showArchive && !libraryChat && active === space.id
-              }
+              on={selected === space.id}
               onClick={() => {
-                setActive(space.id);
-                leave();
+                // Clicking a collection opens or folds its blogs and shows
+                // its options.
+                setSelected(space.id);
+                setConfirming(null);
+                if (blogs.length > 0) toggleFolded(space.id);
               }}
               icon={open ? <FolderOpen /> : <Folder />}
-              count={space.count}
+              count={selected === space.id ? undefined : space.count}
             >
               {space.name}
             </Item>
-            <button
-              type="button"
-              onClick={() => void removeCollection(space.id)}
-              aria-label={`Remove ${space.name}`}
-              title="Remove collection (articles are kept)"
-              className="text-muted-foreground hover:text-foreground bg-accent focus-visible:ring-ring/60 absolute top-[5px] right-1.5 grid size-5 place-items-center rounded-sm opacity-0 outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
-            >
-              <X className="size-3.5" aria-hidden />
-            </button>
+            {selected === space.id && (
+              <button
+                type="button"
+                onClick={() => setConfirming(space.id)}
+                aria-label={`Delete ${space.name}`}
+                title="Delete collection (the blogs are kept)"
+                className="text-muted-foreground hover:text-destructive hover:bg-background/60 focus-visible:ring-ring/60 absolute top-[5px] right-1.5 grid size-5 place-items-center rounded-sm outline-none focus-visible:ring-2"
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+              </button>
+            )}
+            {confirming === space.id && (
+              <div className="bg-accent/60 mx-1 mt-0.5 mb-1 flex flex-col gap-2 rounded-md p-2 text-[0.75rem]">
+                <span>
+                  Delete “{space.name}”?
+                  <span className="text-muted-foreground">
+                    {" "}
+                    The blogs are kept.
+                  </span>
+                </span>
+                <span className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirming(null);
+                      setSelected(null);
+                      void removeCollection(space.id);
+                    }}
+                    className="bg-destructive text-destructive-foreground focus-visible:ring-ring/60 h-6 rounded-md px-2.5 font-medium outline-none focus-visible:ring-2"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(null)}
+                    className="hover:bg-accent focus-visible:ring-ring/60 h-6 rounded-md px-2.5 outline-none focus-visible:ring-2"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              </div>
+            )}
             {open && blogs.length > 0 && (
               <ul className="mt-0.5 mb-1 flex flex-col gap-px">
                 {blogs.map((a) => (
@@ -236,6 +271,7 @@ export function LibrarySidebar() {
             on={!reading && showArchive}
             onClick={() => {
               setShowArchive(true);
+              setSelected(null);
               leave();
             }}
             icon={<Archive />}
@@ -247,28 +283,35 @@ export function LibrarySidebar() {
       )}
 
       <div className="mt-auto flex flex-col gap-0.5 pt-6">
-        <button
-          type="button"
-          onClick={() => setSetupOpen(true)}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left text-[0.75rem] outline-none focus-visible:ring-2"
-        >
-          <span
-            aria-hidden
-            className={cn(
-              "mx-[5px] size-1.5 rounded-full",
-              agentStatus === "ready"
-                ? "bg-[var(--sp-1)]"
-                : agentStatus === "checking"
+        {/* Only shown when the agent needs attention; "connected" needs no
+            text. */}
+        {agentStatus !== "ready" && (
+          <button
+            type="button"
+            onClick={() => setSetupOpen(true)}
+            className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left text-[0.75rem] outline-none focus-visible:ring-2"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "mx-[5px] size-1.5 rounded-full",
+                agentStatus === "checking"
                   ? "bg-muted-foreground animate-pulse"
                   : "bg-honey",
-            )}
-          />
-          {agentStatus === "ready"
-            ? "Codex connected"
-            : agentStatus === "checking"
-              ? "Checking Codex…"
+              )}
+            />
+            {agentStatus === "checking"
+              ? "Checking the agent…"
               : "Set up Explain"}
-        </button>
+          </button>
+        )}
+        <Item
+          on={false}
+          onClick={() => setSettingsOpen(true)}
+          icon={<Settings />}
+        >
+          Settings
+        </Item>
       </div>
     </nav>
   );
@@ -313,12 +356,8 @@ function Item({
   );
 }
 
-/** The name field that replaces the "New collection" button while naming. */
-function NewCollectionName({
-  onDone,
-}: {
-  onDone: (name: string | null) => void;
-}) {
+/** A new, unnamed folder in the list: type its name, Enter to keep it. */
+function NewFolder({ onDone }: { onDone: (name: string | null) => void }) {
   const [value, setValue] = useState("");
   return (
     <form
@@ -326,18 +365,19 @@ function NewCollectionName({
         e.preventDefault();
         onDone(value.trim() || null);
       }}
-      className="px-1"
+      className="bg-accent/70 flex h-[30px] items-center gap-2.5 rounded-md pr-2 pl-7"
     >
+      <Folder className="text-muted-foreground size-4 shrink-0" aria-hidden />
       <input
         autoFocus
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && onDone(null)}
         onBlur={() => onDone(value.trim() || null)}
-        placeholder="Name your collection"
+        placeholder="Name this folder"
         aria-label="New collection name"
         maxLength={32}
-        className="bg-muted placeholder:text-muted-foreground h-8 w-full rounded-md px-2.5 text-[0.8125rem] outline-none"
+        className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
       />
     </form>
   );

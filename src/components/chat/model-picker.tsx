@@ -25,9 +25,11 @@ export function ModelPicker() {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<AgentModel[] | null>(cached);
   const [failed, setFailed] = useState(false);
+  const [query, setQuery] = useState("");
 
   function onOpenChange(next: boolean) {
     setOpen(next);
+    setQuery("");
     if (!next || cached) return;
     setFailed(false);
     agentListModels()
@@ -58,6 +60,14 @@ export function ModelPicker() {
     }
   }
 
+  // Some agents offer hundreds of models, so a long list can be searched.
+  const shown =
+    models?.filter((m) =>
+      `${m.name} ${m.id} ${m.description}`
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
+    ) ?? null;
+
   const label = chosen
     ? (models?.find((m) => m.id === chosen)?.name ?? chosen)
     : "Auto";
@@ -80,6 +90,16 @@ export function ModelPicker() {
         side="top"
         className="flex max-h-80 w-72 flex-col gap-0.5 overflow-y-auto p-1.5"
       >
+        {models && models.length > 12 && (
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`Search ${models.length} models`}
+            aria-label="Search models"
+            autoFocus
+            className="bg-muted placeholder:text-muted-foreground mb-1 h-8 shrink-0 rounded-lg px-2.5 text-[0.8125rem] outline-none"
+          />
+        )}
         <Option
           on={!chosen}
           title="Auto"
@@ -96,7 +116,7 @@ export function ModelPicker() {
             Could not load the models. Is Codex set up?
           </p>
         )}
-        {models?.map((m) => (
+        {shown?.map((m) => (
           <Option
             key={m.id}
             on={chosen === m.id}

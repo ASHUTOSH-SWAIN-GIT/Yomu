@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Library,
   Search,
+  Settings as SettingsIcon,
   Sparkles,
 } from "lucide-react";
 import { searchLibrary } from "@/lib/db";
@@ -15,13 +16,11 @@ import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { openSampleArticle } from "@/lib/sample-article";
 import { filterByQuery } from "@/lib/palette";
-import { displaySpaceName, buildSpaces, spaceOfArticle } from "@/lib/spaces";
 import { cn } from "@/lib/utils";
 import { SUMMARY_LABEL } from "@/lib/scope";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
-import { useSpacesStore } from "@/stores/spaces-store";
 import { goHome, openSavedArticle } from "@/lib/navigate";
 import { useUiStore } from "@/stores/ui-store";
 import type { SearchHit } from "@/types/library";
@@ -39,7 +38,7 @@ interface Action {
 }
 
 /**
- * Cmd/Ctrl+K: one place to find anything (articles, chat answers, spaces)
+ * Cmd/Ctrl+K: one place to find anything (articles, chat answers, commands)
  * and to run commands. Search is full-text (see searchLibrary); with no
  * query it lists recent articles and commands.
  */
@@ -65,10 +64,6 @@ export function CommandPalette() {
 
 function PaletteBody({ close }: { close: () => void }) {
   const articles = useLibraryStore((s) => s.articles);
-  const active = useSpacesStore((s) => s.active);
-  const extra = useSpacesStore((s) => s.extra);
-  const slots = useSpacesStore((s) => s.slots);
-  const setActive = useSpacesStore((s) => s.setActive);
   const reader = useReaderStore((s) => s.state);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -95,8 +90,6 @@ function PaletteBody({ close }: { close: () => void }) {
   );
 
   function openArticle(id: string) {
-    const article = byId.get(id);
-    if (article) setActive(spaceOfArticle(article, active));
     void openSavedArticle(id);
     close();
   }
@@ -144,6 +137,13 @@ function PaletteBody({ close }: { close: () => void }) {
       run: () => ui().setFocusMode(!ui().focusMode),
     },
     {
+      id: "settings",
+      label: "Open settings",
+      icon: <SettingsIcon />,
+      shortcut: `${MOD},`,
+      run: () => ui().setSettingsOpen(true),
+    },
+    {
       id: "chat",
       label: "Show or hide the chat",
       icon: <MessageSquare />,
@@ -160,12 +160,6 @@ function PaletteBody({ close }: { close: () => void }) {
     },
   ];
   const shownActions = filterByQuery(actions, query, (a) => a.label);
-
-  const spaces = filterByQuery(
-    buildSpaces(articles, extra, slots, active),
-    query,
-    (s) => s.name,
-  ).filter(() => query.trim().length > 0);
 
   // Results only count for the current query (they may lag a keystroke).
   const current = query.trim() ? hits : [];
@@ -259,39 +253,6 @@ function PaletteBody({ close }: { close: () => void }) {
                   <span className="block truncate">
                     {byId.get(h.articleId)?.title}
                   </span>
-                </span>
-              </Row>
-            ))}
-          </Group>
-        )}
-
-        {spaces.length > 0 && (
-          <Group label="Collections">
-            {spaces.map((s) => (
-              <Row
-                key={`s-${s.id}`}
-                value={`s-${s.id}`}
-                icon={
-                  <span
-                    aria-hidden
-                    className="mx-[3px] size-2.5 rounded-full"
-                    style={{
-                      background:
-                        s.slot === null
-                          ? "var(--sp-inbox)"
-                          : `var(--sp-${s.slot})`,
-                    }}
-                  />
-                }
-                onSelect={() => {
-                  setActive(s.id);
-                  void goHome();
-                  close();
-                }}
-              >
-                <span>{displaySpaceName(s.id)}</span>
-                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
-                  {s.count}
                 </span>
               </Row>
             ))}

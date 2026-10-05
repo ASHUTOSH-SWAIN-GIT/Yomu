@@ -70,6 +70,28 @@ pub async fn diagnose() -> Diagnosis {
     }
 }
 
+/// Where `command` lives: itself when it has a path (`~/` allowed), else the
+/// first executable file with that name on `PATH`. `None` when not found.
+pub fn resolve_command(command: &str) -> Option<std::path::PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let command = command.trim();
+    let is_program = |p: &std::path::Path| {
+        p.metadata()
+            .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+    };
+    if command.contains('/') {
+        let path = match (command.strip_prefix("~/"), std::env::var_os("HOME")) {
+            (Some(rest), Some(home)) => std::path::PathBuf::from(home).join(rest),
+            _ => std::path::PathBuf::from(command),
+        };
+        return is_program(&path).then_some(path);
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|dir| dir.join(command))
+        .find(|p| is_program(p))
+}
+
 /// Kicks off `codex login`, which is expected to open a browser itself.
 /// This returns as soon as the process is spawned; the frontend re-polls
 /// `agent_status` afterwards rather than waiting on this to finish.
@@ -84,6 +106,14 @@ pub async fn login() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_programs_on_the_path_and_by_path() {
+        assert!(resolve_command("sh").is_some());
+        assert!(resolve_command("/bin/sh").is_some());
+        assert!(resolve_command("definitely-not-a-real-program-xyz").is_none());
+        assert!(resolve_command("/etc/hosts").is_none()); // not executable
+    }
 
     #[test]
     fn signed_in_output_goes_to_stderr_and_still_counts() {

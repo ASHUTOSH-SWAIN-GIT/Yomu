@@ -20,6 +20,10 @@ export type { Theme } from "@/lib/appearance";
 
 const SIDEBAR_KEY = "yomu-sidebar";
 const CHAT_MODEL_KEY = "yomu-chat-model";
+const CHAT_WIDTH_KEY = "yomu-chat-width";
+/** Width of the chat panel beside an article, before the user drags it. */
+export const CHAT_WIDTH_DEFAULT = 416;
+export const CHAT_WIDTH_MIN = 320;
 let peekTimer: ReturnType<typeof setTimeout>;
 
 interface UiState {
@@ -66,7 +70,13 @@ interface UiState {
   /** The chat panel fills the whole page instead of sitting beside it. */
   chatFull: boolean;
   setChatFull: (full: boolean) => void;
+  /** Width in pixels of the side panel; dragged by its left edge. */
+  chatWidth: number;
+  /** `save` writes it down, for the end of a drag (not every move). */
+  setChatWidth: (width: number, save?: boolean) => void;
   /** The Codex setup checklist dialog. */
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
   /** Skill level and code-example preference, applied to every explain
@@ -118,6 +128,14 @@ export const useUiStore = create<UiState>((set, get) => ({
     write(CHAT_MODEL_KEY, chatModel ?? "");
     set({ chatModel });
   },
+  chatWidth: Math.max(
+    CHAT_WIDTH_MIN,
+    Number(read(CHAT_WIDTH_KEY)) || CHAT_WIDTH_DEFAULT,
+  ),
+  setChatWidth: (chatWidth, save) => {
+    if (save) write(CHAT_WIDTH_KEY, String(Math.round(chatWidth)));
+    set({ chatWidth });
+  },
   chatFull: false,
   setChatFull: (chatFull) => set({ chatFull }),
   chatOpen: false,
@@ -128,6 +146,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAnswerOpen: (answerOpen) => set({ answerOpen }),
   answerFocus: null,
   setAnswerFocus: (answerFocus) => set({ answerFocus }),
+  settingsOpen: false,
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setupOpen: false,
   setSetupOpen: (setupOpen) => set({ setupOpen }),
   explainPrefs: parseExplainPrefs(read(EXPLAIN_PREFS_KEY)),

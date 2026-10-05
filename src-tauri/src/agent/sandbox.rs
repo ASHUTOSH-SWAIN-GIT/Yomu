@@ -35,9 +35,18 @@ use std::path::{Path, PathBuf};
 ///   security-relevant write target, same category as the npm cache);
 /// - allows outbound network (Codex can't run without it).
 pub fn profile() -> String {
+    profile_with(&[], &[])
+}
+
+/// Like [`profile`], for a custom agent: `extra_read` are folders it may
+/// read (its own program), `extra_write` folders it may read and write (its
+/// own state, such as a sign-in). Both only matter inside the home folder.
+pub fn profile_with(extra_read: &[PathBuf], extra_write: &[PathBuf]) -> String {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let path = std::env::var("PATH").unwrap_or_default();
-    build(home.as_deref(), &node_roots(home.as_deref(), &path))
+    let mut roots = node_roots(home.as_deref(), &path);
+    roots.extend_from_slice(extra_read);
+    build(home.as_deref(), &roots, extra_write)
 }
 
 /// The Node installs on `PATH` that live inside `home` (e.g. nvm's
@@ -52,7 +61,7 @@ fn node_roots(home: Option<&Path>, path: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-fn build(home: Option<&Path>, node_roots: &[PathBuf]) -> String {
+fn build(home: Option<&Path>, node_roots: &[PathBuf], extra_write: &[PathBuf]) -> String {
     let mut writable = Vec::new();
     let mut read_lock = String::new();
     if let Some(home) = home {
@@ -74,11 +83,14 @@ fn build(home: Option<&Path>, node_roots: &[PathBuf]) -> String {
             "(allow file-read-data (literal \"{}\"))\n",
             sub(".npmrc")
         ));
-        for root in node_roots {
+        for root in node_roots.iter().chain(extra_write) {
             read_lock.push_str(&format!(
                 "(allow file-read-data (subpath \"{}\"))\n",
                 escape(&root.to_string_lossy())
             ));
+        }
+        for dir in extra_write {
+            writable.push(escape(&dir.to_string_lossy()));
         }
     }
     read_lock.push_str("(deny file-read-data (subpath \"/Volumes\"))\n");
@@ -119,6 +131,7 @@ mod tests {
         build(
             Some(Path::new("/Users/me")),
             &[PathBuf::from("/Users/me/.nvm/v24")],
+            &[],
         )
     }
 
@@ -154,6 +167,21 @@ mod tests {
     }
 
     #[test]
+    fn a_custom_agent_gets_its_own_folders_and_nothing_more() {
+        let p = build(
+            Some(Path::new("/Users/me")),
+            &[PathBuf::from("/Users/me/bin")],
+            &[PathBuf::from("/Users/me/.myagent")],
+        );
+        assert!(p.contains("(allow file-write* (subpath \"/Users/me/.myagent\"))"));
+        assert!(p.contains("(allow file-read-data (subpath \"/Users/me/.myagent\"))"));
+        assert!(p.contains("(allow file-read-data (subpath \"/Users/me/bin\"))"));
+        // The program's folder is readable, not writable.
+        assert!(!p.contains("file-write* (subpath \"/Users/me/bin\")"));
+        assert!(!p.contains("file-write* (subpath \"/Users/me\")"));
+    }
+
+    #[test]
     fn finds_only_node_installs_inside_home() {
         let tmp = std::env::temp_dir().join("yomu-node-roots-test");
         let bin = tmp.join("home/.nvm/v1/bin");
@@ -169,7 +197,7 @@ mod tests {
 
     #[test]
     fn escapes_quotes_and_backslashes_in_paths() {
-        let p = build(Some(Path::new(r#"/Users/we"ird"#)), &[]);
+        let p = build(Some(Path::new(r#"/Users/we"ird"#)), &[], &[]);
         assert!(p.contains(r#"we\"ird"#));
     }
 }

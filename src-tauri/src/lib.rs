@@ -106,6 +106,22 @@ async fn agent_resume_session(
         .await
 }
 
+/// Switches to the agent chosen in the settings and starts it, so a wrong
+/// command shows up as an error now.
+#[tauri::command]
+async fn agent_use(
+    config: agent::AgentConfig,
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<(), String> {
+    harness.use_agent(config).await
+}
+
+/// Whether a command exists, and where; for the custom agent field.
+#[tauri::command]
+fn agent_find_command(command: String) -> Option<String> {
+    agent::resolve_command(&command).map(|p| p.to_string_lossy().into_owned())
+}
+
 /// The models the account can use, for the model picker in the chat.
 #[tauri::command]
 async fn agent_list_models(
@@ -206,6 +222,8 @@ pub fn run() {
             agent_new_session,
             agent_resume_session,
             agent_warm,
+            agent_use,
+            agent_find_command,
             agent_list_models,
             agent_set_model,
             agent_cancel,

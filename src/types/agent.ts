@@ -15,7 +15,20 @@ export interface Diagnosis {
   loggedIn: boolean;
 }
 
-/** Mirrors `ModelInfo` in `src-tauri/src/agent/harness.rs`. */
+/** Mirrors `AgentConfig` in `src-tauri/src/agent/config.rs`: which agent
+ * Yomu talks to. */
+export type AgentConfig =
+  | { kind: "codex" }
+  | {
+      kind: "custom";
+      command: string;
+      args: string[];
+      /** Folders the agent keeps its own state in; the sandbox lets it read
+       * and write there. */
+      dataDirs: string[];
+    };
+
+/** Mirrors `ModelInfo' in `src-tauri/src/agent/harness.rs`. */
 export interface AgentModel {
   /** What the agent takes to select it, e.g. `gpt-5.5[low]`. */
   id: string;
