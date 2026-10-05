@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Composer } from "@/components/chat/composer";
 import { CopyButton } from "@/components/chat/copy-button";
 import { Markdown } from "@/components/chat/markdown";
-import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
@@ -45,72 +44,22 @@ export function LibraryChat() {
     setText("");
   }
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    send(text);
-  }
-
   const box = (
-    <form onSubmit={onSubmit} className="w-full">
-      <div
-        className={cn(
-          "bg-card border-border focus-within:border-input flex items-end gap-2 rounded-3xl border py-2 pr-2 pl-5 transition-colors",
-          started
-            ? "shadow-[var(--shadow-card)]"
-            : "shadow-[var(--shadow-float)]",
-        )}
-      >
-        <textarea
-          id="library-chat-input"
-          autoFocus
-          rows={1}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send(text);
-            }
-          }}
-          disabled={!ready}
-          placeholder={
-            ready ? "Ask anything about your blogs" : "Set up Explain to chat"
-          }
-          aria-label="Message"
-          className={cn(
-            "placeholder:text-muted-foreground field-sizing-content max-h-52 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-[0.9375rem] leading-6 outline-none disabled:opacity-60",
-            !started && "min-h-14",
-          )}
-        />
-        {streaming ? (
-          <button
-            type="button"
-            onClick={() => void stop()}
-            aria-label="Stop"
-            className="bg-primary text-primary-foreground focus-visible:ring-ring/60 mb-0.5 grid size-9 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2"
-          >
-            <Square className="size-3 fill-current" aria-hidden />
-          </button>
-        ) : ready ? (
-          <button
-            type="submit"
-            disabled={!text.trim()}
-            aria-label="Send"
-            className="bg-primary text-primary-foreground disabled:bg-secondary disabled:text-muted-foreground focus-visible:ring-ring/60 mb-0.5 grid size-9 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2"
-          >
-            <ArrowUp className="size-4" aria-hidden />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setSetupOpen(true)}
-            className="bg-primary text-primary-foreground focus-visible:ring-ring/60 mb-0.5 h-9 shrink-0 rounded-full px-4 text-[0.8125rem] font-medium outline-none focus-visible:ring-2"
-          >
-            Set up
-          </button>
-        )}
-      </div>
-    </form>
+    <Composer
+      id="library-chat-input"
+      value={text}
+      onChange={setText}
+      onSend={send}
+      onStop={() => void stop()}
+      onSetup={() => setSetupOpen(true)}
+      streaming={streaming}
+      ready={ready}
+      placeholder={
+        ready ? "Ask anything about your blogs" : "Set up Explain to chat"
+      }
+      autoFocus
+      tall={!started}
+    />
   );
 
   const context = (
@@ -134,7 +83,7 @@ export function LibraryChat() {
               key={idea}
               type="button"
               onClick={() => send(idea)}
-              className="border-border text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 h-9 rounded-full border px-4 text-[0.8125rem] outline-none focus-visible:ring-2"
+              className="bg-muted text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 h-9 rounded-full px-4 text-[0.8125rem] outline-none focus-visible:ring-2"
             >
               {idea}
             </button>

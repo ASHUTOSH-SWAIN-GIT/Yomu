@@ -19,6 +19,7 @@ import { readStorage as read, writeStorage as write } from "@/lib/storage";
 export type { Theme } from "@/lib/appearance";
 
 const SIDEBAR_KEY = "yomu-sidebar";
+const CHAT_MODEL_KEY = "yomu-chat-model";
 let peekTimer: ReturnType<typeof setTimeout>;
 
 interface UiState {
@@ -59,6 +60,9 @@ interface UiState {
   /** The chat panel on the right of an article. */
   chatOpen: boolean;
   setChatOpen: (open: boolean) => void;
+  /** The model picked in the chat's picker; null leaves it to Yomu. */
+  chatModel: string | null;
+  setChatModel: (id: string | null) => void;
   /** The chat panel fills the whole page instead of sitting beside it. */
   chatFull: boolean;
   setChatFull: (full: boolean) => void;
@@ -109,6 +113,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   pastTitle: false,
   setPastTitle: (pastTitle) => set({ pastTitle }),
+  chatModel: read(CHAT_MODEL_KEY) || null,
+  setChatModel: (chatModel) => {
+    write(CHAT_MODEL_KEY, chatModel ?? "");
+    set({ chatModel });
+  },
   chatFull: false,
   setChatFull: (chatFull) => set({ chatFull }),
   chatOpen: false,

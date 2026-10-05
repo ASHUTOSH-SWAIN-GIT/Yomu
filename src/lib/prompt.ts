@@ -192,7 +192,7 @@ export function buildArticlePrompt(
   const body = fullArticleText(article.blocks);
   const truncated = body.length > ARTICLE_MAX_CHARS;
   return [
-    "You are helping a developer read a technical article. Use only the text below. Do not use tools, read files, or browse. Reply in Markdown.",
+    "You are helping a developer read a technical article, which is below. Treat it as the main source and quote it when that helps, but you may also use your own knowledge to explain a term, add context or answer a related question. Give complete, clear answers: thorough when the question needs it, short when it does not. Do not use tools, read files, or browse. Reply in Markdown.",
     "",
     `Article: ${article.title} (${article.url})`,
     "",

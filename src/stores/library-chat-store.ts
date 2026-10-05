@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { agentCancel, agentNewSession, agentPrompt } from "@/lib/commands";
 import { onAgentEvent } from "@/lib/agent-events";
+import { applyChosenModel } from "@/lib/models";
 import { classifyError, type ChatError } from "@/lib/chat-errors";
 import { inventoryPassages } from "@/lib/db";
 import { explainPrefInstructions } from "@/lib/explain-prefs";
@@ -75,7 +76,11 @@ export const useLibraryChatStore = create<LibraryChatStore>((set, get) => {
     lastQuestion = question;
     set({ streaming: true, error: null });
     try {
-      const sessionId = get().sessionId ?? (await agentNewSession());
+      let sessionId = get().sessionId;
+      if (!sessionId) {
+        sessionId = await agentNewSession();
+        await applyChosenModel(sessionId);
+      }
       if (mine !== epoch) return;
       set({ sessionId });
       const passages = await inventoryPassages(question).catch((err) => {

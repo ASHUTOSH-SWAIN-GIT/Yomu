@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex as StdMutex};
 
+use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::process::Command;
 use tokio::sync::{mpsc, Mutex};
@@ -70,10 +71,21 @@ pub struct AgentHarness {
     models: StdMutex<ModelState>,
 }
 
+/// A model the account can use, for the picker in the chat.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ModelInfo {
+    /// What `session/set_model` takes, e.g. `gpt-5.5[low]` (name + effort).
+    pub id: String,
+    pub name: String,
+    pub description: String,
+}
+
 #[derive(Default)]
 struct ModelState {
     /// Model ids (`name[effort]`) from the latest session, best first.
     available: Vec<String>,
+    /// Display name and description per id, when the agent gave them.
+    labels: std::collections::HashMap<String, (String, String)>,
     /// Model names the account rejected a prompt on; never picked again.
     rejected: HashSet<String>,
 }
@@ -291,9 +303,64 @@ impl AgentHarness {
                     .collect()
             })
             .unwrap_or_default();
-        if !available.is_empty() {
-            self.models.lock().unwrap().available = available;
+        if available.is_empty() {
+            return;
         }
+        let labels = models
+            .get("availableModels")
+            .and_then(Value::as_array)
+            .map(|list| {
+                list.iter()
+                    .filter_map(|m| {
+                        let id = m.get("modelId").and_then(Value::as_str)?;
+                        let text = |key: &str| {
+                            m.get(key)
+                                .and_then(Value::as_str)
+                                .unwrap_or_default()
+                                .to_string()
+                        };
+                        Some((id.to_string(), (text("name"), text("description"))))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut state = self.models.lock().unwrap();
+        state.available = available;
+        state.labels = labels;
+    }
+
+    /// The models the account offers (minus any it turned down), for the
+    /// picker. The agent only reports them when a session starts, so with
+    /// none known yet a throwaway session in `cwd` learns them.
+    pub async fn list_models(&self, cwd: &Path) -> Result<Vec<ModelInfo>, String> {
+        if self.models.lock().unwrap().available.is_empty() {
+            self.new_session(cwd).await?;
+        }
+        let usable = self.usable_models();
+        let state = self.models.lock().unwrap();
+        Ok(usable
+            .into_iter()
+            .map(|id| {
+                let (name, description) = state.labels.get(&id).cloned().unwrap_or_default();
+                ModelInfo {
+                    name: if name.is_empty() { id.clone() } else { name },
+                    description,
+                    id,
+                }
+            })
+            .collect())
+    }
+
+    /// Moves a session to a model the user picked.
+    pub async fn select_model(&self, session_id: &str, model_id: &str) -> Result<(), String> {
+        let conn = self.connection().await?;
+        conn.client
+            .request(
+                "session/set_model",
+                json!({ "sessionId": session_id, "modelId": model_id }),
+            )
+            .await
+            .map(|_| ())
     }
 
     /// The offered models minus any the account rejected this run.

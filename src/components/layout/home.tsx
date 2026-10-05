@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LibraryChat } from "@/components/chat/library-chat";
-import { NewCollection } from "@/components/layout/new-collection";
 import { CollectionPicker } from "@/components/layout/collection-picker";
 import {
   ArticleCover,
@@ -43,7 +42,6 @@ export function Home() {
   const active = useSpacesStore((s) => s.active);
   const slots = useSpacesStore((s) => s.slots);
   const showArchive = useSpacesStore((s) => s.showArchive);
-  const creating = useSpacesStore((s) => s.creating);
   const libraryChat = useSpacesStore((s) => s.libraryChat);
 
   const [input, setInput] = useState("");
@@ -76,7 +74,6 @@ export function Home() {
       : null;
 
   if (libraryChat) return <LibraryChat />;
-  if (creating) return <NewCollection />;
 
   return (
     <div className="mx-auto w-full max-w-[62rem] px-10 pt-14 pb-32">
@@ -102,7 +99,7 @@ export function Home() {
       {isHome && (
         <form
           onSubmit={submit}
-          className="bg-card border-border focus-within:border-input mt-8 flex h-13 max-w-[38rem] items-center gap-3 rounded-xl border pr-1.5 pl-4 shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-[var(--dur)] focus-within:shadow-[var(--shadow-card-hover)]"
+          className="bg-muted mt-8 flex h-13 max-w-[38rem] items-center gap-3 rounded-2xl pr-1.5 pl-4"
         >
           <LinkIcon
             className="text-muted-foreground size-4 shrink-0"

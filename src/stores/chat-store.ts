@@ -6,6 +6,7 @@ import {
   agentResumeSession,
 } from "@/lib/commands";
 import { onAgentEvent } from "@/lib/agent-events";
+import { applyChosenModel } from "@/lib/models";
 import { classifyError, type ChatError } from "@/lib/chat-errors";
 import {
   addHighlight,
@@ -203,6 +204,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     if (chat.acpSessionId) {
       try {
         await agentResumeSession(chat.acpSessionId);
+        await applyChosenModel(chat.acpSessionId);
         set({ sessionId: chat.acpSessionId });
         return { sessionId: chat.acpSessionId, fresh: false };
       } catch {
@@ -211,6 +213,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }
     }
     const sessionId = await agentNewSession();
+    await applyChosenModel(sessionId);
     await setChatSession(chat.id, sessionId);
     set({ sessionId, chat: { ...chat, acpSessionId: sessionId } });
     return { sessionId, fresh: true };

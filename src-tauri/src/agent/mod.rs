@@ -8,5 +8,5 @@ mod status;
 mod tests;
 
 pub use events::AgentEvent;
-pub use harness::AgentHarness;
+pub use harness::{AgentHarness, ModelInfo};
 pub use status::{diagnose, login, Diagnosis};

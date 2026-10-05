@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ScrapedArticle } from "@/types/article";
-import type { Diagnosis } from "@/types/agent";
+import type { AgentModel, Diagnosis } from "@/types/agent";
 
 /**
  * Thin wrappers around Tauri commands (`src-tauri/src/lib.rs`). Keep all
@@ -51,6 +51,19 @@ export async function agentNewSession(): Promise<string> {
  * no longer has it, in which case the caller opens a new one. */
 export async function agentResumeSession(sessionId: string): Promise<void> {
   return invoke("agent_resume_session", { sessionId });
+}
+
+/** The models the account can use. */
+export async function agentListModels(): Promise<AgentModel[]> {
+  return invoke<AgentModel[]>("agent_list_models");
+}
+
+/** Moves a live session to a model the user picked. */
+export async function agentSetModel(
+  sessionId: string,
+  modelId: string,
+): Promise<void> {
+  return invoke("agent_set_model", { sessionId, modelId });
 }
 
 /** Starts the agent in the background so the first Explain is fast. */

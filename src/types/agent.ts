@@ -15,6 +15,14 @@ export interface Diagnosis {
   loggedIn: boolean;
 }
 
+/** Mirrors `ModelInfo` in `src-tauri/src/agent/harness.rs`. */
+export interface AgentModel {
+  /** What the agent takes to select it, e.g. `gpt-5.5[low]`. */
+  id: string;
+  name: string;
+  description: string;
+}
+
 export type AgentEvent =
   | { kind: "token"; session_id: string; text: string }
   | { kind: "done"; session_id: string }

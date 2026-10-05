@@ -41,8 +41,6 @@ interface SpacesStore {
   slots: Record<string, number>;
   setActive: (id: string) => void;
   /** The "New collection" page is open. */
-  creating: boolean;
-  setCreating: (on: boolean) => void;
   /** The universal chat page is open. */
   libraryChat: boolean;
   setLibraryChat: (on: boolean) => void;
@@ -67,19 +65,15 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({
       active: id,
       showArchive: false,
-      creating: false,
       libraryChat: false,
     });
   },
 
-  creating: false,
-  setCreating: (creating) => set({ creating, libraryChat: false }),
   libraryChat: false,
-  setLibraryChat: (libraryChat) => set({ libraryChat, creating: false }),
+  setLibraryChat: (libraryChat) => set({ libraryChat }),
 
   showArchive: false,
-  setShowArchive: (showArchive) =>
-    set({ showArchive, creating: false, libraryChat: false }),
+  setShowArchive: (showArchive) => set({ showArchive, libraryChat: false }),
 
   createSpace(name) {
     const id = normalizeTag(name);

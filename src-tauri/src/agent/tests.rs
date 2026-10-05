@@ -260,3 +260,27 @@ async fn reports_the_error_when_every_model_is_turned_down() {
     let err = f.harness.prompt(&session, "REJECT_ALL").await.unwrap_err();
     assert!(err.contains("not supported"), "{err}");
 }
+
+#[tokio::test]
+async fn lists_the_models_the_account_offers() {
+    let f = fixture("model-list").await;
+    // No session yet: listing learns the models from a throwaway one.
+    let models = f.harness.list_models(&f.cwd).await.unwrap();
+    let ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+    assert_eq!(ids, ["current[low]", "backup[low]"]);
+    // The mock gives no display names, so the id stands in.
+    assert_eq!(models[0].name, "current[low]");
+}
+
+#[tokio::test]
+async fn a_picked_model_applies_to_the_session() {
+    let mut f = fixture("model-pick").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness
+        .select_model(&session, "backup[low]")
+        .await
+        .unwrap();
+    f.harness.prompt(&session, "SHOW_MODEL").await.unwrap();
+    let events = until_done(&mut f.events).await;
+    assert_eq!(joined_tokens(&events).trim(), "model backup[low]");
+}

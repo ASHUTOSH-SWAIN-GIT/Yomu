@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Maximize2, Minimize2, Square, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Maximize2, Minimize2, X } from "lucide-react";
+import { Composer } from "@/components/chat/composer";
 import { CopyButton } from "@/components/chat/copy-button";
 import { Markdown } from "@/components/chat/markdown";
 import { chatArtFor } from "@/lib/chat-art";
@@ -61,11 +62,6 @@ export function ChatPanel() {
     if (!ready) return setSetupOpen(true);
     void ask(article, question);
     setText("");
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    send(text);
   }
 
   const iconButton =
@@ -203,56 +199,22 @@ export function ChatPanel() {
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="shrink-0 px-4 pt-1 pb-4">
-        <div className="bg-card border-border focus-within:border-input mx-auto flex w-full max-w-3xl items-end gap-2 rounded-3xl border py-1.5 pr-1.5 pl-4 shadow-[var(--shadow-card)] transition-colors">
-          <textarea
-            id="chat-input"
-            ref={inputRef}
-            rows={1}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send(text);
-              }
-            }}
-            disabled={!ready}
-            placeholder={
-              ready ? "Ask about this article" : "Set up Explain to chat"
-            }
-            aria-label="Message"
-            className="placeholder:text-muted-foreground field-sizing-content max-h-40 min-h-9 min-w-0 flex-1 resize-none bg-transparent py-2 text-[0.875rem] leading-5 outline-none disabled:opacity-60"
-          />
-          {streaming ? (
-            <button
-              type="button"
-              onClick={() => void stop()}
-              aria-label="Stop"
-              className="bg-primary text-primary-foreground focus-visible:ring-ring/60 mb-0.5 grid size-8 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2"
-            >
-              <Square className="size-3 fill-current" aria-hidden />
-            </button>
-          ) : ready ? (
-            <button
-              type="submit"
-              disabled={!text.trim()}
-              aria-label="Send"
-              className="bg-primary text-primary-foreground disabled:bg-secondary disabled:text-muted-foreground focus-visible:ring-ring/60 mb-0.5 grid size-8 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2"
-            >
-              <ArrowUp className="size-4" aria-hidden />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSetupOpen(true)}
-              className="bg-primary text-primary-foreground focus-visible:ring-ring/60 mb-0.5 h-8 shrink-0 rounded-full px-3.5 text-[0.75rem] font-medium outline-none focus-visible:ring-2"
-            >
-              Set up
-            </button>
-          )}
-        </div>
-      </form>
+      <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pt-1 pb-4">
+        <Composer
+          id="chat-input"
+          textareaRef={inputRef}
+          value={text}
+          onChange={setText}
+          onSend={send}
+          onStop={() => void stop()}
+          onSetup={() => setSetupOpen(true)}
+          streaming={streaming}
+          ready={ready}
+          placeholder={
+            ready ? "Ask about this article" : "Set up Explain to chat"
+          }
+        />
+      </div>
     </aside>
   );
 }

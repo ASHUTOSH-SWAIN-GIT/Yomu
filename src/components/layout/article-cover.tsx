@@ -137,6 +137,44 @@ export function SiteLogoTile({
   );
 }
 
+/** The site's logo at text size, for the blogs listed in the sidebar. */
+export function SiteFavicon({
+  url,
+  icon,
+  site,
+  className,
+}: {
+  url: string;
+  icon?: string | null;
+  site: string;
+  className?: string;
+}) {
+  const { src, next } = useSiteLogo(url, icon);
+  if (!src) {
+    return (
+      <span
+        aria-hidden
+        className={cn(
+          "bg-muted text-muted-foreground grid size-4 shrink-0 place-items-center rounded-[4px] text-[0.5625rem] font-semibold",
+          className,
+        )}
+      >
+        {initial(site)}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      referrerPolicy="no-referrer"
+      onError={next}
+      className={cn("size-4 shrink-0 rounded-[4px] object-contain", className)}
+    />
+  );
+}
+
 /** The top of a blog card: the site's logo large in the middle, over a soft
  * wash made from the logo itself, so the logo fills the space. Falls back
  * to the site's initial on a tint of its colour. */

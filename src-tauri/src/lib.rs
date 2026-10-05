@@ -106,6 +106,24 @@ async fn agent_resume_session(
         .await
 }
 
+/// The models the account can use, for the model picker in the chat.
+#[tauri::command]
+async fn agent_list_models(
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<Vec<agent::ModelInfo>, String> {
+    harness.list_models(&fresh_temp_dir().await?).await
+}
+
+/// Moves a session to a model the user picked in the chat.
+#[tauri::command]
+async fn agent_set_model(
+    session_id: String,
+    model_id: String,
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<(), String> {
+    harness.select_model(&session_id, &model_id).await
+}
+
 /// Starts the agent in the background so the first Explain is fast.
 #[tauri::command]
 async fn agent_warm(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<(), String> {
@@ -188,6 +206,8 @@ pub fn run() {
             agent_new_session,
             agent_resume_session,
             agent_warm,
+            agent_list_models,
+            agent_set_model,
             agent_cancel,
             agent_prompt
         ])

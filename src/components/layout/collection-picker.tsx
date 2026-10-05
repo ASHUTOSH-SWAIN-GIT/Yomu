@@ -1,12 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Check, Plus } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { goHome } from "@/lib/navigate";
 import { buildSpaces, INBOX } from "@/lib/spaces";
+import { normalizeTag } from "@/lib/tags";
 import { cn } from "@/lib/utils";
 import { useLibraryStore } from "@/stores/library-store";
 import { useSpacesStore } from "@/stores/spaces-store";
@@ -33,7 +33,7 @@ export function CollectionPicker({
   const removeTag = useLibraryStore((s) => s.removeTag);
   const extra = useSpacesStore((s) => s.extra);
   const slots = useSpacesStore((s) => s.slots);
-  const setCreating = useSpacesStore((s) => s.setCreating);
+  const [name, setName] = useState("");
 
   const tags = articles.find((a) => a.id === articleId)?.tags ?? [];
   const collections = useMemo(
@@ -82,17 +82,30 @@ export function CollectionPicker({
             </button>
           );
         })}
-        <button
-          type="button"
-          onClick={() => {
-            onOpenChange?.(false);
-            void goHome().then(() => setCreating(true));
+        {/* A new collection is made by tagging this blog with its name. */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const id = normalizeTag(name);
+            if (!id || id === INBOX) return;
+            void addTag(articleId, id);
+            setName("");
           }}
-          className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 mt-0.5 flex h-8 items-center gap-2.5 rounded-md px-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2"
+          className="mt-0.5 flex h-8 items-center gap-2.5 px-2.5"
         >
-          <Plus className="size-3.5" aria-hidden />
-          New collection
-        </button>
+          <Plus
+            className="text-muted-foreground size-3.5 shrink-0"
+            aria-hidden
+          />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={32}
+            placeholder="New collection"
+            aria-label="New collection name"
+            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
+          />
+        </form>
       </PopoverContent>
     </Popover>
   );
