@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
-import { Archive, BookOpen, Home, Plus } from "lucide-react";
+import { useMemo } from "react";
+import { Archive, Home, Plus, X } from "lucide-react";
 import { buildSpaces, INBOX } from "@/lib/spaces";
-import { openSampleArticle } from "@/lib/sample-article";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
 import { useLibraryStore } from "@/stores/library-store";
@@ -18,10 +17,12 @@ export function LibrarySidebar() {
   const setActive = useSpacesStore((s) => s.setActive);
   const showArchive = useSpacesStore((s) => s.showArchive);
   const setShowArchive = useSpacesStore((s) => s.setShowArchive);
-  const createSpace = useSpacesStore((s) => s.createSpace);
+  const creating = useSpacesStore((s) => s.creating);
+  const setCreating = useSpacesStore((s) => s.setCreating);
+  const deleteSpace = useSpacesStore((s) => s.deleteSpace);
+  const removeTag = useLibraryStore((s) => s.removeTag);
   const agentStatus = useAgentStore((s) => s.status);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
-  const [naming, setNaming] = useState(false);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const peek = useUiStore((s) => s.sidebarPeek);
   const peekSidebar = useUiStore((s) => s.peekSidebar);
@@ -31,6 +32,14 @@ export function LibrarySidebar() {
     () => buildSpaces(articles, extra, slots, active),
     [articles, extra, slots, active],
   );
+  // Removing a collection keeps its articles: they just lose the tag and show
+  // on Home again.
+  async function removeCollection(id: string) {
+    const tagged = articles.filter((a) => a.tags.includes(id));
+    await Promise.all(tagged.map((a) => removeTag(a.id, id)));
+    deleteSpace(id);
+  }
+
   const archived = articles.filter((a) => a.archived).length;
   const named = spaces.filter((s) => s.id !== INBOX);
 
@@ -41,7 +50,7 @@ export function LibrarySidebar() {
       onMouseEnter={() => !sidebarOpen && peekSidebar(true)}
       onMouseLeave={() => peekSidebar(false)}
       className={cn(
-        "bg-frame border-border flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r px-2 pt-3 pb-3 text-[0.8125rem]",
+        "bg-frame border-border flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r px-2 pt-2 pb-3 text-[0.8125rem]",
         // Collapsed: parked off-screen over the page, slid in on hover. The
         // shadow rides the same transition so it fades with the slide.
         !sidebarOpen &&
@@ -52,18 +61,8 @@ export function LibrarySidebar() {
             : "invisible -translate-x-full shadow-none"),
       )}
     >
-      <div className="mb-2 flex items-center gap-2 px-2.5">
-        <span
-          aria-hidden
-          className="bg-primary text-primary-foreground grid size-5 place-items-center rounded-[5px] font-serif text-[0.6875rem] font-semibold"
-        >
-          読
-        </span>
-        <span className="font-medium">Yomu</span>
-      </div>
-
       <Item
-        on={!showArchive && active === INBOX}
+        on={!showArchive && !creating && active === INBOX}
         onClick={() => setActive(INBOX)}
         icon={<Home />}
       >
@@ -73,43 +72,39 @@ export function LibrarySidebar() {
       <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
         My collection
       </h2>
-      {naming ? (
-        <NewSpace
-          onDone={(name) => {
-            setNaming(false);
-            if (name) createSpace(name);
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setNaming(true)}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4"
-        >
-          <Plus aria-hidden />
-          New collection
-        </button>
-      )}
+      <Item on={creating} onClick={() => setCreating(true)} icon={<Plus />}>
+        New collection
+      </Item>
       {named.map((space) => (
-        <Item
-          key={space.id}
-          on={!showArchive && active === space.id}
-          onClick={() => setActive(space.id)}
-          icon={
-            <i
-              className="mx-[3px] block size-2.5 rounded-full"
-              style={{
-                background:
-                  space.slot === null
-                    ? "var(--sp-inbox)"
-                    : `var(--sp-${space.slot})`,
-              }}
-            />
-          }
-          count={space.count}
-        >
-          {space.name}
-        </Item>
+        <div key={space.id} className="group relative flex flex-col">
+          <Item
+            on={!showArchive && !creating && active === space.id}
+            onClick={() => setActive(space.id)}
+            icon={
+              <i
+                className="mx-[3px] block size-2.5 rounded-full"
+                style={{
+                  background:
+                    space.slot === null
+                      ? "var(--sp-inbox)"
+                      : `var(--sp-${space.slot})`,
+                }}
+              />
+            }
+            count={space.count}
+          >
+            {space.name}
+          </Item>
+          <button
+            type="button"
+            onClick={() => void removeCollection(space.id)}
+            aria-label={`Remove ${space.name}`}
+            title="Remove collection (articles are kept)"
+            className="text-muted-foreground hover:text-foreground bg-accent focus-visible:ring-ring/60 absolute top-1/2 right-1.5 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        </div>
       ))}
 
       {archived > 0 && (
@@ -127,13 +122,6 @@ export function LibrarySidebar() {
       )}
 
       <div className="mt-auto flex flex-col gap-0.5 pt-6">
-        <Item
-          on={false}
-          onClick={() => void openSampleArticle()}
-          icon={<BookOpen />}
-        >
-          Take the tour
-        </Item>
         <button
           type="button"
           onClick={() => setSetupOpen(true)}
@@ -194,30 +182,5 @@ function Item({
         </span>
       )}
     </button>
-  );
-}
-
-function NewSpace({ onDone }: { onDone: (name: string | null) => void }) {
-  const [value, setValue] = useState("");
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onDone(value.trim() || null);
-      }}
-      className="px-1"
-    >
-      <input
-        autoFocus
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && onDone(null)}
-        onBlur={() => onDone(value.trim() || null)}
-        placeholder="Name your collection"
-        aria-label="New collection name"
-        maxLength={32}
-        className="bg-muted placeholder:text-muted-foreground focus:ring-ring/60 h-8 w-full rounded-md px-2 outline-none focus:ring-2"
-      />
-    </form>
   );
 }

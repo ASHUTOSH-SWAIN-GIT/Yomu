@@ -40,11 +40,16 @@ interface SpacesStore {
   /** Colour slot per space (see lib/spaces.ts). */
   slots: Record<string, number>;
   setActive: (id: string) => void;
+  /** The "New collection" page is open. */
+  creating: boolean;
+  setCreating: (on: boolean) => void;
   /** The library shows archived articles instead of the active space. */
   showArchive: boolean;
   setShowArchive: (on: boolean) => void;
   /** Creates a space from a name; returns its id, or null if the name is empty. */
   createSpace: (name: string) => string | null;
+  /** Forgets a space you created. Its articles are untagged by the caller. */
+  deleteSpace: (id: string) => void;
   /** Gives every known space a stable colour slot. */
   syncSlots: (names: string[]) => void;
 }
@@ -56,11 +61,14 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
 
   setActive(id) {
     writeStorage(ACTIVE_KEY, id);
-    set({ active: id, showArchive: false });
+    set({ active: id, showArchive: false, creating: false });
   },
 
+  creating: false,
+  setCreating: (creating) => set({ creating }),
+
   showArchive: false,
-  setShowArchive: (showArchive) => set({ showArchive }),
+  setShowArchive: (showArchive) => set({ showArchive, creating: false }),
 
   createSpace(name) {
     const id = normalizeTag(name);
@@ -71,6 +79,13 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     get().setActive(id);
     set({ extra });
     return id;
+  },
+
+  deleteSpace(id) {
+    const extra = get().extra.filter((e) => e !== id);
+    writeStorage(EXTRA_KEY, JSON.stringify(extra));
+    set({ extra });
+    if (get().active === id) get().setActive(INBOX);
   },
 
   syncSlots(names) {

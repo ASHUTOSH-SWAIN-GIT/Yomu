@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FileText, Moon, PanelLeft, Plus, Sun, X } from "lucide-react";
 import { usesOverlayTitleBar } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -29,10 +30,10 @@ export function TabStrip() {
     (theme === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
+  const articleOf = (articleId: string | null) =>
+    articleId ? articles.find((a) => a.id === articleId) : undefined;
   const titleOf = (articleId: string | null) =>
-    articleId
-      ? (articles.find((a) => a.id === articleId)?.title ?? "Article")
-      : "Library";
+    articleId ? (articleOf(articleId)?.title ?? "Article") : "Library";
 
   return (
     <div
@@ -73,7 +74,7 @@ export function TabStrip() {
                 onClick={() => void activate(tab.id)}
                 className="focus-visible:ring-ring/60 flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
               >
-                <FileText className="size-3.5 shrink-0" aria-hidden />
+                <TabIcon url={articleOf(tab.articleId)?.canonicalUrl} />
                 <span className="truncate">{titleOf(tab.articleId)}</span>
               </button>
               {tabs.length > 1 && (
@@ -108,5 +109,30 @@ export function TabStrip() {
         {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
       </button>
     </div>
+  );
+}
+
+/** The site's own favicon for an article tab (the site was already contacted
+ * to save the article), or a page icon for the library, when the favicon is
+ * missing or remote images are blocked. */
+function TabIcon({ url }: { url?: string }) {
+  const blocked = useUiStore((s) => s.blockRemoteImages);
+  const [failed, setFailed] = useState<string | null>(null);
+  let src: string | null = null;
+  try {
+    if (url) src = new URL("/favicon.ico", url).href;
+  } catch {
+    // Not a valid URL: fall back to the page icon.
+  }
+  if (!src || blocked || failed === src)
+    return <FileText className="size-3.5 shrink-0" aria-hidden />;
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      className="size-4 shrink-0 rounded-[3px] object-contain"
+      onError={() => setFailed(src)}
+    />
   );
 }

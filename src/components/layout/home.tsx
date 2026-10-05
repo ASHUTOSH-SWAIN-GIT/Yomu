@@ -9,6 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NewCollection } from "@/components/layout/new-collection";
 import { ArticleCover, SiteMark } from "@/components/layout/article-cover";
 import { formatRelativeTime } from "@/lib/format";
 import {
@@ -35,12 +36,17 @@ export function Home() {
   const active = useSpacesStore((s) => s.active);
   const slots = useSpacesStore((s) => s.slots);
   const showArchive = useSpacesStore((s) => s.showArchive);
+  const creating = useSpacesStore((s) => s.creating);
 
   const [input, setInput] = useState("");
   const loading = state.status === "loading";
+  const isHome = !showArchive && active === INBOX;
+  // Home lists every saved article as cards; a collection lists its own.
   const list = showArchive
     ? articles.filter((a) => a.archived)
-    : articlesInSpace(articles, active);
+    : isHome
+      ? articles.filter((a) => !a.archived)
+      : articlesInSpace(articles, active);
   const reading = list.filter((a) => a.progress > 0 && a.progress < 0.95);
   const fresh = list.filter((a) => a.progress === 0);
   const done = list.filter((a) => a.progress >= 0.95);
@@ -51,7 +57,6 @@ export function Home() {
     if (url && !loading) void openUrl(url);
   }
 
-  const isHome = !showArchive && active === INBOX;
   const title = showArchive
     ? "Archive"
     : isHome
@@ -61,6 +66,8 @@ export function Home() {
     !showArchive && active !== INBOX && slots[active] !== undefined
       ? `var(--sp-${slots[active]})`
       : null;
+
+  if (creating) return <NewCollection />;
 
   return (
     <div className="mx-auto w-full max-w-[54rem] px-10 pt-12 pb-32">
@@ -86,7 +93,7 @@ export function Home() {
       {isHome && (
         <form
           onSubmit={submit}
-          className="bg-card focus-within:ring-honey/35 mt-7 flex h-14 items-center gap-3 rounded-xl pr-2 pl-4 shadow-[var(--shadow-card)] transition-shadow duration-[var(--dur)] focus-within:shadow-[var(--shadow-card-hover)] focus-within:ring-2"
+          className="bg-card focus-within:ring-honey/35 mt-7 flex h-12 max-w-[32rem] items-center gap-3 rounded-none pr-1.5 pl-4 shadow-[var(--shadow-card)] transition-shadow duration-[var(--dur)] focus-within:shadow-[var(--shadow-card-hover)] focus-within:ring-2"
         >
           <LinkIcon
             className="text-muted-foreground size-4 shrink-0"
@@ -106,7 +113,7 @@ export function Home() {
             type="submit"
             size="sm"
             disabled={loading || !input.trim()}
-            className="h-9 gap-2 px-3.5 text-[0.8125rem]"
+            className="h-9 gap-2 rounded-none px-3.5 text-[0.8125rem]"
           >
             {loading ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -129,8 +136,8 @@ export function Home() {
         </p>
       )}
 
-      {isHome ? (
-        articles.length === 0 && !loading && <Welcome />
+      {articles.length === 0 && isHome ? (
+        !loading && <Welcome />
       ) : list.length === 0 ? (
         <p className="text-muted-foreground mt-14 text-center text-[0.8125rem]">
           {showArchive
@@ -143,6 +150,7 @@ export function Home() {
           fresh={fresh}
           done={done}
           archive={showArchive}
+          cards={isHome}
           slots={slots}
         />
       )}
@@ -209,7 +217,7 @@ function Welcome() {
       <button
         type="button"
         onClick={() => void openSampleArticle()}
-        className="group bg-card focus-visible:ring-ring/60 mt-8 flex w-full max-w-[26rem] overflow-hidden rounded-xl text-left shadow-[var(--shadow-card)] transition-shadow duration-[var(--dur)] outline-none hover:shadow-[var(--shadow-card-hover)] focus-visible:ring-2"
+        className="group bg-card focus-visible:ring-ring/60 mt-8 flex w-full max-w-[26rem] overflow-hidden rounded-none text-left shadow-[var(--shadow-card)] transition-shadow duration-[var(--dur)] outline-none hover:shadow-[var(--shadow-card-hover)] focus-visible:ring-2"
       >
         <ArticleCover
           site="yomu"
@@ -235,12 +243,15 @@ function LibraryList({
   fresh,
   done,
   archive,
+  cards,
   slots,
 }: {
   reading: ArticleSummary[];
   fresh: ArticleSummary[];
   done: ArticleSummary[];
   archive: boolean;
+  /** Home: one grid of cards, newest first, no groups. */
+  cards: boolean;
   slots: Record<string, number>;
 }) {
   const openArticle = useTabsStore((s) => s.openArticle);
@@ -268,6 +279,18 @@ function LibraryList({
           <Row key={a.id} {...props(a)} />
         ))}
       </Rows>
+    );
+  }
+
+  if (cards) {
+    return (
+      <div onKeyDown={moveFocus}>
+        <ul className="mt-10 grid grid-cols-[repeat(auto-fill,minmax(14.5rem,1fr))] gap-4">
+          {[...reading, ...fresh, ...done].map((a) => (
+            <Card key={a.id} {...props(a)} />
+          ))}
+        </ul>
+      </div>
     );
   }
 
@@ -342,7 +365,7 @@ function Card({
 }: ItemProps) {
   const percent = Math.round(article.progress * 100);
   return (
-    <li className="group bg-card relative overflow-hidden rounded-xl shadow-[var(--shadow-card)] transition-[box-shadow,transform] duration-[var(--dur)] ease-[var(--ease)] hover:-translate-y-px hover:shadow-[var(--shadow-card-hover)]">
+    <li className="group bg-card relative overflow-hidden rounded-none shadow-[var(--shadow-card)] transition-[box-shadow,transform] duration-[var(--dur)] ease-[var(--ease)] hover:-translate-y-px hover:shadow-[var(--shadow-card-hover)]">
       <button
         type="button"
         data-row
