@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Hot air balloons in a pastel sky">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ec6ff"/><stop offset="0.55" stop-color="#ffc2e0"/><stop offset="1" stop-color="#ffe9c9"/></linearGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <g fill="#fff" opacity="0.9"><ellipse cx="60" cy="190" rx="50" ry="14"/><ellipse cx="96" cy="182" rx="32" ry="12"/><ellipse cx="200" cy="206" rx="56" ry="14"/><ellipse cx="226" cy="198" rx="28" ry="11"/><ellipse cx="150" cy="226" rx="70" ry="14"/></g>
+    <g fill="#fff" opacity="0.7"><ellipse cx="200" cy="50" rx="30" ry="8"/><ellipse cx="60" cy="40" rx="24" ry="6"/></g>
+    <g transform="translate(86 96) scale(1.5)"><ellipse cx="0" cy="0" rx="20" ry="24" fill="#ff6b6b"/><path d="M-20 0 Q0 -26 0 -24 Q0 26 -6 24 Q-20 12 -20 0Z" fill="#ffd166" opacity="0.9"/><path d="M-9 22 L-5 36 H5 L9 22" fill="none" stroke="#5a3a2a" stroke-width="1.2"/><rect x="-6" y="36" width="12" height="8" rx="2" fill="#8a5a3a"/></g><g transform="translate(170 70) scale(1.0)"><ellipse cx="0" cy="0" rx="20" ry="24" fill="#7c5cff"/><path d="M-20 0 Q0 -26 0 -24 Q0 26 -6 24 Q-20 12 -20 0Z" fill="#a8e6ff" opacity="0.9"/><path d="M-9 22 L-5 36 H5 L9 22" fill="none" stroke="#5a3a2a" stroke-width="1.2"/><rect x="-6" y="36" width="12" height="8" rx="2" fill="#8a5a3a"/></g><g transform="translate(196 140) scale(0.8)"><ellipse cx="0" cy="0" rx="20" ry="24" fill="#2ec4b6"/><path d="M-20 0 Q0 -26 0 -24 Q0 26 -6 24 Q-20 12 -20 0Z" fill="#fff3b0" opacity="0.9"/><path d="M-9 22 L-5 36 H5 L9 22" fill="none" stroke="#5a3a2a" stroke-width="1.2"/><rect x="-6" y="36" width="12" height="8" rx="2" fill="#8a5a3a"/></g>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>

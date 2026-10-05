@@ -13,8 +13,12 @@ import { Button } from "@/components/ui/button";
 import { LibraryChat } from "@/components/chat/library-chat";
 import { NewCollection } from "@/components/layout/new-collection";
 import { CollectionPicker } from "@/components/layout/collection-picker";
-import { ArticleCover, SiteMark } from "@/components/layout/article-cover";
-import { formatRelativeTime } from "@/lib/format";
+import {
+  ArticleCover,
+  SiteLogoBanner,
+  SiteLogoTile,
+  SiteMark,
+} from "@/components/layout/article-cover";
 import {
   articleColor,
   articlesInSpace,
@@ -75,10 +79,10 @@ export function Home() {
   if (creating) return <NewCollection />;
 
   return (
-    <div className="mx-auto w-full max-w-[54rem] px-10 pt-12 pb-32">
+    <div className="mx-auto w-full max-w-[62rem] px-10 pt-14 pb-32">
       <header>
         <p className="text-muted-foreground text-[0.8125rem]">{greeting()}</p>
-        <h1 className="font-display mt-1 flex items-center gap-3 text-[2.125rem] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
+        <h1 className="font-display mt-1.5 flex items-center gap-3 text-[2.25rem] leading-[1.12] font-semibold tracking-[-0.025em] text-balance">
           {color && (
             <i
               aria-hidden
@@ -98,7 +102,7 @@ export function Home() {
       {isHome && (
         <form
           onSubmit={submit}
-          className="bg-card focus-within:ring-honey/35 mt-7 flex h-12 max-w-[32rem] items-center gap-3 rounded-none pr-1.5 pl-4 shadow-[var(--shadow-card)] transition-shadow duration-[var(--dur)] focus-within:shadow-[var(--shadow-card-hover)] focus-within:ring-2"
+          className="bg-card border-border focus-within:border-input mt-8 flex h-13 max-w-[38rem] items-center gap-3 rounded-xl border pr-1.5 pl-4 shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-[var(--dur)] focus-within:shadow-[var(--shadow-card-hover)]"
         >
           <LinkIcon
             className="text-muted-foreground size-4 shrink-0"
@@ -118,7 +122,7 @@ export function Home() {
             type="submit"
             size="sm"
             disabled={loading || !input.trim()}
-            className="h-9 gap-2 rounded-none px-3.5 text-[0.8125rem]"
+            className="h-10 gap-2 rounded-lg px-4 text-[0.8125rem]"
           >
             {loading ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -286,17 +290,18 @@ function LibraryList({
   }
 
   if (cards) {
+    const all = [...reading, ...fresh, ...done];
     return (
       <div onKeyDown={moveFocus}>
-        <h2 className="mt-10 text-[0.8125rem] font-medium">
-          All blogs
-          <span className="text-muted-foreground ml-2 font-normal">
-            {reading.length + fresh.length + done.length}
+        <div className="mt-14 flex items-baseline gap-2">
+          <h2 className="text-[0.9375rem] font-semibold">All blogs</h2>
+          <span className="text-muted-foreground text-[0.8125rem] tabular-nums">
+            {all.length}
           </span>
-        </h2>
-        <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(14.5rem,1fr))] gap-4">
-          {[...reading, ...fresh, ...done].map((a) => (
-            <Card key={a.id} {...props(a)} />
+        </div>
+        <ul className="divide-border mt-3 flex flex-col divide-y">
+          {all.map((a) => (
+            <HomeRow key={a.id} {...props(a)} />
           ))}
         </ul>
       </div>
@@ -373,28 +378,46 @@ function Card({
   onConfirm,
 }: ItemProps) {
   const percent = Math.round(article.progress * 100);
+  const status =
+    article.progress >= 0.95
+      ? "Finished"
+      : article.progress > 0
+        ? `${percent}% read`
+        : "Unread";
   return (
-    <li className="group bg-card relative overflow-hidden rounded-none shadow-[var(--shadow-card)] transition-[box-shadow,transform] duration-[var(--dur)] ease-[var(--ease)] hover:-translate-y-px hover:shadow-[var(--shadow-card-hover)]">
+    <li className="group relative">
       <button
         type="button"
         data-row
         onClick={onOpen}
         title={article.title}
-        className="focus-visible:ring-ring/60 flex w-full flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
+        className="bg-card border-border hover:border-input focus-visible:ring-ring/60 flex h-full w-full flex-col overflow-hidden rounded-xl border text-left shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] duration-[var(--dur)] ease-[var(--ease)] outline-none hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] focus-visible:ring-2"
       >
-        <ArticleCover
+        <SiteLogoBanner
+          url={article.canonicalUrl}
+          icon={article.icon}
           site={article.site}
           color={color}
-          progress={article.progress}
           className="h-24 w-full"
-        />
-        <span className="flex flex-col gap-1.5 px-4 pt-3 pb-3.5">
-          <span className="line-clamp-2 font-serif text-[0.9375rem] leading-snug font-medium">
+        >
+          {article.progress > 0 && article.progress < 0.95 && (
+            <span className="absolute inset-x-0 bottom-0 h-[3px] bg-black/20">
+              <span
+                className="bg-foreground block h-full"
+                style={{ width: `${percent}%` }}
+              />
+            </span>
+          )}
+        </SiteLogoBanner>
+        <span className="flex flex-1 flex-col gap-1.5 px-3.5 pt-3 pb-3.5">
+          <span className="text-muted-foreground truncate text-[0.6875rem]">
+            {article.site}
+          </span>
+          <span className="line-clamp-2 text-[0.875rem] leading-snug font-semibold tracking-[-0.01em]">
             {article.title}
           </span>
-          <span className="text-muted-foreground flex items-center gap-2 text-[0.75rem]">
-            <span className="truncate">{article.site}</span>
-            <span className="ml-auto shrink-0 tabular-nums">{percent}%</span>
+          <span className="text-muted-foreground mt-auto flex items-center gap-1.5 pt-1 text-[0.6875rem]">
+            <span>{status}</span>
           </span>
         </span>
       </button>
@@ -408,9 +431,69 @@ function Card({
         <Confirm
           title={article.title}
           onConfirm={onConfirm}
-          className="bg-card/95 absolute inset-0 flex-col justify-center p-4 backdrop-blur-sm"
+          className="bg-card/95 absolute inset-0 flex-col justify-center rounded-xl p-4 backdrop-blur-sm"
         />
       )}
+    </li>
+  );
+}
+
+/** One blog in Home's list: its site's logo, the title with the site under
+ * it, how far you are, and when it was saved. */
+function HomeRow({
+  article,
+  confirming,
+  onOpen,
+  onArchive,
+  onDelete,
+  onConfirm,
+}: ItemProps) {
+  if (confirming) {
+    return (
+      <li className="bg-muted flex h-[3.75rem] items-center px-2">
+        <Confirm
+          title={article.title}
+          onConfirm={onConfirm}
+          className="w-full"
+        />
+      </li>
+    );
+  }
+  const finished = article.progress >= 0.95;
+  return (
+    <li className="group hover:bg-muted/60 relative transition-colors duration-[var(--dur-fast)]">
+      <button
+        type="button"
+        data-row
+        onClick={onOpen}
+        title={article.title}
+        className="focus-visible:ring-ring/60 flex h-[3.75rem] w-full items-center gap-4 px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
+      >
+        <SiteLogoTile
+          url={article.canonicalUrl}
+          icon={article.icon}
+          site={article.site}
+        />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span
+            className={cn(
+              "truncate text-[0.9375rem] font-medium",
+              finished && "text-muted-foreground",
+            )}
+          >
+            {article.title}
+          </span>
+          <span className="text-muted-foreground truncate text-[0.75rem]">
+            {article.site}
+          </span>
+        </span>
+      </button>
+      <Actions
+        article={article}
+        onArchive={onArchive}
+        onDelete={onDelete}
+        className="top-1/2 right-2 -translate-y-1/2"
+      />
     </li>
   );
 }
@@ -474,9 +557,6 @@ function Row({
             {article.site}
           </span>
         </span>
-        <span className="text-muted-foreground shrink-0 text-[0.75rem] tabular-nums group-focus-within:invisible group-hover:invisible">
-          {formatRelativeTime(article.scrapedAt)}
-        </span>
       </button>
       <Actions
         article={article}
@@ -505,7 +585,7 @@ function Actions({
   return (
     <span
       className={cn(
-        "bg-card absolute gap-0.5 rounded-lg p-0.5 shadow-[var(--shadow-card)] group-focus-within:flex group-hover:flex",
+        "bg-card/90 absolute gap-0.5 rounded-lg p-0.5 shadow-[var(--shadow-float)] backdrop-blur-sm group-focus-within:flex group-hover:flex",
         picking ? "flex" : "hidden",
         className,
       )}

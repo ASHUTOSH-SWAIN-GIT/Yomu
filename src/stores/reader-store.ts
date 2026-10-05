@@ -5,6 +5,7 @@ import {
   getArticleById,
   upsertArticle,
 } from "@/lib/db";
+import { saveToDefaultCollection } from "@/lib/default-collection";
 import { logError } from "@/lib/log";
 import { useLibraryStore } from "@/stores/library-store";
 import type { StoredArticle } from "@/types/library";
@@ -45,6 +46,10 @@ export const useReaderStore = create<ReaderStore>((set) => ({
       const scraped = await scrapeUrl(url);
       const saved = await upsertArticle(scraped);
       set({ state: { status: "ready", article: saved } });
+      // A failure to file it must not lose the blog that was just saved.
+      await saveToDefaultCollection(saved.id).catch((err) =>
+        logError("saving to the default collection failed", err),
+      );
       await useLibraryStore.getState().refresh();
     } catch (err) {
       logError(`opening ${url} failed`, err);

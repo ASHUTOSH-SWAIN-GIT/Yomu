@@ -50,6 +50,8 @@ pub struct ScrapedArticle {
     pub title: String,
     pub author: Option<String>,
     pub site: String,
+    /// The site's logo address, from the page's own `<link rel="icon">`.
+    pub icon: Option<String>,
     pub blocks: Vec<Block>,
     pub scraped_at: u64,
 }
@@ -181,6 +183,7 @@ async fn enrich_from_page(
     merge::absolutize_images(&mut article.blocks, canonical);
     article.author = article.author.take().or(page.author);
     article.published_at = article.published_at.or(page.published_at);
+    article.icon = article.icon.take().or(page.icon);
 }
 
 /// Turns fetched or rendered HTML into an article.
@@ -243,6 +246,7 @@ fn extract(
         title,
         author,
         site,
+        icon: meta::extract_icon(&original_document, &final_parsed),
         published_at: structured.published_at,
         blocks,
         scraped_at: now_millis(),

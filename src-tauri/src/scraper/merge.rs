@@ -10,12 +10,28 @@ use url::Url;
 
 use super::blocks::{Block, Span};
 
-/// An image's identity across URL variants (CDN resize parameters, query
-/// strings): its file name without extension.
+/// Whether a path segment is a UUID (`8-4-4-4-12` hex digits), the id image
+/// hosts such as Cloudflare Images put in the address of every picture.
+fn is_uuid(segment: &str) -> bool {
+    let parts: Vec<&str> = segment.split('-').collect();
+    parts.len() == 5
+        && parts
+            .iter()
+            .zip([8, 4, 4, 4, 12])
+            .all(|(p, n)| p.len() == n && p.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+/// An image's identity across URL variants. One picture is often linked
+/// several ways: resize parameters, a query string, or a size name in the
+/// last segment (`.../<id>/public`, `.../<id>/orig`). The id in the address
+/// when there is one, else the file name without extension.
 fn image_key(src: &str) -> String {
     let path = Url::parse(src)
         .map(|u| u.path().to_string())
         .unwrap_or_else(|_| src.split(['?', '#']).next().unwrap_or(src).to_string());
+    if let Some(id) = path.split('/').find(|segment| is_uuid(segment)) {
+        return id.to_lowercase();
+    }
     let name = path.rsplit('/').next().unwrap_or(&path);
     name.rsplit_once('.')
         .map_or(name, |(stem, _)| stem)
@@ -170,6 +186,36 @@ mod tests {
             para(A),
             img("https://cdn.x/upload/w_1800/chart_1.jpg?v=2"),
             para(B),
+        ];
+        add_missing_images(&mut base, &rendered);
+        assert_eq!(base.len(), 3);
+    }
+
+    #[test]
+    fn treats_size_variants_of_one_hosted_image_as_the_same_image() {
+        let id = "73c08a93-2662-4fa0-f28d-63925bac3c00";
+        let mut base = vec![
+            img(&format!("https://imagedelivery.net/acct/{id}/public")),
+            para(A),
+        ];
+        let rendered = vec![
+            img(&format!("https://imagedelivery.net/acct/{id}/md2x")),
+            img(&format!("https://imagedelivery.net/acct/{id}/orig")),
+            para(A),
+        ];
+        add_missing_images(&mut base, &rendered);
+        assert_eq!(base.len(), 2);
+    }
+
+    #[test]
+    fn different_images_with_the_same_size_name_stay_separate() {
+        let mut base = vec![
+            img("https://h.dev/acct/73c08a93-2662-4fa0-f28d-63925bac3c00/public"),
+            para(A),
+        ];
+        let rendered = vec![
+            img("https://h.dev/acct/11111111-2222-3333-4444-555555555555/public"),
+            para(A),
         ];
         add_missing_images(&mut base, &rendered);
         assert_eq!(base.len(), 3);

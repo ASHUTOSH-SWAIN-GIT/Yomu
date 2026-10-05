@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Check, Copy, Square } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
+import { CopyButton } from "@/components/chat/copy-button";
 import { Markdown } from "@/components/chat/markdown";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
@@ -188,29 +189,6 @@ export function LibraryChat() {
         <div className="mt-2">{context}</div>
       </div>
     </div>
-  );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      aria-label="Copy reply"
-      onClick={() => {
-        void navigator.clipboard.writeText(text).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        });
-      }}
-      className="text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 mt-1 grid size-7 place-items-center rounded-md opacity-0 outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
-    >
-      {copied ? (
-        <Check className="size-3.5" aria-hidden />
-      ) : (
-        <Copy className="size-3.5" aria-hidden />
-      )}
-    </button>
   );
 }
 

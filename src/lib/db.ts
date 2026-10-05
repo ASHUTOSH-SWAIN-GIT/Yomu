@@ -36,6 +36,7 @@ interface ArticleRow {
   blocks_json: string;
   scraped_at: number;
   published_at: number | null;
+  icon_url: string | null;
   saved: number;
   progress: number;
   archived: number;
@@ -73,10 +74,11 @@ export async function listArticles(): Promise<ArticleSummary[]> {
       | "published_at"
       | "progress"
       | "archived"
+      | "icon_url"
     > & { tags: string | null })[]
   >(
     `SELECT a.id, a.url, a.canonical_url, a.title, a.author, a.site, a.scraped_at,
-            a.published_at, a.progress, a.archived,
+            a.published_at, a.progress, a.archived, a.icon_url,
             (SELECT group_concat(tag, char(31)) FROM article_tags t WHERE t.article_id = a.id) AS tags
      FROM articles a ORDER BY a.scraped_at DESC`,
   );
@@ -91,6 +93,7 @@ export async function listArticles(): Promise<ArticleSummary[]> {
     progress: row.progress,
     archived: row.archived === 1,
     tags: row.tags ? row.tags.split("\u001f").sort() : [],
+    icon: row.icon_url,
   }));
 }
 
@@ -130,8 +133,8 @@ export async function upsertArticle(
   const blocksJson = JSON.stringify(article.blocks);
 
   await db.execute(
-    `INSERT INTO articles (id, url, canonical_url, title, author, site, blocks_json, scraped_at, published_at, saved, text_content)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10)
+    `INSERT INTO articles (id, url, canonical_url, title, author, site, blocks_json, scraped_at, published_at, saved, text_content, icon_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, $11)
      ON CONFLICT(canonical_url) DO UPDATE SET
        url = excluded.url,
        title = excluded.title,
@@ -140,7 +143,8 @@ export async function upsertArticle(
        blocks_json = excluded.blocks_json,
        text_content = excluded.text_content,
        scraped_at = excluded.scraped_at,
-       published_at = excluded.published_at`,
+       published_at = excluded.published_at,
+       icon_url = COALESCE(excluded.icon_url, icon_url)`,
     [
       id,
       article.url,
@@ -152,6 +156,7 @@ export async function upsertArticle(
       article.scrapedAt,
       article.publishedAt,
       articleText(article.blocks),
+      article.icon ?? null,
     ],
   );
 

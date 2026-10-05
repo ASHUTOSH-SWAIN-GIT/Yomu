@@ -80,6 +80,12 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_5,
         },
+        Migration {
+            version: 6,
+            description: "site icon",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_6,
+        },
     ]
 }
 
@@ -161,4 +167,10 @@ pub const MIGRATION_4: &str = r#"
 /// NULL on rows from before this migration; `src/lib/scope.ts` infers it.
 pub const MIGRATION_5: &str = r#"
     ALTER TABLE messages ADD COLUMN scope TEXT;
+"#;
+
+/// The site's logo address (see `scraper::meta::extract_icon`), shown on the
+/// article's card. NULL for articles saved before this migration.
+pub const MIGRATION_6: &str = r#"
+    ALTER TABLE articles ADD COLUMN icon_url TEXT;
 "#;

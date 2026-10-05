@@ -6,7 +6,6 @@ import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
 import { useUiStore } from "@/stores/ui-store";
-import { formatRelativeTime } from "@/lib/format";
 import { readingMinutes } from "@/lib/reading";
 import { useReaderStore } from "@/stores/reader-store";
 import type { StoredArticle } from "@/types/library";
@@ -102,11 +101,6 @@ function Article({
             <span className="text-foreground font-medium">
               {article.author}
             </span>
-          )}
-          {article.publishedAt ? (
-            <span>Published {formatRelativeTime(article.publishedAt)}</span>
-          ) : (
-            <span>Saved {formatRelativeTime(article.scrapedAt)}</span>
           )}
           <span>{minutes} min read</span>
         </div>

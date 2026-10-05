@@ -29,6 +29,8 @@ export type Block =
   | { type: "table"; header: string[]; rows: string[][] };
 
 export interface ScrapedArticle {
+  /** The site's logo address, when the page declares one. */
+  icon?: string | null;
   url: string;
   canonicalUrl: string;
   title: string;

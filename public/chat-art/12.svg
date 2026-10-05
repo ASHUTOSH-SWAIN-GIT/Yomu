@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Snowy peaks under a cold sun">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b5876"/><stop offset="0.6" stop-color="#8ec5fc"/><stop offset="1" stop-color="#e0f3ff"/></linearGradient><radialGradient id="sun" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff6d6" stop-opacity="1"/></radialGradient><linearGradient id="m1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dff1ff"/><stop offset="1" stop-color="#7fa8d6"/></linearGradient><linearGradient id="m2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9bbfe6"/><stop offset="1" stop-color="#4f77ad"/></linearGradient><linearGradient id="m3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a82b8"/><stop offset="1" stop-color="#2a4a80"/></linearGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <circle cx="70" cy="70" r="20" fill="url(#sun)"/><circle cx="70" cy="70" r="36" fill="#fff" opacity="0.2"/>
+    <path d="M60 196 L136 70 L214 196 Z" fill="url(#m1)"/><path d="M136 70 L112 112 L128 104 L138 116 L152 104 L162 112 Z" fill="#fff"/>
+    <path d="M-10 200 L50 120 L120 206 Z" fill="url(#m2)"/><path d="M130 206 L190 130 L270 206 Z" fill="url(#m2)"/>
+    <path d="M0 214 C 50 196, 100 212, 150 214 S 220 204, 256 210 V256 H0 Z" fill="url(#m3)"/>
+    <g fill="#173561"><path d="M14 238 L4.5 238 L14 215.4 L23.5 238 Z"/><path d="M30 238 L16.8 238 L30 207.2 L42.7 238 Z"/><path d="M47 238 L36.8 238 L47 212.9 L57.9 238 Z"/><path d="M60 238 L46.3 238 L60 206.0 L73.2 238 Z"/><path d="M75 238 L64.4 238 L75 212.5 L85.9 238 Z"/><path d="M91 238 L79.5 238 L91 211.0 L102.1 238 Z"/><path d="M107 238 L97.6 238 L107 215.2 L116.7 238 Z"/><path d="M119 238 L104.8 238 L119 203.5 L133.8 238 Z"/><path d="M133 238 L122.0 238 L133 213.1 L143.0 238 Z"/><path d="M149 238 L136.2 238 L149 207.5 L161.8 238 Z"/><path d="M161 238 L148.4 238 L161 208.7 L172.9 238 Z"/><path d="M176 238 L166.3 238 L176 214.5 L186.0 238 Z"/><path d="M192 238 L181.9 238 L192 215.2 L201.1 238 Z"/><path d="M205 238 L195.2 238 L205 215.8 L213.9 238 Z"/><path d="M217 238 L201.6 238 L217 202.3 L231.6 238 Z"/><path d="M230 238 L215.1 238 L230 202.1 L245.2 238 Z"/></g>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A lighthouse on a stormy night">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1026"/><stop offset="0.7" stop-color="#1f3b6e"/><stop offset="1" stop-color="#3a6ea5"/></linearGradient><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d4e89"/><stop offset="1" stop-color="#081a33"/></linearGradient><linearGradient id="beam" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#fff3b0"/></linearGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <g fill="#fff"><circle cx="156" cy="14" r="1.2" opacity="0.79"/><circle cx="62" cy="69" r="1.6" opacity="0.91"/><circle cx="177" cy="30" r="0.8" opacity="0.75"/><circle cx="29" cy="41" r="1.8" opacity="0.87"/><circle cx="102" cy="15" r="1.2" opacity="0.57"/><circle cx="100" cy="58" r="1.2" opacity="0.91"/><circle cx="77" cy="68" r="1.0" opacity="0.65"/><circle cx="102" cy="27" r="1.3" opacity="0.93"/><circle cx="71" cy="66" r="1.4" opacity="0.52"/><circle cx="11" cy="40" r="0.9" opacity="0.97"/><circle cx="87" cy="78" r="1.2" opacity="0.95"/><circle cx="90" cy="95" r="1.3" opacity="0.72"/><circle cx="26" cy="93" r="1.4" opacity="0.92"/><circle cx="50" cy="38" r="1.8" opacity="0.62"/><circle cx="18" cy="73" r="1.1" opacity="0.8"/><circle cx="28" cy="78" r="1.7" opacity="0.54"/><circle cx="108" cy="82" r="1.7" opacity="0.96"/><circle cx="48" cy="24" r="1.8" opacity="0.89"/><path d="M173 24l1.6 4.4 4.4 1.6-4.4 1.6-1.6 4.4-1.6-4.4-4.4-1.6 4.4-1.6z"/></g>
+    <path d="M148 86 L256 40 L256 120 Z" fill="url(#beam)" opacity="0.28"/>
+    <rect y="170" width="256" height="86" fill="url(#sea)"/>
+    <path d="M0 196 q16 -9 32 0 t32 0 t32 0 t32 0 t32 0 t32 0 t32 0 t32 0 V256 H0Z" fill="#14396a"/>
+    <path d="M0 224 q16 -9 32 0 t32 0 t32 0 t32 0 t32 0 t32 0 t32 0 t32 0 V256 H0Z" fill="#0b2347"/>
+    <path d="M100 176 H196 L176 160 H120 Z" fill="#2a2f45"/>
+    <path d="M130 160 L138 92 H158 L166 160 Z" fill="#f4f1ea"/>
+    <path d="M133 140 L135 122 H161 L163 140 Z" fill="#d6453d"/><path d="M137 106 L138 92 H158 L159 106 Z" fill="#d6453d"/>
+    <rect x="136" y="78" width="24" height="14" rx="2" fill="#fff3b0"/><path d="M134 78 L148 64 L162 78 Z" fill="#2a2f45"/>
+    <g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.8"><path d="M100 182 q8 -8 16 0"/><path d="M180 188 q8 -8 16 0"/></g>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>

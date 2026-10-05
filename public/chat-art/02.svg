@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A moonlit lake">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050a2b"/><stop offset="0.6" stop-color="#1a2a6c"/><stop offset="1" stop-color="#3b4a9c"/></linearGradient><linearGradient id="lake" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#223476"/><stop offset="1" stop-color="#0b1138"/></linearGradient><radialGradient id="moon" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fffdf0" stop-opacity="1"/><stop offset="0.7" stop-color="#f4efc8" stop-opacity="1"/><stop offset="1" stop-color="#d9d3a2" stop-opacity="1"/></radialGradient><radialGradient id="mhalo" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#cfd8ff" stop-opacity="0.7"/><stop offset="1" stop-color="#cfd8ff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <g fill="#fff"><circle cx="230" cy="118" r="0.9" opacity="0.54"/><circle cx="223" cy="31" r="1.5" opacity="0.83"/><circle cx="88" cy="42" r="1.4" opacity="0.8"/><circle cx="158" cy="97" r="1.0" opacity="0.72"/><circle cx="110" cy="112" r="1.5" opacity="1.0"/><circle cx="105" cy="79" r="1.7" opacity="0.75"/><circle cx="240" cy="14" r="1.7" opacity="0.68"/><circle cx="91" cy="58" r="1.2" opacity="0.94"/><circle cx="52" cy="81" r="1.0" opacity="0.62"/><circle cx="55" cy="51" r="1.0" opacity="0.76"/><circle cx="102" cy="75" r="1.5" opacity="0.59"/><circle cx="238" cy="67" r="1.6" opacity="0.87"/><circle cx="242" cy="107" r="1.2" opacity="0.8"/><circle cx="102" cy="119" r="1.8" opacity="0.58"/><circle cx="203" cy="61" r="1.5" opacity="0.73"/><circle cx="145" cy="41" r="1.3" opacity="0.96"/><circle cx="138" cy="75" r="1.6" opacity="0.68"/><circle cx="236" cy="68" r="1.7" opacity="0.73"/><circle cx="155" cy="102" r="1.7" opacity="0.86"/><circle cx="134" cy="94" r="1.0" opacity="0.66"/><circle cx="189" cy="116" r="1.0" opacity="0.95"/><circle cx="78" cy="108" r="1.7" opacity="0.65"/><path d="M189 49l1.6 4.4 4.4 1.6-4.4 1.6-1.6 4.4-1.6-4.4-4.4-1.6 4.4-1.6z"/></g>
+    <circle cx="150" cy="82" r="66" fill="url(#mhalo)"/>
+    <circle cx="150" cy="82" r="30" fill="url(#moon)"/>
+    <circle cx="140" cy="74" r="6" fill="#d9d3a2" opacity="0.5"/><circle cx="162" cy="92" r="4" fill="#d9d3a2" opacity="0.45"/>
+    <path d="M0 150 C 50 138, 90 144, 130 150 S 210 142, 256 148 V256 H0 Z" fill="#101a52"/>
+    <g fill="#0a1038"><path d="M0 150 L-14.4 150 L0 115.6 L14.4 150 Z"/><path d="M12 150 L-3.9 150 L12 112.7 L27.5 150 Z"/><path d="M25 150 L9.4 150 L25 113.6 L39.9 150 Z"/><path d="M37 150 L27.2 150 L37 125.7 L47.6 150 Z"/><path d="M48 150 L31.0 150 L48 110.2 L64.4 150 Z"/><path d="M59 150 L42.5 150 L59 110.9 L75.4 150 Z"/><path d="M67 150 L53.9 150 L67 118.2 L80.6 150 Z"/><path d="M76 150 L62.5 150 L76 117.0 L90.2 150 Z"/><path d="M87 150 L77.1 150 L87 126.0 L97.3 150 Z"/><path d="M96 150 L84.1 150 L96 121.4 L108.1 150 Z"/><path d="M109 150 L93.4 150 L109 113.2 L124.3 150 Z"/><path d="M117 150 L101.7 150 L117 112.6 L133.1 150 Z"/><path d="M126 150 L111.5 150 L126 115.7 L140.3 150 Z"/><path d="M134 150 L124.3 150 L134 126.2 L144.3 150 Z"/><path d="M147 150 L135.3 150 L147 122.6 L158.3 150 Z"/><path d="M156 150 L138.6 150 L156 109.5 L172.7 150 Z"/><path d="M168 150 L156.1 150 L168 121.3 L180.2 150 Z"/><path d="M181 150 L167.3 150 L181 117.0 L195.0 150 Z"/><path d="M193 150 L181.1 150 L193 122.7 L204.0 150 Z"/><path d="M205 150 L190.5 150 L205 114.5 L220.4 150 Z"/><path d="M218 150 L202.1 150 L218 111.0 L234.8 150 Z"/><path d="M228 150 L215.2 150 L228 120.1 L240.4 150 Z"/><path d="M236 150 L225.4 150 L236 123.7 L247.4 150 Z"/><path d="M244 150 L232.3 150 L244 121.1 L256.6 150 Z"/><path d="M255 150 L245.5 150 L255 126.1 L265.5 150 Z"/></g>
+    <rect y="150" width="256" height="106" fill="url(#lake)"/>
+    <g fill="#f4efc8" opacity="0.55"><rect x="124" y="156" width="52" height="3" rx="1.5"/><rect x="132" y="165" width="38" height="3" rx="1.5"/><rect x="138" y="174" width="26" height="2.5" rx="1.25"/><rect x="143" y="182" width="16" height="2" rx="1"/></g>
+    <g fill="none" stroke="#6b7bd1" stroke-width="1" opacity="0.5"><path d="M20 200 q10 -4 20 0 t20 0"/><path d="M180 214 q10 -4 20 0 t20 0"/><path d="M70 232 q10 -4 20 0 t20 0"/></g>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>

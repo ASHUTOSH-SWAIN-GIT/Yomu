@@ -26,6 +26,56 @@ pub fn extract_author(document: &Html) -> Option<String> {
     None
 }
 
+/// The page's logo: the largest icon it declares in `<head>`, preferring a
+/// touch icon (a large square logo) over a favicon. Resolved against the
+/// page address; `None` when it declares none.
+pub fn extract_icon(document: &Html, base: &url::Url) -> Option<String> {
+    let selector = Selector::parse("link[rel][href]").ok()?;
+    let mut best: Option<(u32, String)> = None;
+    for link in document.select(&selector) {
+        let rel = link.value().attr("rel")?.to_lowercase();
+        let touch = rel.contains("apple-touch-icon");
+        if !(touch || rel.split_whitespace().any(|t| t == "icon")) {
+            continue;
+        }
+        let href = link.value().attr("href")?.trim();
+        if href.is_empty() || href.starts_with("data:") {
+            continue;
+        }
+        let Ok(resolved) = base.join(href) else {
+            continue;
+        };
+        if !matches!(resolved.scheme(), "http" | "https") {
+            continue;
+        }
+        // "180x180" counts as 180; "any" (a scalable icon) as 64.
+        let size = link
+            .value()
+            .attr("sizes")
+            .map(|s| {
+                s.split_whitespace()
+                    .map(|part| {
+                        if part == "any" {
+                            64
+                        } else {
+                            part.split('x')
+                                .next()
+                                .and_then(|n| n.parse().ok())
+                                .unwrap_or(0)
+                        }
+                    })
+                    .max()
+                    .unwrap_or(0)
+            })
+            .unwrap_or(0);
+        let score = if touch { 1000 } else { 0 } + size;
+        if best.as_ref().is_none_or(|(s, _)| score > *s) {
+            best = Some((score, resolved.to_string()));
+        }
+    }
+    best.map(|(_, url)| url)
+}
+
 /// Page title for pages we extract ourselves (see rules.rs). Prefers the
 /// first `h1`, since `<title>` on docs sites carries a "- Site Name" suffix.
 pub fn extract_title(document: &Html) -> Option<String> {
@@ -153,5 +203,44 @@ mod tests {
     fn falls_back_to_host_for_site_name() {
         let doc = Html::parse_document("<html><head></head></html>");
         assert_eq!(extract_site_name(&doc, "example.com"), "example.com");
+    }
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::*;
+
+    fn icon(html: &str) -> Option<String> {
+        let base = url::Url::parse("https://site.dev/blog/post").unwrap();
+        extract_icon(&Html::parse_document(html), &base)
+    }
+
+    #[test]
+    fn prefers_a_touch_icon_then_the_largest_icon() {
+        let html = r#"<head>
+            <link rel="icon" href="/f16.png" sizes="16x16">
+            <link rel="icon" href="/f32.png" sizes="32x32">
+            <link rel="apple-touch-icon" href="/touch.png" sizes="180x180">
+        </head>"#;
+        assert_eq!(icon(html).as_deref(), Some("https://site.dev/touch.png"));
+        let html = r#"<head>
+            <link rel="shortcut icon" href="/a.ico">
+            <link rel="icon" href="/b.png" sizes="48x48">
+        </head>"#;
+        assert_eq!(icon(html).as_deref(), Some("https://site.dev/b.png"));
+    }
+
+    #[test]
+    fn resolves_relative_addresses_and_skips_unusable_ones() {
+        assert_eq!(
+            icon(r#"<link rel="icon" href="../logo.svg">"#).as_deref(),
+            Some("https://site.dev/logo.svg")
+        );
+        assert_eq!(
+            icon(r#"<link rel="icon" href="data:image/png;base64,AAA">"#),
+            None
+        );
+        assert_eq!(icon(r#"<link rel="mask-icon" href="/mask.svg">"#), None);
+        assert_eq!(icon("<head></head>"), None);
     }
 }

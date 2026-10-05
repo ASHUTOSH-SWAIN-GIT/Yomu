@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Fish drifting through sunlit water">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#47d1d1"/><stop offset="0.5" stop-color="#1a8fc9"/><stop offset="1" stop-color="#0a2a6b"/></linearGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sea)"/>
+    <g fill="#fff" opacity="0.14"><path d="M70 0 L110 0 L60 256 L10 256Z"/><path d="M150 0 L176 0 L150 256 L110 256Z"/><path d="M200 0 L226 0 L240 256 L200 256Z"/></g>
+    <g fill="none" stroke="#e8ffff" stroke-width="1.4" opacity="0.8"><circle cx="60" cy="120" r="5"/><circle cx="72" cy="96" r="3"/><circle cx="52" cy="70" r="4"/><circle cx="200" cy="150" r="4"/><circle cx="188" cy="120" r="2.5"/></g>
+    <g transform="translate(100 108)"><path d="M0 0 C 14 -16 40 -16 54 0 C 40 16 14 16 0 0Z" fill="#ffb347"/><path d="M54 0 L72 -14 L72 14Z" fill="#ff8a3d"/><circle cx="14" cy="-2" r="2.6" fill="#1b2a49"/></g>
+    <g transform="translate(160 164) scale(0.7)"><path d="M0 0 C 14 -16 40 -16 54 0 C 40 16 14 16 0 0Z" fill="#ff7aa8"/><path d="M54 0 L72 -14 L72 14Z" fill="#e0457b"/><circle cx="14" cy="-2" r="2.6" fill="#1b2a49"/></g>
+    <path d="M0 226 C 50 210, 100 232, 160 220 S 230 214, 256 224 V256 H0Z" fill="#14456f"/>
+    <g fill="#ff6b8a"><path d="M40 256 C 38 232, 46 224, 44 212 C 54 224, 54 238, 52 256Z"/><path d="M62 256 C 66 236, 60 228, 66 216 C 74 230, 72 242, 74 256Z" fill="#ffb347"/><path d="M196 256 C 192 232, 202 224, 198 208 C 212 224, 210 240, 208 256Z" fill="#c77dff"/></g>
+    <rect y="240" width="256" height="16" fill="#0a2a55" opacity="0.7"/>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>

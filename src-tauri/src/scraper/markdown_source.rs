@@ -46,6 +46,7 @@ pub async fn try_fetch(client: &reqwest::Client, canonical: &Url) -> Option<Scra
             author: None,
             site: canonical.host_str().unwrap_or("unknown").to_string(),
             published_at: None,
+            icon: None,
             blocks,
             scraped_at: now_millis(),
         });

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A red rock canyon at golden hour">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c3e91"/><stop offset="0.5" stop-color="#f2709c"/><stop offset="1" stop-color="#ffd194"/></linearGradient><radialGradient id="sun" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff6d0" stop-opacity="1"/><stop offset="1" stop-color="#ffc371" stop-opacity="1"/></radialGradient><linearGradient id="r1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8743b"/><stop offset="1" stop-color="#b5452a"/></linearGradient><linearGradient id="r2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b5452a"/><stop offset="1" stop-color="#7a2a1e"/></linearGradient><linearGradient id="r3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b2218"/><stop offset="1" stop-color="#2f0f0d"/></linearGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <circle cx="128" cy="112" r="26" fill="url(#sun)"/>
+    <path d="M0 90 H46 V150 H70 V176 H0Z" fill="url(#r1)"/><path d="M256 100 H208 V156 H184 V180 H256Z" fill="url(#r1)"/>
+    <path d="M0 150 H34 V176 H60 V200 H0Z" fill="url(#r2)"/><path d="M256 156 H220 V184 H192 V206 H256Z" fill="url(#r2)"/>
+    <path d="M0 196 C 40 188, 80 206, 120 214 S 200 214, 256 200 V256 H0Z" fill="url(#r3)"/>
+    <path d="M90 256 C 110 232, 150 232, 170 256Z" fill="#ffc371" opacity="0.5"/>
+    <g stroke="#ffe3b0" stroke-width="1" opacity="0.5"><path d="M0 110 H46 M0 126 H46 M0 140 H46"/><path d="M256 120 H208 M256 136 H208 M256 150 H208"/></g>
+    <path d="M40 70 q5 -6 10 0 q5 -6 10 0" stroke="#fff" stroke-width="1.4" fill="none" opacity="0.8"/>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>

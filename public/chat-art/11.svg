@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="A blossom spring beneath a snowy peak">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffc8dd"/><stop offset="0.6" stop-color="#ffe3ec"/><stop offset="1" stop-color="#fff5f0"/></linearGradient><linearGradient id="fuji" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d83c7"/><stop offset="1" stop-color="#3b4a8c"/></linearGradient><linearGradient id="land" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c85a7a"/><stop offset="1" stop-color="#7a2e55"/></linearGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <circle cx="188" cy="62" r="22" fill="#ff8fa3"/>
+    <path d="M30 190 L112 78 L194 190 Z" fill="url(#fuji)"/>
+    <path d="M112 78 L90 108 L102 104 L112 112 L124 104 L134 108 Z" fill="#fff"/>
+    <path d="M0 196 C 50 176, 110 186, 150 198 S 220 190, 256 184 V256 H0 Z" fill="url(#land)"/>
+    <path d="M0 228 C 60 210, 120 224, 180 230 S 236 222, 256 224 V256 H0 Z" fill="#4a1a3c"/>
+    <path d="M200 256 C 196 220, 200 190, 214 160" fill="none" stroke="#3a1530" stroke-width="5" stroke-linecap="round"/>
+    <g fill="#ff9fba"><circle cx="214" cy="150" r="20"/><circle cx="194" cy="164" r="16"/><circle cx="232" cy="166" r="15"/><circle cx="212" cy="176" r="14"/></g>
+    <g fill="#ffd0e0" opacity="0.9"><ellipse cx="123" cy="229" rx="3.3" ry="1.7" transform="rotate(119 123 229)"/><ellipse cx="123" cy="138" rx="3.9" ry="2.0" transform="rotate(48 123 138)"/><ellipse cx="55" cy="213" rx="3.2" ry="1.6" transform="rotate(161 55 213)"/><ellipse cx="165" cy="211" rx="2.6" ry="1.3" transform="rotate(114 165 211)"/><ellipse cx="85" cy="44" rx="2.4" ry="1.2" transform="rotate(177 85 44)"/><ellipse cx="170" cy="18" rx="3.4" ry="1.7" transform="rotate(101 170 18)"/><ellipse cx="123" cy="175" rx="3.7" ry="1.8" transform="rotate(166 123 175)"/><ellipse cx="48" cy="167" rx="2.2" ry="1.1" transform="rotate(135 48 167)"/><ellipse cx="24" cy="23" rx="2.3" ry="1.1" transform="rotate(61 24 23)"/><ellipse cx="161" cy="15" rx="3.8" ry="1.9" transform="rotate(83 161 15)"/><ellipse cx="120" cy="159" rx="3.9" ry="1.9" transform="rotate(132 120 159)"/><ellipse cx="67" cy="171" rx="2.8" ry="1.4" transform="rotate(1 67 171)"/><ellipse cx="177" cy="29" rx="3.1" ry="1.6" transform="rotate(71 177 29)"/><ellipse cx="112" cy="149" rx="4.2" ry="2.1" transform="rotate(21 112 149)"/><ellipse cx="189" cy="73" rx="2.8" ry="1.4" transform="rotate(58 189 73)"/><ellipse cx="139" cy="81" rx="2.3" ry="1.1" transform="rotate(144 139 81)"/><ellipse cx="204" cy="35" rx="3.0" ry="1.5" transform="rotate(74 204 35)"/><ellipse cx="106" cy="25" rx="4.1" ry="2.1" transform="rotate(175 106 25)"/><ellipse cx="8" cy="62" rx="2.6" ry="1.3" transform="rotate(13 8 62)"/><ellipse cx="128" cy="104" rx="4.2" ry="2.1" transform="rotate(101 128 104)"/><ellipse cx="115" cy="26" rx="3.3" ry="1.7" transform="rotate(50 115 26)"/><ellipse cx="207" cy="180" rx="2.7" ry="1.4" transform="rotate(22 207 180)"/></g>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>

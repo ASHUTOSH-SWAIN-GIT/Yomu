@@ -32,6 +32,8 @@ export interface ArticleSummary {
   progress: number;
   archived: boolean;
   tags: string[];
+  /** The site's logo address, when the page declared one. */
+  icon?: string | null;
 }
 
 /** One full-text search match. `kind` says where it matched. */

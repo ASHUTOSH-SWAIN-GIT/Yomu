@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
 
 function initial(site: string): string {
   return (site.replace(/^(www|docs?|blog)\./, "")[0] ?? "·").toUpperCase();
@@ -69,6 +71,132 @@ export function SiteMark({ site, color }: { site: string; color: string }) {
       }}
     >
       {initial(site)}
+    </span>
+  );
+}
+
+/** The site's logo address to show, trying the icon the page declared, then
+ * its touch icon, then its favicon. Fetched from the site itself (already
+ * contacted to save the blog), never a third party, and none when remote
+ * images are blocked. `next` moves to the following candidate after a
+ * failed load; `src` is `undefined` once none is left. */
+function useSiteLogo(url: string, icon?: string | null) {
+  const blocked = useUiStore((s) => s.blockRemoteImages);
+  const [tried, setTried] = useState(0);
+  const sources: string[] = icon ? [icon] : [];
+  try {
+    const page = new URL(url);
+    if (/^https?:$/.test(page.protocol)) {
+      sources.push(
+        new URL("/apple-touch-icon.png", page).href,
+        new URL("/favicon.ico", page).href,
+      );
+    }
+  } catch {
+    // Not a web address (the built-in tour): use the initial.
+  }
+  return {
+    src: blocked ? undefined : sources[tried],
+    next: () => setTried((n) => n + 1),
+  };
+}
+
+/** The site's logo in a small tile, for list rows. */
+export function SiteLogoTile({
+  url,
+  icon,
+  site,
+  className,
+}: {
+  url: string;
+  icon?: string | null;
+  site: string;
+  className?: string;
+}) {
+  const { src, next } = useSiteLogo(url, icon);
+  return (
+    <span className={cn("grid size-10 shrink-0 place-items-center", className)}>
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          aria-hidden
+          referrerPolicy="no-referrer"
+          onError={next}
+          className="size-8 rounded-md object-contain"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="text-muted-foreground text-lg font-semibold"
+        >
+          {initial(site)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** The top of a blog card: the site's logo large in the middle, over a soft
+ * wash made from the logo itself, so the logo fills the space. Falls back
+ * to the site's initial on a tint of its colour. */
+export function SiteLogoBanner({
+  url,
+  icon,
+  site,
+  color,
+  className,
+  children,
+}: {
+  url: string;
+  icon?: string | null;
+  site: string;
+  color: string;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const { src, next } = useSiteLogo(url, icon);
+
+  return (
+    <span
+      className={cn(
+        "relative grid place-items-center overflow-hidden",
+        className,
+      )}
+      style={{
+        background: `linear-gradient(140deg, color-mix(in oklab, ${color} 22%, var(--card)), color-mix(in oklab, ${color} 8%, var(--card)))`,
+      }}
+    >
+      {src && (
+        // The same logo, enlarged and blurred, as the backdrop.
+        <img
+          src={src}
+          alt=""
+          aria-hidden
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 size-full scale-[2.5] object-cover opacity-90 blur-2xl brightness-50"
+        />
+      )}
+      <span className="bg-background relative grid size-16 place-items-center overflow-hidden rounded-2xl shadow-[var(--shadow-card)]">
+        {src ? (
+          <img
+            src={src}
+            alt=""
+            aria-hidden
+            referrerPolicy="no-referrer"
+            onError={next}
+            className="size-12 object-contain"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="text-muted-foreground text-2xl font-semibold"
+          >
+            {initial(site)}
+          </span>
+        )}
+      </span>
+      {children}
     </span>
   );
 }

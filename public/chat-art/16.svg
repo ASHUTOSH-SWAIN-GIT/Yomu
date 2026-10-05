@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Palm trees at a tropical sunset">
+  <defs>
+    <clipPath id="disc"><circle cx="128" cy="128" r="124"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a0ca3"/><stop offset="0.45" stop-color="#f72585"/><stop offset="0.8" stop-color="#ff9e00"/><stop offset="1" stop-color="#ffd60a"/></linearGradient><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9e00"/><stop offset="0.3" stop-color="#c9184a"/><stop offset="1" stop-color="#240046"/></linearGradient><radialGradient id="sun" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff3b0" stop-opacity="1"/><stop offset="1" stop-color="#ffb703" stop-opacity="1"/></radialGradient>
+  </defs>
+  <g clip-path="url(#disc)">
+    <rect width="256" height="256" fill="url(#sky)"/>
+    <circle cx="128" cy="140" r="38" fill="url(#sun)"/>
+    <rect y="148" width="256" height="108" fill="url(#sea)"/>
+    <g fill="#fff3b0" opacity="0.6"><rect x="104" y="152" width="48" height="3" rx="1.5"/><rect x="112" y="161" width="32" height="3" rx="1.5"/><rect x="118" y="170" width="20" height="2.5" rx="1.25"/></g>
+    <path d="M0 214 C 60 200, 120 214, 180 208 S 240 210, 256 206 V256 H0Z" fill="#1a0033"/>
+    <g fill="none" stroke="#12002a" stroke-width="4" stroke-linecap="round"><path d="M44 230 C 40 190, 52 150, 76 118"/><path d="M214 232 C 216 196, 206 160, 186 132"/></g>
+    <g fill="#12002a"><path d="M76 118 C 56 104, 38 112, 26 128 C 48 114, 62 114, 76 118Z"/><path d="M76 118 C 80 96, 98 88, 116 92 C 98 98, 86 106, 76 118Z"/><path d="M76 118 C 92 118, 106 130, 110 146 C 100 130, 90 124, 76 118Z"/><path d="M76 118 C 60 120, 48 132, 46 148 C 54 134, 64 126, 76 118Z"/>
+    <path d="M186 132 C 206 112, 226 114, 238 130 C 218 120, 200 122, 186 132Z"/><path d="M186 132 C 180 110, 164 102, 148 106 C 164 112, 176 120, 186 132Z"/><path d="M186 132 C 172 134, 160 146, 158 162 C 166 148, 176 140, 186 132Z"/></g>
+    <circle cx="128" cy="128" r="123" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+  </g>
+</svg>
