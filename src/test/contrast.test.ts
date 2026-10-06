@@ -12,7 +12,8 @@ const css = ["../index.css", "../themes.css"]
 
 function tokensIn(selector: string): Record<string, string> {
   const start = css.indexOf(`\n${selector} {`);
-  if (start < 0) throw new Error(`no ${selector} block in index.css or themes.css`);
+  if (start < 0)
+    throw new Error(`no ${selector} block in index.css or themes.css`);
   const body = css.slice(start, css.indexOf("\n}", start));
   const tokens: Record<string, string> = {};
   for (const m of body.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {

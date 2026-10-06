@@ -7,6 +7,7 @@ import { commentLayout } from "@/lib/reader-layout";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
+import { GlossaryLayer } from "@/components/reader/glossary";
 import { Outline } from "@/components/reader/outline";
 import { AddCommentButton, BlockComments } from "@/components/reader/comments";
 import { useCommentHighlights } from "@/hooks/use-comment-highlights";
@@ -218,6 +219,11 @@ function Article({
           )}
         />
       </article>
+      <GlossaryLayer
+        articleRef={articleRef}
+        articleId={article.id}
+        blocks={article.blocks}
+      />
       {selection && (
         <AddCommentButton
           article={article}

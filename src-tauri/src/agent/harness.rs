@@ -50,6 +50,19 @@ fn default_command() -> Option<Command> {
     }
 }
 
+/// `~/x` as the full path in the user's home folder; anything else as given.
+/// Lets a saved argument such as `--cache ~/.npm/yomu` name a folder.
+#[cfg(not(target_os = "macos"))]
+fn expand_home(arg: &str) -> String {
+    match (arg.strip_prefix("~/"), std::env::var_os("HOME")) {
+        (Some(rest), Some(home)) => std::path::Path::new(&home)
+            .join(rest)
+            .to_string_lossy()
+            .into_owned(),
+        _ => arg.to_string(),
+    }
+}
+
 /// Builds the command for an agent the user set up, in the same sandbox as
 /// Codex on macOS: writes denied everywhere except its own data folder, and
 /// reads of home limited to the program's folder and that data folder.
@@ -89,14 +102,14 @@ fn custom_command(command: &str, args: &[String], data_dirs: &[String]) -> Optio
             .arg(super::sandbox::profile_with(&read, &write))
             .arg("--")
             .arg(command)
-            .args(args);
+            .args(args.iter().map(|a| expand(a)));
         Some(cmd)
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = data_dirs;
         let mut cmd = Command::new(command);
-        cmd.args(args);
+        cmd.args(args.iter().map(|a| expand_home(a)));
         Some(cmd)
     }
 }

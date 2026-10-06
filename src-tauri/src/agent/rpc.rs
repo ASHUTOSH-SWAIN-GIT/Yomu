@@ -11,13 +11,17 @@
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, oneshot, Mutex};
+
+/// The last few lines an agent printed on stderr, kept to explain a crash.
+type StderrTail = Arc<StdMutex<std::collections::VecDeque<String>>>;
+const STDERR_TAIL_LINES: usize = 6;
 
 pub type NotificationSender = mpsc::UnboundedSender<(String, Value)>;
 type PendingRequests = Arc<Mutex<HashMap<i64, oneshot::Sender<Result<Value, String>>>>>;
@@ -70,13 +74,15 @@ impl RpcClient {
         let pending: PendingRequests = Arc::new(Mutex::new(HashMap::new()));
         let stdin = Arc::new(Mutex::new(stdin));
 
+        let tail = StderrTail::default();
         spawn_reader(
             stdout,
             Arc::clone(&pending),
             notifications,
             Arc::clone(&stdin),
+            Arc::clone(&tail),
         );
-        spawn_stderr_logger(stderr);
+        spawn_stderr_logger(stderr, tail);
 
         Ok(RpcClient {
             child: Mutex::new(child),
@@ -139,6 +145,7 @@ fn spawn_reader(
     pending: PendingRequests,
     notifications: NotificationSender,
     stdin: Arc<Mutex<ChildStdin>>,
+    tail: StderrTail,
 ) {
     tokio::spawn(async move {
         let mut lines = BufReader::new(stdout).lines();
@@ -201,8 +208,12 @@ fn spawn_reader(
         // The agent's stdout closed (crashed or exited). Fail every
         // in-flight request instead of leaving its caller hanging
         // forever — the harness treats this as "needs a respawn".
+        // Its last words usually say why (a missing package, a sign-in
+        // problem); give stderr a moment to arrive.
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        let reason = exit_reason(&tail);
         for (_, sender) in pending.lock().await.drain() {
-            let _ = sender.send(Err("agent process exited".to_string()));
+            let _ = sender.send(Err(reason.clone()));
         }
     });
 }
@@ -227,13 +238,49 @@ fn reply_to_agent_request(method: &str, id: Value) -> Value {
     }
 }
 
-fn spawn_stderr_logger(stderr: tokio::process::ChildStderr) {
+/// "agent process exited", with what the agent last printed after it.
+fn exit_reason(tail: &StderrTail) -> String {
+    let lines: Vec<String> = tail.lock().unwrap().iter().cloned().collect();
+    if lines.is_empty() {
+        "agent process exited".to_string()
+    } else {
+        format!("agent process exited: {}", lines.join(" | "))
+    }
+}
+
+fn spawn_stderr_logger(stderr: tokio::process::ChildStderr, tail: StderrTail) {
     tokio::spawn(async move {
         let mut lines = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = lines.next_line().await {
             // The agent's stderr is useful for debugging a failed
             // connection but isn't part of the protocol.
             log::debug!("[agent stderr] {line}");
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let mut tail = tail.lock().unwrap();
+            if tail.len() == STDERR_TAIL_LINES {
+                tail.pop_front();
+            }
+            tail.push_back(line.chars().take(300).collect());
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_crash_says_what_the_agent_last_printed() {
+        let tail = StderrTail::default();
+        assert_eq!(exit_reason(&tail), "agent process exited");
+        tail.lock().unwrap().push_back("npm error EACCES".into());
+        tail.lock().unwrap().push_back("cannot write cache".into());
+        assert_eq!(
+            exit_reason(&tail),
+            "agent process exited: npm error EACCES | cannot write cache"
+        );
+    }
 }

@@ -5,6 +5,7 @@
  * step.
  */
 
+import { FONTS, type ReaderFont } from "@/lib/fonts";
 import {
   THEMES as THEME_LIST,
   type ThemeId,
@@ -13,20 +14,14 @@ import {
 
 /** A colour theme, or "system" to follow macOS light/dark. */
 export type Theme = ThemeId | "system";
-export type ReaderFont = "serif" | "sans";
-export type ReaderSize = "s" | "m" | "l" | "xl";
-export type ReaderMeasure = "narrow" | "medium" | "wide";
+export type { ReaderFont } from "@/lib/fonts";
 
 export interface ReaderPrefs {
   font: ReaderFont;
-  size: ReaderSize;
-  measure: ReaderMeasure;
 }
 
 export const DEFAULT_READER: ReaderPrefs = {
   font: "sans",
-  size: "m",
-  measure: "medium",
 };
 
 export const THEME_KEY = "yomu-theme";
@@ -35,9 +30,7 @@ export const THEME_MODE_KEY = "yomu-theme-mode";
 export const READER_KEY = "yomu-reader";
 
 const THEME_IDS = new Set<string>(THEME_LIST.map((t) => t.id));
-const FONTS: ReaderFont[] = ["sans", "serif"];
-const SIZES: ReaderSize[] = ["s", "m", "l", "xl"];
-const MEASURES: ReaderMeasure[] = ["narrow", "medium", "wide"];
+const FONT_IDS = new Set<string>(FONTS.map((f) => f.id));
 
 export function parseTheme(raw: string | null | undefined): Theme {
   return raw === "system" || (raw && THEME_IDS.has(raw))
@@ -66,15 +59,9 @@ export function parseReaderPrefs(raw: string | null | undefined): ReaderPrefs {
     // Corrupt JSON: fall back to defaults.
   }
   return {
-    font: FONTS.includes(data.font as ReaderFont)
+    font: FONT_IDS.has(data.font as string)
       ? (data.font as ReaderFont)
       : DEFAULT_READER.font,
-    size: SIZES.includes(data.size as ReaderSize)
-      ? (data.size as ReaderSize)
-      : DEFAULT_READER.size,
-    measure: MEASURES.includes(data.measure as ReaderMeasure)
-      ? (data.measure as ReaderMeasure)
-      : DEFAULT_READER.measure,
   };
 }
 
@@ -100,7 +87,4 @@ export function applyAppearance(
 
   // Defaults carry no attribute: the CSS variables already hold them.
   root.dataset.readerFont = reader.font === "sans" ? undefined : reader.font;
-  root.dataset.readerSize = reader.size === "m" ? undefined : reader.size;
-  root.dataset.readerMeasure =
-    reader.measure === "medium" ? undefined : reader.measure;
 }

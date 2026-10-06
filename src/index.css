@@ -79,7 +79,7 @@
   --dur-slow: 320ms;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
-  /* Reading preferences (set by the Aa menu, see stores/ui-store.ts). */
+  /* Reading preferences (see stores/ui-store.ts). */
   --reader-ink: #2c2721;
   --reader-font: var(--font-sans);
   --reader-size: 1.0625rem;
@@ -209,27 +209,35 @@ html.dark {
 }
 
 /* Reader preferences, applied as data attributes on <html>. */
-/* The one non-default typeface: a real serif from the system, for people
-   who read long articles better that way. */
+/* The article typefaces other than the default (Inter). The files of the
+   self-hosted ones load when chosen (lib/fonts.ts). */
 :root[data-reader-font="serif"] {
   --reader-font:
     "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  --reader-leading: 1.72;
 }
-:root[data-reader-size="s"] {
-  --reader-size: 0.9375rem;
+:root[data-reader-font="source-sans"] {
+  --reader-font: "Source Sans 3 Variable", var(--font-sans);
 }
-:root[data-reader-size="l"] {
-  --reader-size: 1.1875rem;
+:root[data-reader-font="atkinson"] {
+  --reader-font: "Atkinson Hyperlegible Next Variable", var(--font-sans);
 }
-:root[data-reader-size="xl"] {
-  --reader-size: 1.3125rem;
+:root[data-reader-font="source-serif"] {
+  --reader-font: "Source Serif 4 Variable", Georgia, serif;
 }
-:root[data-reader-measure="narrow"] {
-  --reader-measure: 54ch;
+:root[data-reader-font="literata"] {
+  --reader-font: "Literata Variable", Georgia, serif;
 }
-:root[data-reader-measure="wide"] {
-  --reader-measure: 74ch;
+:root[data-reader-font="lora"] {
+  --reader-font: "Lora Variable", Georgia, serif;
+}
+:root[data-reader-font="merriweather"] {
+  --reader-font: "Merriweather Variable", Georgia, serif;
+}
+:root[data-reader-font="newsreader"] {
+  --reader-font: "Newsreader Variable", Georgia, serif;
+}
+:root[data-reader-font="mono"] {
+  --reader-font: var(--font-mono);
 }
 
 @theme inline {
@@ -356,6 +364,15 @@ html.dark {
   text-decoration: underline;
   text-decoration-color: var(--comment-line);
   text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+}
+
+/* Terms the agent has explained before (the glossary): a dotted underline,
+   quieter than a comment's wash. */
+::highlight(yomu-term) {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--muted-foreground);
+  text-decoration-thickness: 1.5px;
   text-underline-offset: 0.22em;
 }
 

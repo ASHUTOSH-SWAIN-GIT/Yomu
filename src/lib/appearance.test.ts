@@ -49,9 +49,12 @@ describe("parseReaderPrefs", () => {
 
   it("keeps valid fields and replaces invalid ones individually", () => {
     const prefs = parseReaderPrefs(
-      JSON.stringify({ font: "sans", size: "huge", measure: "wide" }),
+      JSON.stringify({ font: "comic-sans", size: "xl" }),
     );
-    expect(prefs).toEqual({ font: "sans", size: "m", measure: "wide" });
+    expect(prefs).toEqual({ font: "sans" });
+    expect(parseReaderPrefs(JSON.stringify({ font: "lora" }))).toEqual({
+      font: "lora",
+    });
   });
 });
 
@@ -88,19 +91,9 @@ describe("applyAppearance", () => {
 
   it("writes non-default reader prefs as data attributes and clears defaults", () => {
     const { root } = fakeRoot();
-    applyAppearance(root, "light", false, {
-      font: "serif",
-      size: "xl",
-      measure: "narrow",
-    });
-    expect(root.dataset).toMatchObject({
-      readerFont: "serif",
-      readerSize: "xl",
-      readerMeasure: "narrow",
-    });
+    applyAppearance(root, "light", false, { font: "serif" });
+    expect(root.dataset).toMatchObject({ readerFont: "serif" });
     applyAppearance(root, "light", false, DEFAULT_READER);
     expect(root.dataset.readerFont).toBeUndefined();
-    expect(root.dataset.readerSize).toBeUndefined();
-    expect(root.dataset.readerMeasure).toBeUndefined();
   });
 });

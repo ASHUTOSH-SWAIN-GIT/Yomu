@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Group, Option } from "@/components/settings/picker-parts";
 import { resolveTheme, type Theme } from "@/lib/appearance";
 import { THEMES, type ThemeMeta } from "@/lib/themes";
-import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
 /** The theme dropdown: Auto, then the light themes, then the dark ones,
@@ -79,55 +79,6 @@ export function ThemePicker() {
         ))}
       </PopoverContent>
     </Popover>
-  );
-}
-
-function Group({ title }: { title: string }) {
-  return (
-    <div className="text-muted-foreground mt-1.5 px-2.5 pt-1 pb-0.5 text-[0.6875rem] font-semibold tracking-wide uppercase">
-      {title}
-    </div>
-  );
-}
-
-function Option({
-  on,
-  label,
-  note,
-  swatch,
-  onClick,
-}: {
-  on: boolean;
-  label: string;
-  note?: string;
-  swatch: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={on}
-      onClick={onClick}
-      className={cn(
-        "hover:bg-accent focus-visible:ring-ring/60 flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2",
-        on && "bg-accent/60",
-      )}
-    >
-      {swatch}
-      <span className="min-w-0 flex-1 truncate">
-        {label}
-        {note && (
-          <span className="text-muted-foreground ml-1.5 text-[0.75rem]">
-            {note}
-          </span>
-        )}
-      </span>
-      <Check
-        className={cn("size-3.5 shrink-0", !on && "invisible")}
-        aria-hidden
-      />
-    </button>
   );
 }
 

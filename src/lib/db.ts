@@ -1,6 +1,7 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { Block } from "@/types/article";
 import { articleText } from "@/lib/article-text";
+import type { GlossaryRow } from "@/lib/glossary";
 import { resolveScope, type MessageScope } from "@/lib/scope";
 import { normalizeTag } from "@/lib/tags";
 import type {
@@ -492,6 +493,38 @@ export async function listHighlights(articleId: string): Promise<Highlight[]> {
 }
 
 /** Removes the newest assistant message (used when regenerating it). */
+/** Every passage the agent has explained, in any article, with the answer
+ * that followed it in the chat (the first assistant message after it). */
+export async function listGlossaryRows(): Promise<GlossaryRow[]> {
+  const db = await getDb();
+  const rows = await db.select<
+    {
+      text: string;
+      answer: string | null;
+      article_id: string;
+      title: string | null;
+      answered_at: number;
+    }[]
+  >(
+    `SELECT h.text, h.article_id, a.title,
+            (SELECT m2.content FROM messages m2
+              WHERE m2.chat_id = m.chat_id AND m2.role = 'assistant' AND m2.rowid > m.rowid
+              ORDER BY m2.rowid LIMIT 1) AS answer,
+            m.created_at AS answered_at
+     FROM messages m
+     JOIN highlights h ON h.id = m.highlight_id
+     JOIN articles a ON a.id = h.article_id
+     WHERE m.role = 'user'`,
+  );
+  return rows.map((r) => ({
+    text: r.text,
+    answer: r.answer,
+    articleId: r.article_id,
+    articleTitle: r.title ?? "",
+    answeredAt: r.answered_at,
+  }));
+}
+
 export async function deleteLastAssistantMessage(
   chatId: string,
 ): Promise<void> {

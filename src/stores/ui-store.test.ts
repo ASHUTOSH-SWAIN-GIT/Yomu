@@ -26,29 +26,20 @@ describe("ui-store persistence", () => {
   it("restores saved theme and reader prefs on load", async () => {
     stubStorage({
       "yomu-theme": "paper",
-      "yomu-reader": JSON.stringify({
-        font: "sans",
-        size: "l",
-        measure: "narrow",
-      }),
+      "yomu-reader": JSON.stringify({ font: "serif" }),
     });
     const s = (await freshStore()).getState();
     expect(s.theme).toBe("paper");
-    expect(s.reader).toEqual({ font: "sans", size: "l", measure: "narrow" });
+    expect(s.reader).toEqual({ font: "serif" });
   });
 
   it("saves changes, merging partial reader updates", async () => {
     const data = stubStorage();
     const store = await freshStore();
     store.getState().setTheme("dark");
-    store.getState().setReader({ size: "xl" });
-    store.getState().setReader({ font: "sans" });
+    store.getState().setReader({ font: "serif" });
     expect(data["yomu-theme"]).toBe("dark");
-    expect(JSON.parse(data["yomu-reader"])).toEqual({
-      font: "sans",
-      size: "xl",
-      measure: "medium",
-    });
+    expect(JSON.parse(data["yomu-reader"])).toEqual({ font: "serif" });
   });
 
   it("still works when storage is unavailable", async () => {
@@ -65,9 +56,9 @@ describe("ui-store persistence", () => {
     const store = await freshStore();
     expect(store.getState().theme).toBe("system");
     store.getState().setTheme("paper");
-    store.getState().setReader({ size: "s" });
+    store.getState().setReader({ font: "serif" });
     expect(store.getState().theme).toBe("paper");
-    expect(store.getState().reader.size).toBe("s");
+    expect(store.getState().reader.font).toBe("serif");
   });
 
   it("starts with focus mode off", async () => {

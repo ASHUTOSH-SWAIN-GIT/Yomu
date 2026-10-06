@@ -11,6 +11,7 @@ use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 
+use super::config::AgentConfig;
 use super::events::AgentEvent;
 use super::harness::AgentHarness;
 
@@ -199,6 +200,45 @@ async fn real_codex_streams_and_resumes() {
         .unwrap();
     let second = until_done_with(&mut events, 120).await;
     assert!(joined_tokens(&second).to_lowercase().contains("pineapple"));
+    harness.shutdown().await;
+}
+
+/// Opt-in: starts any ACP agent through the real harness (sandbox included)
+/// and asks it one short question. For trying a preset before shipping it:
+/// `YOMU_AGENT="gemini --acp" YOMU_AGENT_DIRS="~/.gemini" cargo test real_custom_agent -- --ignored --nocapture`
+#[tokio::test]
+#[ignore]
+async fn real_custom_agent() {
+    let line = std::env::var("YOMU_AGENT").expect("set YOMU_AGENT to the command line");
+    let mut words = line.split_whitespace().map(str::to_string);
+    let command = words.next().expect("empty YOMU_AGENT");
+    let data_dirs = std::env::var("YOMU_AGENT_DIRS")
+        .unwrap_or_default()
+        .split(',')
+        .filter(|d| !d.trim().is_empty())
+        .map(|d| d.trim().to_string())
+        .collect();
+
+    let (tx, mut events) = mpsc::unbounded_channel();
+    let harness = AgentHarness::new(tx);
+    harness
+        .use_agent(AgentConfig::Custom {
+            command,
+            args: words.collect(),
+            data_dirs,
+        })
+        .await
+        .expect("the agent did not start");
+    let cwd = std::env::temp_dir().join("yomu-test-real-custom");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+    let session = harness.new_session(&cwd).await.unwrap();
+    harness
+        .prompt(&session, "Reply with exactly one word: ok")
+        .await
+        .unwrap();
+    let reply = joined_tokens(&until_done_with(&mut events, 180).await);
+    println!("REPLY: {reply:?}");
+    assert!(!reply.trim().is_empty());
     harness.shutdown().await;
 }
 

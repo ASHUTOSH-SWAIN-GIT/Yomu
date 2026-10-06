@@ -1,12 +1,10 @@
-import { Segmented } from "@/components/ui/segmented";
+import { FontPicker } from "@/components/settings/font-picker";
 import { Section, Setting, Switch } from "@/components/settings/controls";
 import { ThemePicker } from "@/components/settings/theme-picker";
 import { useUiStore } from "@/stores/ui-store";
 
-/** Theme, how articles are set, and whether remote images load. */
+/** Theme, typeface, and whether remote images load. */
 export function ReadingSection() {
-  const reader = useUiStore((s) => s.reader);
-  const setReader = useUiStore((s) => s.setReader);
   const blockImages = useUiStore((s) => s.blockRemoteImages);
   const setBlockImages = useUiStore((s) => s.setBlockRemoteImages);
 
@@ -23,45 +21,7 @@ export function ReadingSection() {
         <ThemePicker />
       </Setting>
       <Setting label="Typeface" hint="How article text is set.">
-        <Segmented
-          label="Typeface"
-          value={reader.font}
-          onChange={(font) => setReader({ font })}
-          options={[
-            { value: "sans", label: "Sans" },
-            {
-              value: "serif",
-              label: (
-                <span style={{ fontFamily: "Georgia, serif" }}>Serif</span>
-              ),
-            },
-          ]}
-        />
-      </Setting>
-      <Setting label="Text size">
-        <Segmented
-          label="Text size"
-          value={reader.size}
-          onChange={(size) => setReader({ size })}
-          options={[
-            { value: "s", label: "S", ariaLabel: "Small" },
-            { value: "m", label: "M", ariaLabel: "Medium" },
-            { value: "l", label: "L", ariaLabel: "Large" },
-            { value: "xl", label: "XL", ariaLabel: "Extra large" },
-          ]}
-        />
-      </Setting>
-      <Setting label="Column width" hint="How wide a line of text can get.">
-        <Segmented
-          label="Column width"
-          value={reader.measure}
-          onChange={(measure) => setReader({ measure })}
-          options={[
-            { value: "narrow", label: "Narrow" },
-            { value: "medium", label: "Medium" },
-            { value: "wide", label: "Wide" },
-          ]}
-        />
+        <FontPicker />
       </Setting>
 
       {/* Set with the same variables as an article, so it changes as you

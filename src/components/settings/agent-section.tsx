@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { agentFindCommand } from "@/lib/commands";
-import { isOpenCode, OPENCODE } from "@/lib/agents";
+import { PRESETS, presetOf } from "@/lib/agents";
 import { joinWords, splitWords } from "@/lib/shell-words";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
 import { useSpacesStore } from "@/stores/spaces-store";
 import { useUiStore } from "@/stores/ui-store";
 
-/** Which agent Yomu talks to: Codex, OpenCode, or any program that speaks
- * ACP over stdio. */
+/** Which agent Yomu talks to: Codex, one of the presets (Claude Code, Gemini
+ * CLI, OpenCode), or any program that speaks ACP over stdio. */
 export function AgentSection() {
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const setSettingsPage = useSpacesStore((s) => s.setSettingsPage);
@@ -24,7 +24,8 @@ export function AgentSection() {
   const [command, setCommand] = useState(custom?.command ?? "");
   const [args, setArgs] = useState(custom ? joinWords(custom.args) : "");
   const [dataDirs, setDataDirs] = useState(custom?.dataDirs.join(", ") ?? "");
-  const [openCodeFound, setOpenCodeFound] = useState<string | null>(null);
+  // Where each preset's program was found (by preset id); null if missing.
+  const [installed, setInstalled] = useState<Record<string, string | null>>({});
   const [found, setFound] = useState<string | null | undefined>(undefined);
   const [testing, setTesting] = useState(false);
 
@@ -45,9 +46,11 @@ export function AgentSection() {
 
   useEffect(() => {
     void refresh();
-    agentFindCommand(OPENCODE.command)
-      .then(setOpenCodeFound)
-      .catch(() => setOpenCodeFound(null));
+    for (const preset of PRESETS) {
+      agentFindCommand(preset.detect)
+        .catch(() => null)
+        .then((path) => setInstalled((s) => ({ ...s, [preset.id]: path })));
+    }
   }, [refresh]);
 
   async function applyCustom() {
@@ -65,8 +68,8 @@ export function AgentSection() {
   }
 
   const usingCodex = config.kind === "codex";
-  const usingOpenCode = isOpenCode(config);
-  const usingCustom = !usingCodex && !usingOpenCode;
+  const usingPreset = presetOf(config);
+  const usingCustom = !usingCodex && !usingPreset;
   const agentBadge =
     status === "ready"
       ? "Ready"
@@ -107,30 +110,31 @@ export function AgentSection() {
           )}
         </Card>
 
-        <Card
-          on={usingOpenCode}
-          title="OpenCode"
-          note={
-            openCodeFound
-              ? "Your local OpenCode, with whichever provider and model you have set up in it."
-              : "Not found on this computer. Install OpenCode, then sign in with `opencode auth login`."
-          }
-          badge={
-            usingOpenCode ? agentBadge : openCodeFound ? "Installed" : undefined
-          }
-          onSelect={() => {
-            if (openCodeFound) void setConfig(OPENCODE);
-          }}
-        >
-          {usingOpenCode && customError && (
-            <p
-              role="alert"
-              className="text-destructive mt-2 text-[0.75rem] break-words"
+        {PRESETS.map((preset) => {
+          const on = usingPreset === preset;
+          const found = installed[preset.id];
+          return (
+            <Card
+              key={preset.id}
+              on={on}
+              title={preset.label}
+              note={found ? preset.note : preset.missing}
+              badge={on ? agentBadge : found ? "Installed" : undefined}
+              onSelect={() => {
+                if (found) void setConfig(preset.config);
+              }}
             >
-              {customError}
-            </p>
-          )}
-        </Card>
+              {on && customError && (
+                <p
+                  role="alert"
+                  className="text-destructive mt-2 text-[0.75rem] break-words"
+                >
+                  {customError}
+                </p>
+              )}
+            </Card>
+          );
+        })}
 
         <Card
           on={usingCustom}

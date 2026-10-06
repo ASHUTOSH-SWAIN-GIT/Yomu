@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { applyAppearance } from "@/lib/appearance";
+import { loadFont } from "@/lib/fonts";
 import { useUiStore } from "@/stores/ui-store";
 
 /**
@@ -10,6 +11,8 @@ import { useUiStore } from "@/stores/ui-store";
 export function useThemeEffect() {
   const theme = useUiStore((s) => s.theme);
   const reader = useUiStore((s) => s.reader);
+
+  useEffect(() => loadFont(reader.font), [reader.font]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");

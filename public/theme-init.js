@@ -31,13 +31,7 @@
   try {
     reader = JSON.parse(get("yomu-reader") || "{}") || {};
   } catch (e) {}
-  var pick = function (value, allowed) {
-    return allowed.indexOf(value) > 0 ? value : undefined; // index 0 = default
-  };
-  var font = pick(reader.font, ["sans", "serif"]);
-  var size = pick(reader.size, ["m", "s", "l", "xl"]);
-  var measure = pick(reader.measure, ["medium", "narrow", "wide"]);
-  if (font) root.dataset.readerFont = font;
-  if (size) root.dataset.readerSize = size;
-  if (measure) root.dataset.readerMeasure = measure;
+  // Any font id; one the CSS does not know simply shows the default.
+  if (/^[a-z-]+$/.test(reader.font) && reader.font !== "sans")
+    root.dataset.readerFont = reader.font;
 })();

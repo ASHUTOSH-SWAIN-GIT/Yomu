@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { agentDiagnose, agentLogin, agentUse, agentWarm } from "@/lib/commands";
 import { logError } from "@/lib/log";
+import { upgradeSaved } from "@/lib/agents";
 import { isReady } from "@/lib/setup";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { useModelsStore } from "@/stores/models-store";
@@ -61,7 +62,7 @@ let started: string | null = null;
 export const useAgentStore = create<AgentStore>((set, get) => ({
   status: "checking",
   diagnosis: null,
-  config: parseAgentConfig(readStorage(CONFIG_KEY)),
+  config: upgradeSaved(parseAgentConfig(readStorage(CONFIG_KEY))),
   customError: null,
 
   async refreshStatus() {
