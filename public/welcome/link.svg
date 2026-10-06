@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" role="img" aria-label="A link floating over a sunset">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1464"/><stop offset="0.45" stop-color="#7b2fb5"/><stop offset="0.75" stop-color="#ef4f8f"/><stop offset="1" stop-color="#ffb347"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6c2"/><stop offset="0.6" stop-color="#ffd166"/><stop offset="1" stop-color="#ff8a5c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="h1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c3d9a"/><stop offset="1" stop-color="#5a1f6e"/></linearGradient>
+    <linearGradient id="h2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e2385"/><stop offset="1" stop-color="#2e0f4f"/></linearGradient>
+    <linearGradient id="h3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b0f4a"/><stop offset="1" stop-color="#120626"/></linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="shadow" x="-20%" y="-40%" width="140%" height="200%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#14052b" flood-opacity="0.45"/></filter>
+  </defs>
+  <rect width="400" height="240" fill="url(#sky)"/>
+  <circle cx="290" cy="150" r="80" fill="url(#sun)"/>
+  <circle cx="290" cy="150" r="34" fill="#fff1b8"/>
+  <g fill="#fff" opacity="0.8"><circle cx="40" cy="30" r="1.3"/><circle cx="90" cy="18" r="1"/><circle cx="150" cy="40" r="1.4"/><circle cx="350" cy="26" r="1.2"/><circle cx="220" cy="14" r="1"/><circle cx="380" cy="60" r="0.9"/><circle cx="20" cy="70" r="1"/></g>
+  <path d="M0 170 C60 140 110 150 170 162 S290 140 400 158 V240 H0Z" fill="url(#h1)"/>
+  <path d="M0 192 C70 170 140 182 210 190 S330 172 400 186 V240 H0Z" fill="url(#h2)"/>
+  <path d="M0 214 C90 200 170 210 250 214 S350 206 400 210 V240 H0Z" fill="url(#h3)"/>
+  <rect x="58" y="88" width="230" height="44" rx="22" fill="#ffffff" opacity="0.25" filter="url(#soft)"/>
+  <g filter="url(#shadow)">
+    <rect x="56" y="84" width="232" height="46" rx="23" fill="#ffffff" fill-opacity="0.92"/>
+  </g>
+  <g fill="none" stroke="#7b2fb5" stroke-width="3" stroke-linecap="round">
+    <path d="M82 111 l-4 4 a7 7 0 0 1 -10 -10 l4 -4"/>
+    <path d="M86 103 l4 -4 a7 7 0 0 1 10 10 l-4 4"/>
+    <path d="M80 113 l12 -12" stroke-width="2.6"/>
+  </g>
+  <rect x="112" y="100" width="96" height="6" rx="3" fill="#3b1a5e" opacity="0.75"/>
+  <rect x="112" y="110" width="58" height="5" rx="2.5" fill="#3b1a5e" opacity="0.3"/>
+  <rect x="226" y="94" width="50" height="26" rx="13" fill="#ef4f8f"/>
+  <path d="M244 107 h14 m-5 -5 l5 5 -5 5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M330 52 l2.4 6.6 6.6 2.4 -6.6 2.4 -2.4 6.6 -2.4 -6.6 -6.6 -2.4 6.6 -2.4z" fill="#fff6c2"/>
+</svg>

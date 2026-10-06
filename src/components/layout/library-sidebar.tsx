@@ -20,7 +20,6 @@ import { removeCollection } from "@/lib/collections";
 import { goHome, openSavedArticle } from "@/lib/navigate";
 import { useReaderStore } from "@/stores/reader-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
-import { useAgentStore } from "@/stores/agent-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useSpacesStore } from "@/stores/spaces-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -77,8 +76,6 @@ export function LibrarySidebar() {
   // The collection last clicked: it is the one whose options show.
   const [selected, setSelected] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
-  const agentStatus = useAgentStore((s) => s.status);
-  const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const settingsPage = useSpacesStore((s) => s.settingsPage);
   const setSettingsPage = useSpacesStore((s) => s.setSettingsPage);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
@@ -326,31 +323,6 @@ export function LibrarySidebar() {
         >
           Make it yours
         </Item>
-
-        <div className="mt-auto flex flex-col gap-0.5 pt-6">
-          {/* Only shown when the agent needs attention; "connected" needs no
-            text. */}
-          {agentStatus !== "ready" && (
-            <button
-              type="button"
-              onClick={() => setSetupOpen(true)}
-              className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left text-[0.75rem] outline-none focus-visible:ring-2"
-            >
-              <span
-                aria-hidden
-                className={cn(
-                  "mx-[5px] size-1.5 rounded-full",
-                  agentStatus === "checking"
-                    ? "bg-muted-foreground animate-pulse"
-                    : "bg-honey",
-                )}
-              />
-              {agentStatus === "checking"
-                ? "Checking the agent…"
-                : "Set up Explain"}
-            </button>
-          )}
-        </div>
       </nav>
     </div>
   );

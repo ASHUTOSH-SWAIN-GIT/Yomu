@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" role="img" aria-label="Collections and a note in a desert at dusk">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9a8b"/><stop offset="0.5" stop-color="#ffc48c"/><stop offset="1" stop-color="#ffe6a8"/></linearGradient>
+    <linearGradient id="d1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f08a5d"/><stop offset="1" stop-color="#c8553d"/></linearGradient>
+    <linearGradient id="d2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b83b5e"/><stop offset="1" stop-color="#6a2c70"/></linearGradient>
+    <linearGradient id="f1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f7cff"/><stop offset="1" stop-color="#3a3fd8"/></linearGradient>
+    <linearGradient id="f2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ec4b6"/><stop offset="1" stop-color="#16867c"/></linearGradient>
+    <linearGradient id="f3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1ede4"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#5a1f3c" flood-opacity="0.4"/></filter>
+  </defs>
+  <rect width="400" height="240" fill="url(#sky)"/>
+  <circle cx="90" cy="96" r="38" fill="#fff4d6" opacity="0.9"/>
+  <circle cx="90" cy="96" r="54" fill="#fff4d6" opacity="0.25"/>
+  <path d="M0 170 C80 130 150 150 220 160 S340 130 400 150 V240 H0Z" fill="url(#d1)"/>
+  <path d="M0 205 C90 180 180 196 260 200 S360 186 400 196 V240 H0Z" fill="url(#d2)"/>
+  <g filter="url(#shadow)">
+    <g transform="rotate(-8 230 130)">
+      <path d="M170 70 h40 l10 10 h74 a10 10 0 0 1 10 10 v80 a10 10 0 0 1 -10 10 h-124 a10 10 0 0 1 -10 -10 v-90 a10 10 0 0 1 10 -10z" fill="url(#f1)"/>
+    </g>
+    <g transform="rotate(4 240 140)">
+      <path d="M182 84 h40 l10 10 h74 a10 10 0 0 1 10 10 v80 a10 10 0 0 1 -10 10 h-124 a10 10 0 0 1 -10 -10 v-90 a10 10 0 0 1 10 -10z" fill="url(#f2)"/>
+    </g>
+    <rect x="196" y="108" width="118" height="80" rx="8" fill="url(#f3)"/>
+  </g>
+  <rect x="210" y="122" width="70" height="7" rx="3.5" fill="#2a2433" opacity="0.8"/>
+  <rect x="210" y="138" width="90" height="5" rx="2.5" fill="#2a2433" opacity="0.3"/>
+  <rect x="210" y="149" width="80" height="5" rx="2.5" fill="#2a2433" opacity="0.3"/>
+  <rect x="210" y="160" width="60" height="5" rx="2.5" fill="#2a2433" opacity="0.3"/>
+  <g filter="url(#shadow)" transform="rotate(8 320 80)">
+    <rect x="290" y="46" width="66" height="62" rx="4" fill="#facc15"/>
+    <path d="M290 46 h66 v10 h-66z" fill="#eab308"/>
+  </g>
+  <g transform="rotate(8 320 80)" fill="#5c4400" opacity="0.6">
+    <rect x="298" y="66" width="48" height="4" rx="2"/><rect x="298" y="76" width="40" height="4" rx="2"/><rect x="298" y="86" width="30" height="4" rx="2"/>
+  </g>
+  <path d="M150 50 l2.4 6.6 6.6 2.4 -6.6 2.4 -2.4 6.6 -2.4 -6.6 -6.6 -2.4 6.6 -2.4z" fill="#fff"/>
+</svg>
