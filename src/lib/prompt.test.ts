@@ -361,4 +361,13 @@ describe("buildInventoryPrompt", () => {
     expect(prompt).toContain("(none yet)");
     expect(prompt).toContain("No saved article text matched");
   });
+
+  it("does not limit the agent to the saved blogs", () => {
+    const prompt = buildInventoryPrompt("what is eBPF?", [], []);
+    expect(prompt).toContain("not limited to their blogs");
+    expect(prompt).toContain("never refuse");
+    // The old wording that made it decline questions the blogs don't cover.
+    expect(prompt).not.toContain("say so plainly");
+    expect(prompt).not.toContain("Answer from this material");
+  });
 });

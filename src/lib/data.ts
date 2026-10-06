@@ -14,6 +14,7 @@ import { useSpacesStore } from "@/stores/spaces-store";
 export async function clearAllChats() {
   await deleteAllChats();
   await useLibraryChatStore.getState().reset();
+  await useLibraryChatStore.getState().loadChats();
   // Reload the open blog's chat, which is now empty.
   const reader = useReaderStore.getState().state;
   await useChatStore
@@ -39,6 +40,7 @@ export async function deleteEverything() {
   }
   useReaderStore.getState().reset();
   await useLibraryChatStore.getState().reset();
+  await useLibraryChatStore.getState().loadChats();
   await useChatStore.getState().loadForArticle(null);
   useImageStore.setState({ files: {} });
   useSpacesStore.getState().reset();

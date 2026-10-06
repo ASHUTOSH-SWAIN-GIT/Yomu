@@ -5,6 +5,8 @@ import {
   Folder,
   FolderOpen,
   Home,
+  MoreHorizontal,
+  MessageCircle,
   MessageSquarePlus,
   Plus,
   SlidersHorizontal,
@@ -24,6 +26,9 @@ import { useSpacesStore } from "@/stores/spaces-store";
 import { useUiStore } from "@/stores/ui-store";
 
 const FOLDED_KEY = "yomu-sidebar-folded";
+const CHATS_FOLDED_KEY = "yomu-sidebar-chats-folded";
+/** Previous chats shown before "View all". */
+const RECENT_CHATS = 5;
 
 /** The library's navigation, on the window frame beside the page: Home, your
  * collections, the archive, and the way to add a collection. */
@@ -37,6 +42,8 @@ export function LibrarySidebar() {
   const libraryChat = useSpacesStore((s) => s.libraryChat);
   const setLibraryChat = useSpacesStore((s) => s.setLibraryChat);
   const resetChat = useLibraryChatStore((s) => s.reset);
+  const chatId = useLibraryChatStore((s) => s.chatId);
+  const liveChatId = useLibraryChatStore((s) => s.liveChatId);
   const reading = useReaderStore((s) => s.state.status === "ready");
   const readingId = useReaderStore((s) =>
     s.state.status === "ready" ? s.state.article.id : null,
@@ -101,7 +108,7 @@ export function LibrarySidebar() {
         // and slid in on hover. The shadow rides the same transition so it
         // fades with the slide. Clicking the toggle docks it full height.
         !sidebarOpen &&
-          "absolute top-11 left-2 z-30 h-fit max-h-[calc(100%-3.25rem)] rounded-md border transition-[translate,box-shadow,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[translate]",
+          "absolute top-11 bottom-2 left-2 z-30 rounded-md border transition-[translate,box-shadow,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[translate]",
         !sidebarOpen &&
           (peek
             ? "shadow-[var(--shadow-float)]"
@@ -124,7 +131,9 @@ export function LibrarySidebar() {
         Chat
       </h2>
       <Item
-        on={!reading && libraryChat}
+        on={
+          !reading && libraryChat && (chatId === null || chatId === liveChatId)
+        }
         onClick={() => {
           void resetChat();
           setLibraryChat(true);
@@ -135,6 +144,7 @@ export function LibrarySidebar() {
       >
         New chat
       </Item>
+      <PreviousChats leave={leave} />
 
       <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
         My collection
@@ -389,5 +399,134 @@ function NewFolder({ onDone }: { onDone: (name: string | null) => void }) {
         className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
       />
     </form>
+  );
+}
+
+/** The chats about the whole library you had before, newest first. Click one
+ * to open it; the open one has a trash icon. */
+function PreviousChats({ leave }: { leave: () => void }) {
+  const allChats = useLibraryChatStore((s) => s.chats);
+  const liveChatId = useLibraryChatStore((s) => s.liveChatId);
+  // The chat you are in the middle of joins the list once you move on.
+  const chats = allChats.filter((c) => c.id !== liveChatId);
+  const chatId = useLibraryChatStore((s) => s.chatId);
+  const openChat = useLibraryChatStore((s) => s.openChat);
+  const deleteChat = useLibraryChatStore((s) => s.deleteChat);
+  const libraryChat = useSpacesStore((s) => s.libraryChat);
+  const setLibraryChat = useSpacesStore((s) => s.setLibraryChat);
+  const reading = useReaderStore((s) => s.state.status === "ready");
+  const [confirming, setConfirming] = useState<string | null>(null);
+  // The whole section folds shut, like a collection does.
+  const [folded, setFolded] = useState(
+    () => readStorage(CHATS_FOLDED_KEY) === "1",
+  );
+  function toggleFolded() {
+    setFolded(!folded);
+    writeStorage(CHATS_FOLDED_KEY, folded ? "0" : "1");
+  }
+
+  const setAllChatsOpen = useUiStore((s) => s.setAllChatsOpen);
+  const shown = chats.slice(0, RECENT_CHATS);
+
+  return (
+    <div className="mt-2 flex flex-col">
+      <button
+        type="button"
+        onClick={toggleFolded}
+        aria-expanded={!folded}
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mb-0.5 flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2"
+      >
+        <ChevronRight
+          className={cn(
+            "size-3.5 transition-transform duration-[var(--dur-fast)]",
+            !folded && "rotate-90",
+          )}
+          aria-hidden
+        />
+        Previous chats
+      </button>
+      {!folded && chats.length === 0 && (
+        <p className="text-muted-foreground px-2.5 py-1 text-[0.8125rem] leading-snug">
+          Your chats will be listed here.
+        </p>
+      )}
+      <ul className={cn("flex flex-col gap-px", folded && "hidden")}>
+        {shown.map((chat) => {
+          const open = !reading && libraryChat && chatId === chat.id;
+          return (
+            <li key={chat.id} className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirming(null);
+                  void openChat(chat.id);
+                  setLibraryChat(true);
+                  leave();
+                }}
+                title={chat.title}
+                aria-current={open ? "page" : undefined}
+                className={cn(
+                  "focus-visible:ring-ring/60 flex h-[30px] w-full items-center gap-2.5 rounded-md pr-8 pl-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2",
+                  open
+                    ? "bg-accent text-foreground font-medium"
+                    : "text-foreground/80 hover:bg-accent/70 hover:text-foreground",
+                )}
+              >
+                <MessageCircle
+                  className="text-muted-foreground size-4 shrink-0"
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 truncate">{chat.title}</span>
+              </button>
+              {open && (
+                <button
+                  type="button"
+                  onClick={() => setConfirming(chat.id)}
+                  aria-label={`Delete the chat “${chat.title}”`}
+                  title="Delete this chat"
+                  className="text-muted-foreground hover:text-destructive hover:bg-background/60 focus-visible:ring-ring/60 absolute top-[5px] right-1.5 grid size-5 place-items-center rounded-sm outline-none focus-visible:ring-2"
+                >
+                  <Trash2 className="size-3.5" aria-hidden />
+                </button>
+              )}
+              {confirming === chat.id && (
+                <div className="bg-accent/60 mx-1 mt-0.5 mb-1 flex flex-col gap-2 rounded-md p-2 text-[0.75rem]">
+                  <span>Delete this chat?</span>
+                  <span className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirming(null);
+                        void deleteChat(chat.id);
+                      }}
+                      className="bg-destructive text-destructive-foreground focus-visible:ring-ring/60 h-6 rounded-md px-2.5 font-medium outline-none focus-visible:ring-2"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(null)}
+                      className="hover:bg-accent focus-visible:ring-ring/60 h-6 rounded-md px-2.5 outline-none focus-visible:ring-2"
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {!folded && chats.length > RECENT_CHATS && (
+        <button
+          type="button"
+          onClick={() => setAllChatsOpen(true)}
+          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 mt-0.5 flex h-[30px] items-center gap-2.5 rounded-md pl-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2"
+        >
+          <MoreHorizontal className="size-4 shrink-0" aria-hidden />
+          View all
+        </button>
+      )}
+    </div>
   );
 }

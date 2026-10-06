@@ -86,6 +86,12 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_6,
         },
+        Migration {
+            version: 7,
+            description: "chats with the whole library",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_7,
+        },
     ]
 }
 
@@ -173,4 +179,26 @@ pub const MIGRATION_5: &str = r#"
 /// article's card. NULL for articles saved before this migration.
 pub const MIGRATION_6: &str = r#"
     ALTER TABLE articles ADD COLUMN icon_url TEXT;
+"#;
+
+/// Chats about the whole library (the New chat page), saved so they can be
+/// listed and reopened. Separate from `chats`, which belong to one article.
+pub const MIGRATION_7: &str = r#"
+    CREATE TABLE library_chats (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE library_messages (
+        id TEXT PRIMARY KEY,
+        chat_id TEXT NOT NULL REFERENCES library_chats(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX idx_library_messages_chat ON library_messages(chat_id);
+    CREATE INDEX idx_library_chats_updated ON library_chats(updated_at);
 "#;

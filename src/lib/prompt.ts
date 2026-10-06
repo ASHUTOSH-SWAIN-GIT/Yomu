@@ -211,8 +211,18 @@ export function buildInventoryPrompt(
   passages: RelatedArticle[],
   inventory: { title: string; site: string }[],
   personalizationNotes: string[] = [],
+  /** The conversation so far, for a session that has not seen it (a saved
+   * chat reopened, or a session that had to be restarted). */
+  history: { role: "user" | "assistant"; text: string }[] = [],
 ): string {
   const MAX_LISTED = 150;
+  const earlier = history
+    .slice(-8)
+    .map(
+      (m) =>
+        `${m.role === "user" ? "Reader" : "You"}: ${m.text.slice(0, 1500)}`,
+    )
+    .join("\n");
   const listed = inventory
     .slice(0, MAX_LISTED)
     .map((a) => `- "${a.title}"${a.site ? ` (${a.site})` : ""}`)
@@ -226,7 +236,7 @@ export function buildInventoryPrompt(
       ? passages.map((r) => `- "${r.title}": ${r.snippet}`).join("\n")
       : "(No saved article text matched this message.)";
   return [
-    "You are helping a developer talk with the blogs they have saved. Below are the titles of everything they have saved, then passages from the articles that best match their latest message. Answer from this material and the conversation so far. Cite an article by its title in quotes whenever you use it, and never cite a title that is not listed. If their saved blogs do not cover something, say so plainly instead of guessing. Do not use tools, read files, or browse. Reply in Markdown.",
+    "You are a knowledgeable assistant chatting with a developer who keeps a library of saved blogs. Answer their message fully and helpfully, from your own knowledge, whatever the topic: you are not limited to their blogs, and you must never refuse or hold back an explanation because their blogs do not cover it. Below are the titles of everything they have saved, and passages from the saved articles that best match their latest message. Use them as extra context when they are relevant, and then cite the article by its title in quotes (only titles that are listed). When the blogs are not relevant, ignore them and just answer. Do not use tools, read files, or browse. Reply in Markdown.",
     "",
     `Saved articles (${inventory.length}):`,
     (listed || "(none yet)") + more,
@@ -234,8 +244,11 @@ export function buildInventoryPrompt(
     "Passages matching the latest message:",
     found,
     "",
+    earlier ? `The conversation so far:\n${earlier}\n` : null,
     [`Message: ${question}`, ...personalizationNotes].join("\n"),
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 /** Prompt for a question across the developer's saved library. The model

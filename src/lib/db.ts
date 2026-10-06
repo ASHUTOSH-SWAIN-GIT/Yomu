@@ -185,6 +185,8 @@ export async function deleteArticle(id: string): Promise<void> {
 /** Deletes every chat (and its messages and highlights) but keeps the blogs. */
 export async function deleteAllChats(): Promise<void> {
   const db = await getDb();
+  await db.execute("DELETE FROM library_messages");
+  await db.execute("DELETE FROM library_chats");
   await db.execute("DELETE FROM messages");
   await db.execute("DELETE FROM chats");
   await db.execute("DELETE FROM highlights");
@@ -194,12 +196,83 @@ export async function deleteAllChats(): Promise<void> {
 export async function deleteAllArticles(): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM articles");
+  await db.execute("DELETE FROM library_messages");
+  await db.execute("DELETE FROM library_chats");
   // In case foreign keys were not enforcing the cascade.
   await db.execute("DELETE FROM article_tags");
   await db.execute("DELETE FROM article_images");
   await db.execute("DELETE FROM messages");
   await db.execute("DELETE FROM chats");
   await db.execute("DELETE FROM highlights");
+}
+
+// ---- Chats about the whole library (migration 7) ----
+
+export interface LibraryChatSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+}
+
+export async function createLibraryChat(title: string): Promise<string> {
+  const db = await getDb();
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  await db.execute(
+    "INSERT INTO library_chats (id, title, created_at, updated_at) VALUES ($1, $2, $3, $3)",
+    [id, title, now],
+  );
+  return id;
+}
+
+/** Newest first. */
+export async function listLibraryChats(): Promise<LibraryChatSummary[]> {
+  const db = await getDb();
+  const rows = await db.select<
+    { id: string; title: string; updated_at: number }[]
+  >("SELECT id, title, updated_at FROM library_chats ORDER BY updated_at DESC");
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function listLibraryMessages(
+  chatId: string,
+): Promise<{ role: "user" | "assistant"; text: string }[]> {
+  const db = await getDb();
+  const rows = await db.select<{ role: string; content: string }[]>(
+    "SELECT role, content FROM library_messages WHERE chat_id = $1 ORDER BY created_at, rowid",
+    [chatId],
+  );
+  return rows.map((r) => ({
+    role: r.role === "assistant" ? "assistant" : "user",
+    text: r.content,
+  }));
+}
+
+export async function addLibraryMessage(
+  chatId: string,
+  role: "user" | "assistant",
+  text: string,
+): Promise<void> {
+  const db = await getDb();
+  const now = Date.now();
+  await db.execute(
+    "INSERT INTO library_messages (id, chat_id, role, content, created_at) VALUES ($1, $2, $3, $4, $5)",
+    [crypto.randomUUID(), chatId, role, text, now],
+  );
+  await db.execute("UPDATE library_chats SET updated_at = $2 WHERE id = $1", [
+    chatId,
+    now,
+  ]);
+}
+
+export async function deleteLibraryChat(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM library_messages WHERE chat_id = $1", [id]);
+  await db.execute("DELETE FROM library_chats WHERE id = $1", [id]);
 }
 
 // Chats, highlights and messages (M5). One chat per article, which maps to

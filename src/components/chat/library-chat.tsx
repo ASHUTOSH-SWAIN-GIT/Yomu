@@ -64,7 +64,8 @@ export function LibraryChat() {
 
   const context = (
     <p className="text-muted-foreground text-center text-[0.75rem]">
-      Answers use your {count} saved {count === 1 ? "article" : "articles"}.
+      Can also draw on your {count} saved {count === 1 ? "article" : "articles"}
+      .
     </p>
   );
 

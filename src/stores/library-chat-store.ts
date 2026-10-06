@@ -3,7 +3,15 @@ import { agentCancel, agentNewSession, agentPrompt } from "@/lib/commands";
 import { onAgentEvent } from "@/lib/agent-events";
 import { applyChosenModel } from "@/lib/models";
 import { classifyError, type ChatError } from "@/lib/chat-errors";
-import { inventoryPassages } from "@/lib/db";
+import {
+  addLibraryMessage,
+  createLibraryChat,
+  deleteLibraryChat,
+  inventoryPassages,
+  listLibraryChats,
+  listLibraryMessages,
+  type LibraryChatSummary,
+} from "@/lib/db";
 import { explainPrefInstructions } from "@/lib/explain-prefs";
 import { logError } from "@/lib/log";
 import { buildInventoryPrompt } from "@/lib/prompt";
@@ -17,11 +25,22 @@ export interface LibraryMessage {
 }
 
 interface LibraryChatStore {
+  /** The saved chat on screen; null for a new one that has no message yet. */
+  chatId: string | null;
+  /** The chat started in this visit and still on screen. It stays out of the
+   * "Previous chats" list until you move on to another chat. */
+  liveChatId: string | null;
+  /** Every saved chat, newest first, for the sidebar. */
+  chats: LibraryChatSummary[];
+  loadChats: () => Promise<void>;
+  /** Opens a saved chat. */
+  openChat: (id: string) => Promise<void>;
+  deleteChat: (id: string) => Promise<void>;
   messages: LibraryMessage[];
   streaming: boolean;
   error: ChatError | null;
-  /** Live ACP session. Not saved: a universal chat lives until you start a
-   * new one or quit. */
+  /** Live ACP session. Not saved: a reopened chat starts a new session and
+   * is given what was said so far. */
   sessionId: string | null;
   ask: (text: string) => Promise<void>;
   /** Re-sends the last question after an error. */
@@ -57,9 +76,17 @@ export const useLibraryChatStore = create<LibraryChatStore>((set, get) => {
           return { messages };
         });
         break;
-      case "done":
+      case "done": {
         set({ streaming: false });
+        const { chatId, messages } = get();
+        const last = messages[messages.length - 1];
+        if (chatId && last?.role === "assistant" && last.text) {
+          void addLibraryMessage(chatId, "assistant", last.text)
+            .then(() => get().loadChats())
+            .catch((err) => logError("saving the reply failed", err));
+        }
         break;
+      }
       case "permission_request":
         set({
           error: {
@@ -77,6 +104,9 @@ export const useLibraryChatStore = create<LibraryChatStore>((set, get) => {
     set({ streaming: true, error: null });
     try {
       let sessionId = get().sessionId;
+      // A session that has not been in this conversation is told what was
+      // said so far (a reopened chat, or one that had to be restarted).
+      const history = sessionId ? [] : get().messages.slice(0, -1);
       if (!sessionId) {
         sessionId = await agentNewSession();
         await applyChosenModel(sessionId);
@@ -99,6 +129,7 @@ export const useLibraryChatStore = create<LibraryChatStore>((set, get) => {
           passages,
           inventory,
           explainPrefInstructions(useUiStore.getState().explainPrefs),
+          history,
         ),
       );
     } catch (err) {
@@ -126,6 +157,9 @@ export const useLibraryChatStore = create<LibraryChatStore>((set, get) => {
   }
 
   return {
+    chatId: null,
+    liveChatId: null,
+    chats: [],
     messages: [],
     streaming: false,
     error: null,
@@ -137,6 +171,19 @@ export const useLibraryChatStore = create<LibraryChatStore>((set, get) => {
       set((s) => ({
         messages: [...s.messages, { role: "user", text: question }],
       }));
+      // The first message makes the chat, named after what was asked. A
+      // failure to save must not stop the question from being answered.
+      try {
+        let chatId = get().chatId;
+        if (!chatId) {
+          chatId = await createLibraryChat(question.slice(0, 60));
+          set({ chatId, liveChatId: chatId });
+        }
+        await addLibraryMessage(chatId, "user", question);
+        void get().loadChats();
+      } catch (err) {
+        logError("saving the chat failed", err);
+      }
       await run(question);
     },
 
@@ -154,11 +201,56 @@ export const useLibraryChatStore = create<LibraryChatStore>((set, get) => {
       );
     },
 
+    async loadChats() {
+      try {
+        set({ chats: await listLibraryChats() });
+      } catch (err) {
+        logError("listing chats failed", err);
+      }
+    },
+
+    async openChat(id) {
+      if (get().chatId === id) return;
+      epoch += 1;
+      lastQuestion = null;
+      const { sessionId, streaming } = get();
+      if (sessionId && streaming) {
+        await agentCancel(sessionId).catch((err) =>
+          logError("cancel failed", err),
+        );
+      }
+      try {
+        const messages = await listLibraryMessages(id);
+        set({
+          chatId: id,
+          liveChatId: null,
+          messages,
+          streaming: false,
+          error: null,
+          sessionId: null,
+        });
+      } catch (err) {
+        logError("opening the chat failed", err);
+      }
+    },
+
+    async deleteChat(id) {
+      try {
+        await deleteLibraryChat(id);
+      } catch (err) {
+        logError("deleting the chat failed", err);
+      }
+      if (get().chatId === id) await get().reset();
+      await get().loadChats();
+    },
+
     async reset() {
       epoch += 1;
       lastQuestion = null;
       const { sessionId, streaming } = get();
       set({
+        chatId: null,
+        liveChatId: null,
         messages: [],
         streaming: false,
         error: null,

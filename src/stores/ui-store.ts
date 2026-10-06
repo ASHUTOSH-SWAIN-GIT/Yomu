@@ -77,6 +77,9 @@ interface UiState {
   /** `save` writes it down, for the end of a drag (not every move). */
   setChatWidth: (width: number, save?: boolean) => void;
   /** The Codex setup checklist dialog. */
+  /** The dialog listing every chat with the library. */
+  allChatsOpen: boolean;
+  setAllChatsOpen: (open: boolean) => void;
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
   /** Skill level and code-example preference, applied to every explain
@@ -150,6 +153,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAnswerOpen: (answerOpen) => set({ answerOpen }),
   answerFocus: null,
   setAnswerFocus: (answerFocus) => set({ answerFocus }),
+  allChatsOpen: false,
+  setAllChatsOpen: (allChatsOpen) => set({ allChatsOpen }),
   setupOpen: false,
   setSetupOpen: (setupOpen) => set({ setupOpen }),
   explainPrefs: parseExplainPrefs(read(EXPLAIN_PREFS_KEY)),

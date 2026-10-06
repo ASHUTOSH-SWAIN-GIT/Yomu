@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Popover,
@@ -37,6 +37,12 @@ export function ModelPicker() {
   const [query, setQuery] = useState("");
   // Providers the user opened or folded by hand; the rest follow the default.
   const [toggled, setToggled] = useState<Set<string>>(new Set());
+
+  // A model picked earlier shows by its name, so the list is asked for once
+  // on screen, not only when the menu is opened.
+  useEffect(() => {
+    if (chosen) void load();
+  }, [chosen, load]);
 
   const sections = useMemo(() => groupModels(models ?? []), [models]);
   const total = sections.reduce((n, s) => n + s.entries.length, 0);

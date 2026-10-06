@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { AllChatsDialog } from "@/components/layout/all-chats-dialog";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { ReaderView } from "@/components/layout/reader-view";
@@ -11,6 +12,7 @@ import { goHome } from "@/lib/navigate";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { shortcutFor } from "@/lib/shortcuts";
 import { useAgentStore } from "@/stores/agent-store";
+import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
@@ -36,6 +38,7 @@ export function AppShell() {
   useEffect(() => {
     void refreshLibrary();
     void refreshAgent();
+    void useLibraryChatStore.getState().loadChats();
   }, [refreshLibrary, refreshAgent]);
 
   // Every space (tag) keeps a stable colour.
@@ -88,6 +91,7 @@ export function AppShell() {
       </div>
 
       <CommandPalette />
+      <AllChatsDialog />
       <SetupDialog />
 
       {focusMode && (
