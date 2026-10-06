@@ -265,14 +265,6 @@ describe("askAbout", () => {
     expect(useChatStore.getState().messages[0].text).toBe("Explain this");
   });
 
-  it("opens the answer sheet", async () => {
-    const { useUiStore } = await import("@/stores/ui-store");
-    useUiStore.getState().setAnswerOpen(false);
-    agentReplies("x");
-    await useChatStore.getState().askAbout(article, selection, "why?");
-    expect(useUiStore.getState().answerOpen).toBe(true);
-  });
-
   it("regenerating an asked question re-asks the same question", async () => {
     agentReplies("first");
     await useChatStore
@@ -677,14 +669,9 @@ describe("article questions", () => {
     expect(useChatStore.getState().messages[0].text).toBe("Quiz me");
   });
 
-  it("opens the sheet and ignores an empty question", async () => {
-    const { useUiStore } = await import("@/stores/ui-store");
-    useUiStore.getState().setAnswerOpen(false);
+  it("ignores an empty question", async () => {
     await useChatStore.getState().askArticle(article, "   ");
     expect(commands.agentPrompt).not.toHaveBeenCalled();
-    agentReplies("x");
-    await useChatStore.getState().askArticle(article, "why?");
-    expect(useUiStore.getState().answerOpen).toBe(true);
   });
 
   it("regenerating re-asks the same article question with the article", async () => {

@@ -50,19 +50,9 @@ interface UiState {
   /** The command palette (Cmd/Ctrl+K). */
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
-  /** True while the reader is wide enough to show answers in its margin;
-   * the answer sheet above the Ask bar is only used when it is not. */
   /** The article title has scrolled out of view (the top bar shows it). */
   pastTitle: boolean;
   setPastTitle: (past: boolean) => void;
-  notesInMargin: boolean;
-  setNotesInMargin: (on: boolean) => void;
-  /** The answer sheet above the Ask bar (Cmd/Ctrl+J). */
-  answerOpen: boolean;
-  setAnswerOpen: (open: boolean) => void;
-  /** Which highlight's answer the sheet shows; null means the latest. */
-  answerFocus: string | null;
-  setAnswerFocus: (highlightId: string | null) => void;
   /** The chat panel on the right of an article. */
   chatOpen: boolean;
   setChatOpen: (open: boolean) => void;
@@ -147,12 +137,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatFull: (chatFull) => set({ chatFull }),
   chatOpen: false,
   setChatOpen: (chatOpen) => set({ chatOpen }),
-  notesInMargin: false,
-  setNotesInMargin: (notesInMargin) => set({ notesInMargin }),
-  answerOpen: false,
-  setAnswerOpen: (answerOpen) => set({ answerOpen }),
-  answerFocus: null,
-  setAnswerFocus: (answerFocus) => set({ answerFocus }),
   allChatsOpen: false,
   setAllChatsOpen: (allChatsOpen) => set({ allChatsOpen }),
   setupOpen: false,

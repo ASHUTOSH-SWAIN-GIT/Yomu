@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/log", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/commands", () => ({
   cacheImages: vi.fn(),
+  cachedImageNames: vi.fn(),
   imageCacheDir: vi.fn(),
   scrapeUrl: vi.fn(),
   canonicalizeUrl: vi.fn(),
@@ -36,6 +37,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   useUiStore.setState({ blockRemoteImages: false });
   m(commands.imageCacheDir).mockResolvedValue("/data/images");
+  m(commands.cachedImageNames).mockResolvedValue(["aaa.png", "a.png", "b.png"]);
   m(db.getArticleImages).mockResolvedValue({});
   m(db.saveArticleImages).mockResolvedValue(undefined);
   await useImageStore.getState().sync(null);
@@ -68,6 +70,18 @@ describe("image store sync", () => {
     await useImageStore.getState().sync(article);
     expect(m(commands.cacheImages).mock.calls[0][0]).toEqual([
       "https://example.dev/rel.png",
+    ]);
+  });
+
+  it("downloads again an image that was cleared from the cache folder", async () => {
+    m(db.getArticleImages).mockResolvedValue({
+      "https://cdn.x/a.png": "gone.png",
+      "https://example.dev/rel.png": "b.png",
+    });
+    m(commands.cacheImages).mockResolvedValue(["new.png"]);
+    await useImageStore.getState().sync(article);
+    expect(m(commands.cacheImages).mock.calls[0][0]).toEqual([
+      "https://cdn.x/a.png",
     ]);
   });
 

@@ -3,6 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { BlockRenderer } from "@/components/reader/block-renderer";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatResizeHandle } from "@/components/chat/chat-resize-handle";
+import { commentLayout } from "@/lib/reader-layout";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
@@ -84,7 +85,11 @@ export function ReaderView() {
 
 /** A thin line along the top of the page that fills as you read down. It
  * writes the width straight to the element, so scrolling re-renders nothing. */
-function ScrollBar({ scrollRef }: { scrollRef: RefObject<HTMLElement | null> }) {
+function ScrollBar({
+  scrollRef,
+}: {
+  scrollRef: RefObject<HTMLElement | null>;
+}) {
   const bar = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -107,13 +112,6 @@ function ScrollBar({ scrollRef }: { scrollRef: RefObject<HTMLElement | null> }) 
     </div>
   );
 }
-
-/** Room needed to the right of the article box for a comment: its width
- * (16rem) and a little air. The comment starts where the box ends, since the
- * gap to the text is the box's own padding. */
-const COMMENT_ROOM = 272;
-/** The least the article keeps on its left when it moves aside for them. */
-const MIN_LEFT = 16;
 
 function Article({
   article,
@@ -151,13 +149,7 @@ function Article({
     const el = articleRef.current;
     if (!scroller || !el) return;
     const measure = () => {
-      const room = scroller.clientWidth - el.offsetWidth;
-      const next =
-        room >= 2 * COMMENT_ROOM
-          ? { beside: true, left: null }
-          : room >= COMMENT_ROOM + MIN_LEFT
-            ? { beside: true, left: Math.round(room - COMMENT_ROOM) }
-            : { beside: false, left: null };
+      const next = commentLayout(scroller.clientWidth - el.offsetWidth);
       setLayout((prev) =>
         prev.beside === next.beside && prev.left === next.left ? prev : next,
       );

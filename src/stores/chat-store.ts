@@ -300,12 +300,6 @@ export const useChatStore = create<ChatStore>((set, get) => {
     question?: string,
   ) {
     if (get().streaming) return;
-    // The answer is written in the margin when there is room for one; only
-    // a narrow window shows it in the sheet above the bar.
-    if (!useUiStore.getState().notesInMargin) {
-      useUiStore.getState().setAnswerOpen(true);
-    }
-    useUiStore.getState().setAnswerFocus(null);
 
     const chat = await chatFor(article);
     const highlight = await addHighlight({
@@ -567,8 +561,6 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const chat = await chatFor(article);
       await addMessage(chat.id, "user", question, null, "article");
       turnScope = "article";
-      useUiStore.getState().setAnswerOpen(true);
-      useUiStore.getState().setAnswerFocus(null);
       set((s) => ({
         chat,
         messages: [
@@ -591,8 +583,6 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const chat = await chatFor(article);
       await addMessage(chat.id, "user", question, null, "library");
       turnScope = "library";
-      useUiStore.getState().setAnswerOpen(true);
-      useUiStore.getState().setAnswerFocus(null);
       set((s) => ({
         chat,
         messages: [

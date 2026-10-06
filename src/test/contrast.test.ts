@@ -3,14 +3,16 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { THEMES } from "@/lib/themes";
 
-// Reads the real design tokens from index.css, so changing a colour there
+// Reads the real design tokens from index.css and themes.css, so changing a colour there
 // re-checks accessibility for the theme (WCAG 2.x contrast ratios).
 
-const css = readFileSync(new URL("../index.css", import.meta.url), "utf8");
+const css = ["../index.css", "../themes.css"]
+  .map((f) => readFileSync(new URL(f, import.meta.url), "utf8"))
+  .join("\n");
 
 function tokensIn(selector: string): Record<string, string> {
   const start = css.indexOf(`\n${selector} {`);
-  if (start < 0) throw new Error(`no ${selector} block in index.css`);
+  if (start < 0) throw new Error(`no ${selector} block in index.css or themes.css`);
   const body = css.slice(start, css.indexOf("\n}", start));
   const tokens: Record<string, string> = {};
   for (const m of body.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {

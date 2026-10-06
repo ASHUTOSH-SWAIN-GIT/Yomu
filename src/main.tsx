@@ -8,6 +8,7 @@ import "@fontsource-variable/inter/wght-italic.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "./index.css";
+import "./themes.css";
 import { logUncaughtErrors } from "./lib/log";
 import { usesOverlayTitleBar } from "./lib/platform";
 

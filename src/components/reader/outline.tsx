@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { currentHeadingIndex } from "@/lib/reader-layout";
 import { cn } from "@/lib/utils";
 import type { Block } from "@/types/article";
 
@@ -36,13 +37,14 @@ export function Outline({
     const scroller = scrollRef.current;
     if (!scroller) return;
     const update = () => {
-      const top = scroller.getBoundingClientRect().top + OFFSET;
-      let found = 0;
-      headings.forEach((h, i) => {
-        const el = blockEl(h.index);
-        if (el && el.getBoundingClientRect().top <= top) found = i;
-      });
-      setCurrent(found);
+      setCurrent(
+        currentHeadingIndex(
+          headings.map(
+            (h) => blockEl(h.index)?.getBoundingClientRect().top ?? null,
+          ),
+          scroller.getBoundingClientRect().top + OFFSET,
+        ),
+      );
     };
     update();
     scroller.addEventListener("scroll", update, { passive: true });
