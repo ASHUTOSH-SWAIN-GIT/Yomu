@@ -6,6 +6,7 @@ import { ChatResizeHandle } from "@/components/chat/chat-resize-handle";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
+import { Outline } from "@/components/reader/outline";
 import { AddCommentButton, BlockComments } from "@/components/reader/comments";
 import { useCommentHighlights } from "@/hooks/use-comment-highlights";
 import { useCommentSelection } from "@/hooks/use-comment-selection";
@@ -36,16 +37,18 @@ export function ReaderView() {
 
   return (
     <div ref={rowRef} className="flex h-full">
-      <main
-        ref={scrollRef}
-        className="flex h-full min-w-0 flex-1 flex-col overflow-y-auto"
-      >
-        {state.status === "ready" ? (
-          <Article article={state.article} scrollRef={scrollRef} />
-        ) : (
-          <Home />
+      <div className="relative h-full min-w-0 flex-1">
+        <main ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
+          {state.status === "ready" ? (
+            <Article article={state.article} scrollRef={scrollRef} />
+          ) : (
+            <Home />
+          )}
+        </main>
+        {state.status === "ready" && !focusMode && (
+          <Outline blocks={state.article.blocks} scrollRef={scrollRef} />
         )}
-      </main>
+      </div>
       {state.status === "ready" && (
         // Always mounted so it can slide: the wrapper's width animates from
         // nothing to the panel width (or the whole page) and back.

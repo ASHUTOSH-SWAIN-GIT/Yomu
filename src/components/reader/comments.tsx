@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
-import { ArrowUp, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
+import { ArrowUp, MessageSquareText, Pencil, Trash2 } from "lucide-react";
 import type { CommentSelection } from "@/hooks/use-comment-selection";
 import { rangeOfWords } from "@/hooks/use-comment-highlights";
+import { cn } from "@/lib/utils";
 import { useCommentsStore } from "@/stores/comments-store";
 import type { Comment } from "@/types/library";
 
@@ -40,7 +41,7 @@ export function AddCommentButton({
         }}
         className="hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-[0.8125rem] outline-none focus-visible:ring-2 [&>svg]:size-3.5"
       >
-        <MessageSquarePlus aria-hidden />
+        <MessageSquareText aria-hidden />
         Add comment
       </button>
     </div>,
@@ -115,14 +116,28 @@ function CommentCard({ comment }: { comment: Comment }) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const showActions = !editing && (hovered || focused);
+  // Pointing at the words or at the card links them: the card slides toward
+  // the text, and the words get a slightly stronger wash.
+  const active = useCommentsStore((s) => s.activeId === comment.id);
+  const setActive = useCommentsStore((s) => s.setActive);
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      data-comment-card
+      onMouseEnter={() => {
+        setHovered(true);
+        setActive(comment.id);
+      }}
+      onMouseLeave={() => {
+        setHovered(false);
+        setActive(null);
+      }}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
-      className="border-border bg-card relative rounded-xl border px-3.5 py-3 text-[0.875rem] leading-relaxed"
+      className={cn(
+        "border-border bg-card relative rounded-xl border px-3.5 py-3 text-[0.875rem] leading-relaxed transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+        active && "-translate-x-3",
+      )}
     >
       <p className="font-medium">You</p>
       {editing ? (
@@ -138,7 +153,7 @@ function CommentCard({ comment }: { comment: Comment }) {
         <p className="mt-0.5 whitespace-pre-wrap">{comment.note}</p>
       )}
       {showActions && (
-        <span className="bg-card border-border absolute top-2 right-2 flex gap-0.5 rounded-lg border p-0.5 shadow-sm">
+        <span className="absolute top-2.5 right-2.5 flex gap-0.5">
           <IconButton
             label="Edit comment"
             onClick={() => setEditing(comment.id)}

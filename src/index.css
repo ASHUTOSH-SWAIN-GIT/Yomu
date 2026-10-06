@@ -91,10 +91,12 @@
    (dark themes get the softer wash). */
 :root {
   --comment-mark: rgb(250 204 21 / 0.4);
+  --comment-mark-active: rgb(250 204 21 / 0.47);
   --comment-line: #d9a400;
 }
 html.dark {
   --comment-mark: rgb(250 204 21 / 0.26);
+  --comment-mark-active: rgb(250 204 21 / 0.31);
   --comment-line: #facc15;
 }
 
@@ -351,6 +353,16 @@ html.dark {
    written about): a soft wash and an underline. */
 ::highlight(yomu-comment) {
   background-color: var(--comment-mark);
+  text-decoration: underline;
+  text-decoration-color: var(--comment-line);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+}
+
+/* The commented words you are pointing at (or whose comment you are
+   pointing at): a stronger wash. */
+::highlight(yomu-comment-active) {
+  background-color: var(--comment-mark-active);
   text-decoration: underline;
   text-decoration-color: var(--comment-line);
   text-decoration-thickness: 2px;

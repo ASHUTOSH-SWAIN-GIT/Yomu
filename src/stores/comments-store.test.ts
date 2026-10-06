@@ -81,4 +81,18 @@ describe("comments", () => {
     expect(store().items).toEqual([]);
     expect(h.rows).toEqual([]);
   });
+
+  it("tracks the comment being pointed at, and forgets it when it is deleted", async () => {
+    store().startDraft(draft);
+    await store().saveDraft("x");
+    const id = store().items[0].id;
+    store().setActive(id);
+    expect(store().activeId).toBe(id);
+    store().setActive(null);
+    expect(store().activeId).toBeNull();
+
+    store().setActive(id);
+    await store().remove(id);
+    expect(store().activeId).toBeNull();
+  });
 });

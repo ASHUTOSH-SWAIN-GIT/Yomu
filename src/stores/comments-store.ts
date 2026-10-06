@@ -21,6 +21,9 @@ interface CommentsStore {
   items: Comment[];
   draft: Draft | null;
   editingId: string | null;
+  /** The comment being pointed at: its words and its card react together. */
+  activeId: string | null;
+  setActive: (id: string | null) => void;
   load: (articleId: string) => Promise<void>;
   startDraft: (draft: Draft) => void;
   cancelDraft: () => void;
@@ -35,9 +38,14 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
   items: [],
   draft: null,
   editingId: null,
+  activeId: null,
+
+  setActive(activeId) {
+    if (get().activeId !== activeId) set({ activeId });
+  },
 
   async load(articleId) {
-    set({ articleId, items: [], draft: null, editingId: null });
+    set({ articleId, items: [], draft: null, editingId: null, activeId: null });
     try {
       const items = await listComments(articleId);
       if (get().articleId === articleId) set({ items });
@@ -92,6 +100,7 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
       set((s) => ({
         items: s.items.filter((c) => c.id !== id),
         editingId: s.editingId === id ? null : s.editingId,
+        activeId: s.activeId === id ? null : s.activeId,
       }));
     } catch (err) {
       logError("deleting the comment failed", err);
