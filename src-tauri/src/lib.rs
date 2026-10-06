@@ -31,6 +31,13 @@ async fn cache_images(
     imgcache::cache_images(&client, &imgcache::images_dir(&app)?, &urls).await
 }
 
+/// Names of the files in the image cache, so the reader can tell which of an
+/// article's saved images were since cleared out to keep the cache small.
+#[tauri::command]
+fn cached_image_names(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    Ok(imgcache::list_names(&imgcache::images_dir(&app)?))
+}
+
 /// Absolute path of the image cache directory (created if missing).
 #[tauri::command]
 async fn image_cache_dir(app: tauri::AppHandle) -> Result<String, String> {
@@ -253,6 +260,7 @@ pub fn run() {
             canonicalize_url,
             cache_images,
             image_cache_dir,
+            cached_image_names,
             prune_images,
             storage_info,
             agent_diagnose,

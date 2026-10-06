@@ -45,6 +45,7 @@ export function ReaderView() {
             <Home />
           )}
         </main>
+        {state.status === "ready" && <ScrollBar scrollRef={scrollRef} />}
         {state.status === "ready" && !focusMode && (
           <Outline blocks={state.article.blocks} scrollRef={scrollRef} />
         )}
@@ -77,6 +78,32 @@ export function ReaderView() {
           <ChatPanel />
         </div>
       )}
+    </div>
+  );
+}
+
+/** A thin line along the top of the page that fills as you read down. It
+ * writes the width straight to the element, so scrolling re-renders nothing. */
+function ScrollBar({ scrollRef }: { scrollRef: RefObject<HTMLElement | null> }) {
+  const bar = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => {
+      const max = el.scrollHeight - el.clientHeight;
+      if (bar.current)
+        bar.current.style.width = `${max > 0 ? (el.scrollTop / max) * 100 : 0}%`;
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    return () => el.removeEventListener("scroll", update);
+  }, [scrollRef]);
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5"
+    >
+      <div ref={bar} className="bg-honey h-full w-0 rounded-r-full" />
     </div>
   );
 }

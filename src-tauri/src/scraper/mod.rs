@@ -229,6 +229,18 @@ fn extract(
         return Err(ScrapeError::ExtractionFailed);
     }
     drop_repeated_title(&mut blocks, &title);
+    // The preview just stops where the paywall begins; say so, or it looks
+    // like a failed scrape.
+    if paywall::has_gate(&original_document) {
+        blocks.push(Block::Quote {
+            spans: vec![blocks::Span {
+                italic: true,
+                ..blocks::Span::plain(
+                    "Preview only: the rest of this article is for paid subscribers.".into(),
+                )
+            }],
+        });
+    }
 
     // JSON-LD is more often accurate than guessed meta tags; only fall back
     // to those when a page has no (or incomplete) structured data.

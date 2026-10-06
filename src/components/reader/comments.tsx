@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { RefObject } from "react";
 import {
   ArrowUp,
+  Copy,
   MessageSquareText,
   Pencil,
   Sparkles,
@@ -20,7 +21,8 @@ import type { Comment, StoredArticle } from "@/types/library";
 const buttonClass =
   "hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-[0.8125rem] outline-none focus-visible:ring-2 [&>svg]:size-3.5";
 
-/** What is offered over selected text: ask the agent about it, or comment. */
+/** What is offered over selected text: ask the agent about it, comment, or
+ * copy it. */
 export function AddCommentButton({
   article,
   selection,
@@ -83,6 +85,18 @@ export function AddCommentButton({
       >
         <MessageSquareText aria-hidden />
         Add comment
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard.writeText(anchor.quote);
+          window.getSelection()?.removeAllRanges();
+          onDone();
+        }}
+        className={buttonClass}
+      >
+        <Copy aria-hidden />
+        Copy
       </button>
     </div>,
     document.body,

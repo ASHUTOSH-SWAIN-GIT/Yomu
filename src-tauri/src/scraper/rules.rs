@@ -32,6 +32,7 @@ const RULES: &[(&str, TitleSource)] = &[
     (".md-content__inner", TitleSource::ContentH1),  // MkDocs Material
     (".td-content", TitleSource::ContentH1),         // Hugo Docsy (kubernetes.io)
     ("#article-body", TitleSource::PageH1),          // dev.to
+    ("#mw-content-text .mw-parser-output", TitleSource::PageH1), // Wikipedia / MediaWiki
     ("#mdbook-content main, #content main", TitleSource::TitleTag), // mdBook
 ];
 

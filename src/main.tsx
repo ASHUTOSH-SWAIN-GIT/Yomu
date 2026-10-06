@@ -8,7 +8,10 @@ import "@fontsource-variable/inter/wght-italic.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "./index.css";
+import { logUncaughtErrors } from "./lib/log";
 import { usesOverlayTitleBar } from "./lib/platform";
+
+logUncaughtErrors();
 
 // Before the first paint, so the sidebar never jumps when the title bar loads.
 if (usesOverlayTitleBar())

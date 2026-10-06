@@ -109,8 +109,32 @@ fn walk_children(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block
 
 fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>) {
     let tag = el.value().name();
+    if is_wiki_furniture(el) {
+        return;
+    }
 
     match tag {
+        // The row of tab buttons: its labels are repeated above each panel.
+        _ if el.value().attr("role") == Some("tablist") => {}
+        _ if el.value().attr("role") == Some("tabpanel") => {
+            if let Some(label) = tab_label(el) {
+                blocks.push(Block::Paragraph {
+                    spans: vec![Span {
+                        bold: true,
+                        ..Span::plain(label)
+                    }],
+                });
+            }
+            let before = blocks.len();
+            walk_children(el, base, blocks);
+            if blocks.len() == before {
+                // A panel holding bare text, with no paragraph around it.
+                let spans = collect_spans(el);
+                if spans.iter().any(|s| !s.text.trim().is_empty()) {
+                    blocks.push(Block::Paragraph { spans });
+                }
+            }
+        }
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             let level = tag[1..].parse().unwrap_or(2);
             let text = clean_heading(&collect_text(el));
@@ -151,7 +175,7 @@ fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>
                 .filter_map(ElementRef::wrap)
                 .find(|c| c.value().name() == "code")
                 .unwrap_or(el);
-            let content = collect_text(code_el);
+            let content = code_text(code_el);
             if !content.trim().is_empty() {
                 let declared = code_el
                     .value()
@@ -203,6 +227,7 @@ fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>
                 });
             }
         }
+        "div" if admonition(el, blocks) => {}
         // Containers: recurse without emitting a block of their own.
         "div" | "section" | "article" | "figure" | "main" | "body" | "html" | "span" => {
             walk_children(el, base, blocks);
@@ -245,10 +270,40 @@ fn collect_list_items(list: ElementRef, depth: u8, items: &mut Vec<ListItem>) {
 }
 
 fn cell_text(cell: ElementRef) -> String {
-    collect_text(cell)
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
+    // List items and line breaks inside a cell become ", ", or they run
+    // together ("concurrentfunctional").
+    let mut text = String::new();
+    for node in cell.descendants() {
+        match node.value() {
+            Node::Text(t)
+                if !node
+                    .parent()
+                    .and_then(|p| p.value().as_element())
+                    .is_some_and(|e| matches!(e.name(), "style" | "script")) =>
+            {
+                text.push_str(t)
+            }
+            Node::Element(e) if matches!(e.name(), "li" | "br") => text.push(','),
+            _ => {}
+        }
+    }
+    let words = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Commas from adjacent breaks and item ends: ", ," and a leading comma.
+    let parts: Vec<&str> = words
+        .split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
+    // Real commas in the text are split too; only rejoin when we added some.
+    if cell
+        .descendants()
+        .filter_map(ElementRef::wrap)
+        .any(|e| matches!(e.value().name(), "li" | "br"))
+    {
+        parts.join(", ")
+    } else {
+        words
+    }
 }
 
 /// Turns a `table` into a header plus rows of plain text cells. The header
@@ -270,6 +325,19 @@ fn table_block(table: ElementRef) -> Option<Block> {
         }
         let is_header = cells.iter().all(|c| c.value().name() == "th");
         rows.push((is_header, cells.into_iter().map(cell_text).collect()));
+    }
+
+    // An infobox is label/value pairs. Its title row, picture and section
+    // labels have one cell and say nothing the page does not already show.
+    if table
+        .value()
+        .attr("class")
+        .is_some_and(|c| c.split_whitespace().any(|c| c == "infobox"))
+    {
+        rows.retain(|(_, cells)| cells.len() >= 2 && cells.iter().any(|c| !c.is_empty()));
+        for row in &mut rows {
+            row.0 = false;
+        }
     }
 
     let header = match rows.first() {
@@ -296,9 +364,130 @@ pub(super) fn trim_trailing_newlines(mut spans: Vec<Span>) -> Vec<Span> {
     spans
 }
 
+/// Parts of a MediaWiki page that are not the article: edit links, citation
+/// marks like "[1]", page notices, navigation boxes and the contents box.
+fn is_wiki_furniture(el: ElementRef) -> bool {
+    const CLASSES: &[&str] = &[
+        "mw-editsection",
+        "reference",
+        "hatnote",
+        "navbox",
+        "navbox-styles",
+        "vertical-navbox",
+        "sistersitebox",
+        "ambox",
+        "toc",
+        "reflist",
+        "mw-empty-elt",
+        "noprint",
+        "metadata",
+    ];
+    el.value()
+        .attr("class")
+        .is_some_and(|c| c.split_whitespace().any(|c| CLASSES.contains(&c)))
+}
+
+/// The text of a code block. Some highlighters (Docusaurus) end each line
+/// with a `<br>` instead of a newline character, so those count as one.
+fn code_text(el: ElementRef) -> String {
+    let mut out = String::new();
+    for node in el.descendants() {
+        match node.value() {
+            Node::Text(text) => out.push_str(text),
+            Node::Element(e) if e.name() == "br" => out.push('\n'),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// The label of the tab a `tabpanel` belongs to, found in the tab list that
+/// sits beside the panels (the nth panel goes with the nth tab).
+fn tab_label(panel: ElementRef) -> Option<String> {
+    let panels = panel.parent()?;
+    let index = panels
+        .children()
+        .filter_map(ElementRef::wrap)
+        .filter(|e| e.value().attr("role") == Some("tabpanel"))
+        .position(|e| e == panel)?;
+    // The list is a sibling of the panels, or of the wrapper around them.
+    let list = panels
+        .ancestors()
+        .take(3)
+        .filter_map(ElementRef::wrap)
+        .find_map(|a| {
+            a.children()
+                .filter_map(ElementRef::wrap)
+                .find(|c| c.value().attr("role") == Some("tablist"))
+        })?;
+    let tab = list
+        .descendants()
+        .filter_map(ElementRef::wrap)
+        .filter(|e| e.value().attr("role") == Some("tab"))
+        .nth(index)?;
+    let label = cell_text(tab);
+    (!label.is_empty()).then_some(label)
+}
+
+/// A docs callout (Docusaurus "note", "tip", ...): a quote that starts with
+/// its bold title. Returns false when `el` is not one.
+fn admonition(el: ElementRef, blocks: &mut Vec<Block>) -> bool {
+    let has_class = |e: &ElementRef, name: &str| {
+        e.value()
+            .attr("class")
+            .is_some_and(|c| c.split_whitespace().any(|c| c.contains(name)))
+    };
+    if !has_class(&el, "theme-admonition") {
+        return false;
+    }
+    let kids = || el.children().filter_map(ElementRef::wrap);
+    let (Some(heading), Some(content)) = (
+        kids().find(|c| has_class(c, "admonitionHeading")),
+        kids().find(|c| has_class(c, "admonitionContent")),
+    ) else {
+        return false;
+    };
+    let title = cell_text(heading);
+    let mut spans = Vec::new();
+    if !title.is_empty() {
+        spans.push(Span {
+            bold: true,
+            ..Span::plain(title)
+        });
+    }
+    for part in content.children().filter_map(ElementRef::wrap) {
+        let body = trim_trailing_newlines(collect_spans(part));
+        if body.iter().all(|s| s.text.trim().is_empty()) {
+            continue;
+        }
+        if !spans.is_empty() {
+            spans.push(Span::plain("\n".to_string()));
+        }
+        spans.extend(body);
+    }
+    if spans.is_empty() {
+        return false;
+    }
+    blocks.push(Block::Quote { spans });
+    true
+}
+
 /// Collects the visible text of an element, ignoring child element structure.
+/// Wikipedia puts `<style>` blocks inside table cells; their CSS is not text.
 fn collect_text(el: ElementRef) -> String {
-    el.text().collect::<Vec<_>>().join("")
+    el.descendants()
+        .filter_map(|n| match n.value() {
+            Node::Text(t)
+                if !n
+                    .parent()
+                    .and_then(|p| p.value().as_element())
+                    .is_some_and(|e| matches!(e.name(), "style" | "script")) =>
+            {
+                Some(&t[..])
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Turns the inline children of a paragraph-like element into spans,
@@ -335,6 +524,9 @@ fn collect_spans_inner(
                 let Some(child_el) = ElementRef::wrap(child) else {
                     continue;
                 };
+                if is_wiki_furniture(child_el) {
+                    continue;
+                }
                 match elem.name() {
                     "strong" | "b" => {
                         collect_spans_inner(child_el, true, italic, code, href.clone(), out)
@@ -399,6 +591,72 @@ fn extract_language_from_class(class: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn an_infobox_keeps_only_its_label_value_rows() {
+        let html = r#"<table class="infobox"><tr><th colspan="2">Rust</th></tr>
+            <tr><td colspan="2"><img src="x.png"></td></tr>
+            <tr><th>Paradigms</th><td><ul><li>functional</li><li>generic</li></ul></td></tr>
+            <tr><th>Developer</th><td>The Rust Team<style>.x{color:red}</style></td></tr></table>"#;
+        let blocks = html_to_blocks_with_base(html, None);
+        assert_eq!(
+            blocks,
+            [Block::Table {
+                header: vec![],
+                rows: vec![
+                    vec!["Paradigms".into(), "functional, generic".into()],
+                    vec!["Developer".into(), "The Rust Team".into()],
+                ],
+            }]
+        );
+    }
+
+    #[test]
+    fn wikipedia_citation_marks_and_edit_links_are_dropped() {
+        let html = r#"<p>Rust is fast.<sup class="mw-ref reference"><a href="/c">[1]</a></sup></p>
+            <div class="mw-heading"><h2>History</h2><span class="mw-editsection">[edit]</span></div>"#;
+        let blocks = html_to_blocks_with_base(html, None);
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("{blocks:?}")
+        };
+        assert_eq!(spans.iter().map(|s| s.text.as_str()).collect::<String>(), "Rust is fast.");
+        assert_eq!(blocks[1], Block::Heading { level: 2, text: "History".into() });
+    }
+
+    #[test]
+    fn code_lines_ending_in_br_keep_their_line_breaks() {
+        let html = r#"<pre><code><div class="token-line"><span>let a = 1;</span><br/></div><div class="token-line"><span>let b = 2;</span><br/></div></code></pre>"#;
+        let blocks = html_to_blocks_with_base(html, None);
+        let Block::Code { content, .. } = &blocks[0] else {
+            panic!("expected code, got {blocks:?}");
+        };
+        assert_eq!(content.trim_end(), "let a = 1;\nlet b = 2;");
+    }
+
+    #[test]
+    fn tabs_become_labelled_sections_not_a_bullet_list() {
+        let html = r#"<div><ul role="tablist"><li role="tab">Apple<li role="tab">Orange</ul>
+            <div class="m"><div role="tabpanel">An apple</div><div role="tabpanel" hidden><p>An orange</p></div></div></div>"#;
+        let text: Vec<String> = html_to_blocks_with_base(html, None)
+            .iter()
+            .map(|b| match b {
+                Block::Paragraph { spans } => spans.iter().map(|s| s.text.as_str()).collect(),
+                other => panic!("unexpected {other:?}"),
+            })
+            .collect();
+        assert_eq!(text, ["Apple", "An apple", "Orange", "An orange"]);
+    }
+
+    #[test]
+    fn a_docusaurus_callout_is_a_quote_with_its_title() {
+        let html = r#"<div class="theme-admonition theme-admonition-tip alert"><div class="admonitionHeading_x"><span><svg></svg></span>tip</div><div class="admonitionContent_y"><p>Use <code>cargo</code>.</p></div></div>"#;
+        let blocks = html_to_blocks_with_base(html, None);
+        let [Block::Quote { spans }] = blocks.as_slice() else {
+            panic!("expected one quote, got {blocks:?}");
+        };
+        assert!(spans[0].bold && spans[0].text == "tip");
+        assert_eq!(spans.iter().map(|s| s.text.as_str()).collect::<String>(), "tip\nUse cargo.");
+    }
+
     use super::*;
 
     #[test]

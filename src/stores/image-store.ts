@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { cacheImages, imageCacheDir } from "@/lib/commands";
+import { cacheImages, cachedImageNames, imageCacheDir } from "@/lib/commands";
 import { getArticleImages, saveArticleImages } from "@/lib/db";
 import { imageUrlsOf } from "@/lib/images";
 import { logError } from "@/lib/log";
@@ -36,11 +36,17 @@ export const useImageStore = create<ImageStore>((set, get) => ({
     const stale = () => get().articleId !== article.id;
 
     try {
-      const [dir, known] = await Promise.all([
+      const [dir, savedFiles, onDisk] = await Promise.all([
         get().dir ?? imageCacheDir(),
         getArticleImages(article.id),
+        cachedImageNames(),
       ]);
       if (stale()) return;
+      // Images cleared to keep the cache small are downloaded again below.
+      const present = new Set(onDisk);
+      const known = Object.fromEntries(
+        Object.entries(savedFiles).filter(([, file]) => present.has(file)),
+      );
       set({ dir, files: known, loaded: true });
 
       // Blocking remote images also means not fetching them ourselves.

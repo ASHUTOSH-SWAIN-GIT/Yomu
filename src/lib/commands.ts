@@ -27,6 +27,11 @@ export async function cacheImages(urls: string[]): Promise<(string | null)[]> {
   return invoke<(string | null)[]>("cache_images", { urls });
 }
 
+/** Names of the files still in the image cache. */
+export async function cachedImageNames(): Promise<string[]> {
+  return invoke<string[]>("cached_image_names");
+}
+
 /** Absolute path of the folder holding cached images. */
 export async function imageCacheDir(): Promise<string> {
   return invoke<string>("image_cache_dir");

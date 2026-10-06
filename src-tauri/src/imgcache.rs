@@ -17,6 +17,8 @@ use tokio::task::JoinSet;
 const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_URLS_PER_CALL: usize = 80;
 const CONCURRENT_DOWNLOADS: usize = 4;
+/// The whole cache stays under this; the least recently used images go first.
+const MAX_CACHE_BYTES: u64 = 500 * 1024 * 1024;
 
 pub fn images_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
@@ -75,6 +77,10 @@ fn find_existing(dir: &Path, stem: &str) -> Option<String> {
 async fn download(client: &reqwest::Client, url: &str, dir: &Path) -> Option<String> {
     let stem = file_stem(url);
     if let Some(existing) = find_existing(dir, &stem) {
+        // Reuse counts as use, so what you still read is evicted last.
+        if let Ok(file) = std::fs::File::options().write(true).open(dir.join(&existing)) {
+            let _ = file.set_modified(std::time::SystemTime::now());
+        }
         return Some(existing);
     }
 
@@ -159,12 +165,65 @@ pub async fn cache_images(
             files[index] = Some(name);
         }
     }
+    evict_over(dir, MAX_CACHE_BYTES);
     Ok(files)
 }
 
-/// Largest image sent to the agent. Bigger images cost a lot of plan
-/// quota and are usually slow to process; the cache itself allows 10 MB.
+/// Deletes the least recently used files until the cache fits in `max_bytes`.
+/// An evicted image is simply downloaded again when its article is opened.
+fn evict_over(dir: &Path, max_bytes: u64) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut files: Vec<_> = entries
+        .flatten()
+        .filter_map(|e| {
+            let m = e.metadata().ok().filter(|m| m.is_file())?;
+            Some((m.modified().ok()?, m.len(), e.path()))
+        })
+        .collect();
+    let mut total: u64 = files.iter().map(|f| f.1).sum();
+    files.sort_by_key(|f| f.0);
+    for (_, len, path) in files {
+        if total <= max_bytes {
+            break;
+        }
+        if std::fs::remove_file(path).is_ok() {
+            total -= len;
+        }
+    }
+}
+
+/// File names currently in the cache.
+pub fn list_names(dir: &Path) -> Vec<String> {
+    std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Largest image sent to the agent as it is. Bigger images cost a lot of plan
+/// quota and are usually slow to process, so they are shrunk first.
 const MAX_AGENT_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+/// Longest side of a shrunk image: still sharp for a diagram, far smaller.
+const SHRUNK_SIDE: u32 = 2048;
+
+/// Scales an image down and re-encodes it as JPEG. `None` if it cannot be
+/// decoded or is still over `limit` afterwards.
+fn shrink(bytes: &[u8], limit: usize) -> Option<Vec<u8>> {
+    let img = image::load_from_memory(bytes).ok()?;
+    let img = img.thumbnail(SHRUNK_SIDE, SHRUNK_SIDE);
+    // JPEG has no transparency; flatten to RGB first.
+    let mut out = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 85)
+        .encode_image(&image::DynamicImage::ImageRgb8(img.to_rgb8()))
+        .ok()?;
+    (out.len() <= limit).then_some(out)
+}
 
 /// An image ready to attach to a prompt.
 #[derive(Debug, PartialEq)]
@@ -208,14 +267,24 @@ pub async fn load_for_agent(
         .ok_or_else(|| "could not download that image".to_string())?;
     let mime = agent_mime(&name)?;
 
-    let bytes = tokio::fs::read(dir.join(&name))
+    let mut bytes = tokio::fs::read(dir.join(&name))
         .await
         .map_err(|e| format!("could not read the cached image: {e}"))?;
+    let mut mime = mime;
     if bytes.len() > MAX_AGENT_IMAGE_BYTES {
-        return Err(format!(
-            "that image is {:.1} MB; the limit for sending to the agent is 5 MB",
-            bytes.len() as f64 / 1_048_576.0
-        ));
+        // Decoding a big image is slow; keep it off the async threads.
+        let original = bytes.len();
+        bytes = tokio::task::spawn_blocking(move || shrink(&bytes, MAX_AGENT_IMAGE_BYTES))
+            .await
+            .ok()
+            .flatten()
+            .ok_or_else(|| {
+                format!(
+                    "that image is {:.1} MB and could not be shrunk below 5 MB",
+                    original as f64 / 1_048_576.0
+                )
+            })?;
+        mime = "image/jpeg";
     }
     Ok(AgentImage {
         mime,
@@ -426,6 +495,22 @@ mod tests {
     }
 
     #[test]
+    fn a_big_image_is_shrunk_to_a_jpeg_within_the_limit() {
+        let img = image::RgbImage::from_fn(3000, 2000, |x, y| {
+            image::Rgb([(x % 251) as u8, (y % 241) as u8, ((x * y) % 239) as u8])
+        });
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        let out = shrink(&png, 5 * 1024 * 1024).expect("shrinks");
+        let small = image::load_from_memory(&out).unwrap();
+        assert_eq!(small.width().max(small.height()), SHRUNK_SIDE);
+        assert!(shrink(b"not an image", 1000).is_none());
+        assert!(shrink(&png, 10).is_none(), "still over the limit");
+    }
+
+    #[test]
     fn dir_stats_counts_files_and_bytes() {
         let dir = std::env::temp_dir().join("yomu-dir-stats-test");
         let _ = std::fs::remove_dir_all(&dir);
@@ -436,6 +521,24 @@ mod tests {
         assert_eq!(dir_stats(&dir), (15, 2));
         assert_eq!(dir_stats(&dir.join("missing")), (0, 0));
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn eviction_removes_the_oldest_files_first() {
+        let dir = temp_dir("evict");
+        std::fs::create_dir_all(&dir).unwrap();
+        let now = std::time::SystemTime::now();
+        for (name, age_secs) in [("old.png", 300), ("mid.png", 200), ("new.png", 100)] {
+            let path = dir.join(name);
+            std::fs::write(&path, [0u8; 10]).unwrap();
+            let file = std::fs::File::options().write(true).open(&path).unwrap();
+            file.set_modified(now - std::time::Duration::from_secs(age_secs))
+                .unwrap();
+        }
+        evict_over(&dir, 20);
+        assert!(!dir.join("old.png").exists());
+        assert!(dir.join("mid.png").exists() && dir.join("new.png").exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
