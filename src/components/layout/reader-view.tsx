@@ -199,7 +199,13 @@ function Article({
           )}
         />
       </article>
-      {selection && <AddCommentButton selection={selection} onDone={clear} />}
+      {selection && (
+        <AddCommentButton
+          article={article}
+          selection={selection}
+          onDone={clear}
+        />
+      )}
     </>
   );
 }

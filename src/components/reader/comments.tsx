@@ -1,22 +1,37 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
-import { ArrowUp, MessageSquareText, Pencil, Trash2 } from "lucide-react";
+import {
+  ArrowUp,
+  MessageSquareText,
+  Pencil,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import type { CommentSelection } from "@/hooks/use-comment-selection";
 import { rangeOfWords } from "@/hooks/use-comment-highlights";
 import { cn } from "@/lib/utils";
+import { useAgentStore } from "@/stores/agent-store";
+import { useChatStore } from "@/stores/chat-store";
 import { useCommentsStore } from "@/stores/comments-store";
-import type { Comment } from "@/types/library";
+import { useUiStore } from "@/stores/ui-store";
+import type { Comment, StoredArticle } from "@/types/library";
 
-/** The one option shown over selected text. */
+const buttonClass =
+  "hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-[0.8125rem] outline-none focus-visible:ring-2 [&>svg]:size-3.5";
+
+/** What is offered over selected text: ask the agent about it, or comment. */
 export function AddCommentButton({
+  article,
   selection,
   onDone,
 }: {
+  article: StoredArticle;
   selection: CommentSelection;
   onDone: () => void;
 }) {
   const startDraft = useCommentsStore((s) => s.startDraft);
+  const explain = useChatStore((s) => s.explain);
   const { rect, anchor } = selection;
   // Above the selection, or under it when there is no room above.
   const above = rect.top > 56;
@@ -25,7 +40,7 @@ export function AddCommentButton({
       data-comment-ui
       // Keep the selection: a press here would otherwise clear it.
       onMouseDown={(e) => e.preventDefault()}
-      className="pop-in bg-popover text-popover-foreground fixed z-50 rounded-xl p-1 shadow-[var(--shadow-float)]"
+      className="pop-in bg-popover text-popover-foreground fixed z-50 flex rounded-xl p-1 shadow-[var(--shadow-float)]"
       style={{
         left: Math.max(8, rect.left + rect.width / 2),
         top: above ? rect.top - 8 : rect.bottom + 8,
@@ -35,11 +50,36 @@ export function AddCommentButton({
       <button
         type="button"
         onClick={() => {
+          // Without a connected agent there is nothing to ask; show how to
+          // set one up instead.
+          const ui = useUiStore.getState();
+          if (useAgentStore.getState().status !== "ready")
+            ui.setSetupOpen(true);
+          else {
+            ui.setChatOpen(true);
+            void explain(article, {
+              blockIndex: anchor.blockIndex,
+              startOffset: anchor.start,
+              endOffset: anchor.end,
+              text: anchor.quote,
+            });
+          }
+          window.getSelection()?.removeAllRanges();
+          onDone();
+        }}
+        className={buttonClass}
+      >
+        <Sparkles aria-hidden />
+        Ask
+      </button>
+      <button
+        type="button"
+        onClick={() => {
           startDraft(anchor);
           window.getSelection()?.removeAllRanges();
           onDone();
         }}
-        className="hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-[0.8125rem] outline-none focus-visible:ring-2 [&>svg]:size-3.5"
+        className={buttonClass}
       >
         <MessageSquareText aria-hidden />
         Add comment

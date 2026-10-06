@@ -139,7 +139,7 @@ function PaletteBody({ close }: { close: () => void }) {
     },
     {
       id: "settings",
-      label: "Customize Yomu",
+      label: "Open settings",
       icon: <SlidersHorizontal />,
       shortcut: `${MOD},`,
       run: () => {

@@ -11,6 +11,7 @@ import { useThemeEffect } from "@/hooks/use-theme";
 import { goHome } from "@/lib/navigate";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { shortcutFor } from "@/lib/shortcuts";
+import { applyZoom, savedZoom, stepZoom } from "@/lib/zoom";
 import { useAgentStore } from "@/stores/agent-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
@@ -74,6 +75,30 @@ export function AppShell() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Zoom the whole app: Cmd/Ctrl + and - step it, Cmd/Ctrl 0 resets it. The
+  // level is saved, so the app opens at the same size next time.
+  useEffect(() => {
+    let level = savedZoom();
+    if (level !== 1) void applyZoom(level);
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const next =
+        e.key === "=" || e.key === "+"
+          ? stepZoom(level, 1)
+          : e.key === "-" || e.key === "_"
+            ? stepZoom(level, -1)
+            : e.key === "0"
+              ? 1
+              : null;
+      if (next === null) return;
+      e.preventDefault();
+      level = next;
+      void applyZoom(level);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   return (

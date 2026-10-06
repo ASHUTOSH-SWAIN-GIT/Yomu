@@ -321,7 +321,7 @@ export function LibrarySidebar() {
           }}
           icon={<SlidersHorizontal />}
         >
-          Make it yours
+          Settings
         </Item>
       </nav>
     </div>

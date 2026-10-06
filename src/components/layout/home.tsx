@@ -17,6 +17,8 @@ import { SiteLogoTile, SiteMark } from "@/components/layout/article-cover";
 import { articleColor } from "@/lib/spaces";
 import { openSampleArticle } from "@/lib/sample-article";
 import { cn } from "@/lib/utils";
+import { useAgentStore } from "@/stores/agent-store";
+import { useUiStore } from "@/stores/ui-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
@@ -36,6 +38,8 @@ export function Home() {
   const libraryChat = useSpacesStore((s) => s.libraryChat);
   const settingsPage = useSpacesStore((s) => s.settingsPage);
 
+  const agentStatus = useAgentStore((s) => s.status);
+  const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const [input, setInput] = useState("");
   const loading = state.status === "loading";
   const isHome = !showArchive;
@@ -101,6 +105,18 @@ export function Home() {
             )}
           </Button>
         </form>
+      )}
+      {isHome && agentStatus === "setup" && (
+        <p className="text-muted-foreground mt-3 text-[0.8125rem]">
+          Connect an AI agent to ask about what you read.{" "}
+          <button
+            type="button"
+            onClick={() => setSetupOpen(true)}
+            className="text-foreground underline underline-offset-2 outline-none hover:opacity-80"
+          >
+            Set up
+          </button>
+        </p>
       )}
       {state.status === "loading" && <Fetching url={state.url} />}
       {state.status === "error" && (
@@ -183,7 +199,7 @@ const STEPS = [
     art: "/welcome/collect.svg",
     title: "Comment and collect",
     text: "Leave notes on lines you like and sort blogs into collections.",
-    action: "Make it yours",
+    action: "Open settings",
   },
 ] as const;
 
