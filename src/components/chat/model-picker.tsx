@@ -30,7 +30,7 @@ export function ModelPicker() {
   const chosen = useUiStore((s) => s.chatModel);
   const setChosen = useUiStore((s) => s.setChatModel);
   const [open, setOpen] = useState(false);
-  // What the agent in use offers; Settings clears it when the agent changes.
+  // What the agent in use offers; the customize page clears it when the agent changes.
   const models = useModelsStore((s) => s.models);
   const failed = useModelsStore((s) => s.failed);
   const load = useModelsStore((s) => s.load);

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { resolveTheme } from "@/lib/appearance";
 import { highlightCode } from "@/lib/highlighter";
+import { useUiStore } from "@/stores/ui-store";
 
 export function CodeBlock({
   language,
@@ -10,16 +12,19 @@ export function CodeBlock({
   content: string;
 }) {
   const [html, setHtml] = useState<string | null>(null);
+  // A named theme brings its own code colours, so render again for it.
+  const theme = useUiStore((s) => s.theme);
+  const themeId = theme === "system" ? null : resolveTheme(theme, false).id;
 
   useEffect(() => {
     let cancelled = false;
-    highlightCode(content, language).then((result) => {
+    highlightCode(content, language, themeId).then((result) => {
       if (!cancelled) setHtml(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [content, language]);
+  }, [content, language, themeId]);
 
   return (
     <div className="bg-muted my-[1.1em] overflow-hidden rounded-lg font-sans shadow-[inset_0_0_0_1px_var(--border)]">

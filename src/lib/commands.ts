@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ScrapedArticle } from "@/types/article";
-import type { AgentConfig, AgentModel, Diagnosis } from "@/types/agent";
+import type {
+  AgentConfig,
+  AgentModel,
+  Diagnosis,
+  StorageInfo,
+} from "@/types/agent";
 
 /**
  * Thin wrappers around Tauri commands (`src-tauri/src/lib.rs`). Keep all
@@ -25,6 +30,11 @@ export async function cacheImages(urls: string[]): Promise<(string | null)[]> {
 /** Absolute path of the folder holding cached images. */
 export async function imageCacheDir(): Promise<string> {
   return invoke<string>("image_cache_dir");
+}
+
+/** Where Yomu keeps its data and how large it is. */
+export async function storageInfo(): Promise<StorageInfo> {
+  return invoke<StorageInfo>("storage_info");
 }
 
 /** Deletes cached images not in `keep`; returns how many were removed. */

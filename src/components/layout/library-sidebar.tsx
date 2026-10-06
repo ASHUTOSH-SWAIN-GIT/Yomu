@@ -7,7 +7,7 @@ import {
   Home,
   MessageSquarePlus,
   Plus,
-  Settings,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { SiteFavicon } from "@/components/layout/article-cover";
@@ -72,7 +72,8 @@ export function LibrarySidebar() {
   const [confirming, setConfirming] = useState<string | null>(null);
   const agentStatus = useAgentStore((s) => s.status);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
-  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  const settingsPage = useSpacesStore((s) => s.settingsPage);
+  const setSettingsPage = useSpacesStore((s) => s.setSettingsPage);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const peek = useUiStore((s) => s.sidebarPeek);
   const peekSidebar = useUiStore((s) => s.peekSidebar);
@@ -108,7 +109,7 @@ export function LibrarySidebar() {
       )}
     >
       <Item
-        on={!reading && !showArchive && !libraryChat}
+        on={!reading && !showArchive && !libraryChat && !settingsPage}
         onClick={() => {
           setActive(INBOX);
           setSelected(null);
@@ -282,6 +283,21 @@ export function LibrarySidebar() {
         </>
       )}
 
+      <h2 className="text-foreground mt-6 mb-1 px-2.5 text-[0.8125rem] font-bold">
+        Customize
+      </h2>
+      <Item
+        on={!reading && settingsPage}
+        onClick={() => {
+          setSettingsPage(true);
+          setSelected(null);
+          leave();
+        }}
+        icon={<SlidersHorizontal />}
+      >
+        Make it yours
+      </Item>
+
       <div className="mt-auto flex flex-col gap-0.5 pt-6">
         {/* Only shown when the agent needs attention; "connected" needs no
             text. */}
@@ -305,13 +321,6 @@ export function LibrarySidebar() {
               : "Set up Explain"}
           </button>
         )}
-        <Item
-          on={false}
-          onClick={() => setSettingsOpen(true)}
-          icon={<Settings />}
-        >
-          Settings
-        </Item>
       </div>
     </nav>
   );

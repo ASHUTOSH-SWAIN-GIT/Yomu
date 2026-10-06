@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { CollectionPicker } from "@/components/layout/collection-picker";
 import { UpdateBanner } from "@/components/layout/update-banner";
+import { resolveTheme } from "@/lib/appearance";
 import { goHome } from "@/lib/navigate";
 import { useReaderStore } from "@/stores/reader-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -27,10 +28,13 @@ export function TopBar() {
   const peekSidebar = useUiStore((s) => s.peekSidebar);
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
-  const dark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  // The sun/moon button switches to the theme's light or dark partner
+  // (Catppuccin Mocha <-> Latte, Gruvbox Dark <-> Light, ...).
+  const shown = resolveTheme(
+    theme,
+    window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+  const dark = shown.mode === "dark";
 
   const article = reader.status === "ready" ? reader.article : null;
   const title = article?.title ?? null;
@@ -107,7 +111,7 @@ export function TopBar() {
         )}
         <button
           type="button"
-          onClick={() => setTheme(dark ? "light" : "dark")}
+          onClick={() => setTheme(shown.pair)}
           aria-label={dark ? "Use the light theme" : "Use the dark theme"}
           title={dark ? "Light theme" : "Dark theme"}
           className={ICON_BUTTON}

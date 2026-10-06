@@ -239,6 +239,17 @@ pub fn prune(dir: &Path, keep: &[String]) -> usize {
         .count()
 }
 
+/// Total size in bytes and number of files directly inside `dir`.
+pub fn dir_stats(dir: &Path) -> (u64, usize) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return (0, 0);
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| entry.metadata().ok().filter(|m| m.is_file()))
+        .fold((0, 0), |(bytes, count), m| (bytes + m.len(), count + 1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -412,6 +423,19 @@ mod tests {
             .unwrap_err();
         assert!(file.contains("web images"), "{file}");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dir_stats_counts_files_and_bytes() {
+        let dir = std::env::temp_dir().join("yomu-dir-stats-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::write(dir.join("a.png"), [0u8; 10]).unwrap();
+        std::fs::write(dir.join("b.png"), [0u8; 5]).unwrap();
+        std::fs::write(dir.join("sub/c.png"), [0u8; 99]).unwrap(); // not counted
+        assert_eq!(dir_stats(&dir), (15, 2));
+        assert_eq!(dir_stats(&dir.join("missing")), (0, 0));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

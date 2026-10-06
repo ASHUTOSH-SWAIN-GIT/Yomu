@@ -12,13 +12,20 @@
     }
   };
 
+  // The theme id, and whether it is a dark one (saved next to it, so this
+  // file needs no list of themes). Unknown or "system" follows macOS.
   var theme = get("yomu-theme");
-  var dark =
-    theme === "dark" ||
-    ((theme === "system" || !theme || ["light", "paper"].indexOf(theme) < 0) &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  var mode = get("yomu-theme-mode");
+  var system = !theme || theme === "system";
+  var dark = system
+    ? window.matchMedia("(prefers-color-scheme: dark)").matches
+    : mode
+      ? mode === "dark"
+      : theme === "dark";
   root.classList.toggle("dark", dark);
-  root.classList.toggle("paper", theme === "paper");
+  if (!system && theme !== "light" && theme !== "dark") {
+    root.dataset.theme = theme;
+  }
 
   var reader = {};
   try {
@@ -27,7 +34,7 @@
   var pick = function (value, allowed) {
     return allowed.indexOf(value) > 0 ? value : undefined; // index 0 = default
   };
-  var font = pick(reader.font, ["serif", "sans"]);
+  var font = pick(reader.font, ["sans", "serif"]);
   var size = pick(reader.size, ["m", "s", "l", "xl"]);
   var measure = pick(reader.measure, ["medium", "narrow", "wide"]);
   if (font) root.dataset.readerFont = font;

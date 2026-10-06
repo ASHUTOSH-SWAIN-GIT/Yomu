@@ -89,16 +89,19 @@ describe("ui-store persistence", () => {
     expect(store.getState().explainPrefs).toEqual({
       level: "expert",
       codeExamples: "never",
+      style: "",
     });
 
     store.getState().setExplainPrefs({ level: "beginner" });
     expect(store.getState().explainPrefs).toEqual({
       level: "beginner",
       codeExamples: "never",
+      style: "",
     });
     expect(JSON.parse(data["yomu-explain-prefs"])).toEqual({
       level: "beginner",
       codeExamples: "never",
+      style: "",
     });
   });
 
@@ -108,6 +111,7 @@ describe("ui-store persistence", () => {
     expect(store.getState().explainPrefs).toEqual({
       level: "balanced",
       codeExamples: "helpful",
+      style: "",
     });
   });
 });

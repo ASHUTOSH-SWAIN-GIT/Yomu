@@ -3,8 +3,10 @@ import {
   DEFAULT_READER,
   READER_KEY,
   THEME_KEY,
+  THEME_MODE_KEY,
   parseReaderPrefs,
   parseTheme,
+  resolveTheme,
   type ReaderPrefs,
   type Theme,
 } from "@/lib/appearance";
@@ -75,8 +77,6 @@ interface UiState {
   /** `save` writes it down, for the end of a drag (not every move). */
   setChatWidth: (width: number, save?: boolean) => void;
   /** The Codex setup checklist dialog. */
-  settingsOpen: boolean;
-  setSettingsOpen: (open: boolean) => void;
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
   /** Skill level and code-example preference, applied to every explain
@@ -91,6 +91,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   theme: parseTheme(read(THEME_KEY)),
   setTheme: (theme) => {
     write(THEME_KEY, theme);
+    // public/theme-init.js needs to know a theme is dark before the app
+    // loads, without a list of themes; "system" decides at load time.
+    if (theme !== "system")
+      write(THEME_MODE_KEY, resolveTheme(theme, false).mode);
     set({ theme });
   },
   reader: parseReaderPrefs(read(READER_KEY)),
@@ -146,8 +150,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAnswerOpen: (answerOpen) => set({ answerOpen }),
   answerFocus: null,
   setAnswerFocus: (answerFocus) => set({ answerFocus }),
-  settingsOpen: false,
-  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setupOpen: false,
   setSetupOpen: (setupOpen) => set({ setupOpen }),
   explainPrefs: parseExplainPrefs(read(EXPLAIN_PREFS_KEY)),

@@ -41,6 +41,43 @@ async fn image_cache_dir(app: tauri::AppHandle) -> Result<String, String> {
     Ok(dir.to_string_lossy().into_owned())
 }
 
+/// Where Yomu keeps its data and how much space it takes, for the settings.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StorageInfo {
+    data_dir: String,
+    database_bytes: u64,
+    images_bytes: u64,
+    images_count: usize,
+}
+
+#[tauri::command]
+fn storage_info(app: tauri::AppHandle) -> Result<StorageInfo, String> {
+    use tauri::Manager;
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("could not find the app data directory: {e}"))?;
+    // The database is one file plus SQLite's `-wal` and `-shm` companions.
+    let database_bytes = std::fs::read_dir(&data_dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|e| e.file_name().to_string_lossy().starts_with("yomu.db"))
+                .filter_map(|e| e.metadata().ok())
+                .map(|m| m.len())
+                .sum()
+        })
+        .unwrap_or(0);
+    let (images_bytes, images_count) = imgcache::dir_stats(&imgcache::images_dir(&app)?);
+    Ok(StorageInfo {
+        data_dir: data_dir.to_string_lossy().into_owned(),
+        database_bytes,
+        images_bytes,
+        images_count,
+    })
+}
+
 /// Deletes cached images that no article uses any more.
 #[tauri::command]
 async fn prune_images(app: tauri::AppHandle, keep: Vec<String>) -> Result<usize, String> {
@@ -217,6 +254,7 @@ pub fn run() {
             cache_images,
             image_cache_dir,
             prune_images,
+            storage_info,
             agent_diagnose,
             agent_login,
             agent_new_session,

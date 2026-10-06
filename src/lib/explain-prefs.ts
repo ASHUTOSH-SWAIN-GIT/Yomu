@@ -14,11 +14,18 @@ export type CodeExamplePref = "always" | "helpful" | "never";
 export interface ExplainPrefs {
   level: ExplainLevel;
   codeExamples: CodeExamplePref;
+  /** The user's own instruction for every answer ("be thorough", "answer in
+   * Hindi"); empty for none. */
+  style: string;
 }
+
+/** Longest answer style kept, so it can't swamp the question. */
+export const STYLE_MAX = 300;
 
 export const DEFAULT_EXPLAIN_PREFS: ExplainPrefs = {
   level: "balanced",
   codeExamples: "helpful",
+  style: "",
 };
 
 export const EXPLAIN_PREFS_KEY = "yomu-explain-prefs";
@@ -47,6 +54,10 @@ export function parseExplainPrefs(
     )
       ? (data.codeExamples as CodeExamplePref)
       : DEFAULT_EXPLAIN_PREFS.codeExamples,
+    style:
+      typeof data.style === "string"
+        ? data.style.trim().slice(0, STYLE_MAX)
+        : DEFAULT_EXPLAIN_PREFS.style,
   };
 }
 
@@ -75,11 +86,18 @@ export function codeExamplesInstruction(pref: CodeExamplePref): string | null {
   }
 }
 
+/** The user's own instruction, passed on as they wrote it. */
+export function styleInstruction(style: string): string | null {
+  const text = style.trim();
+  return text ? `Also follow this instruction from the reader: ${text}` : null;
+}
+
 /** Every extra instruction these preferences add, in order, for a caller to
  * append to the prompt's task line (empty when everything is default). */
 export function explainPrefInstructions(prefs: ExplainPrefs): string[] {
   return [
     levelInstruction(prefs.level),
     codeExamplesInstruction(prefs.codeExamples),
+    styleInstruction(prefs.style),
   ].filter((line): line is string => line !== null);
 }

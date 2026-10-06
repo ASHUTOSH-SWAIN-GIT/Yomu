@@ -15,6 +15,14 @@ export interface Diagnosis {
   loggedIn: boolean;
 }
 
+/** Mirrors `StorageInfo` in `src-tauri/src/lib.rs`. */
+export interface StorageInfo {
+  dataDir: string;
+  databaseBytes: number;
+  imagesBytes: number;
+  imagesCount: number;
+}
+
 /** Mirrors `AgentConfig` in `src-tauri/src/agent/config.rs`: which agent
  * Yomu talks to. */
 export type AgentConfig =

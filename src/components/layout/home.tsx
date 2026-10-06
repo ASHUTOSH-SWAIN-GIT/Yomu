@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LibraryChat } from "@/components/chat/library-chat";
+import { SettingsPage } from "@/components/settings/settings-page";
 import { CollectionPicker } from "@/components/layout/collection-picker";
 import {
   ArticleCover,
@@ -36,6 +37,7 @@ export function Home() {
   const slots = useSpacesStore((s) => s.slots);
   const showArchive = useSpacesStore((s) => s.showArchive);
   const libraryChat = useSpacesStore((s) => s.libraryChat);
+  const settingsPage = useSpacesStore((s) => s.settingsPage);
 
   const [input, setInput] = useState("");
   const loading = state.status === "loading";
@@ -50,6 +52,7 @@ export function Home() {
 
   const title = showArchive ? "Archive" : "Read anything. Ask about any line.";
 
+  if (settingsPage) return <SettingsPage />;
   if (libraryChat) return <LibraryChat />;
 
   return (

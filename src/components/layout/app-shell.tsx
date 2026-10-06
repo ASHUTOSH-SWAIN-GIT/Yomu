@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { ReaderView } from "@/components/layout/reader-view";
-import { SettingsDialog } from "@/components/layout/settings-dialog";
 import { SetupDialog } from "@/components/layout/setup-dialog";
 import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
 import { useThemeEffect } from "@/hooks/use-theme";
+import { goHome } from "@/lib/navigate";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { shortcutFor } from "@/lib/shortcuts";
 import { useAgentStore } from "@/stores/agent-store";
@@ -63,7 +63,11 @@ export function AppShell() {
         );
       } else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
       else if (command === "paste-link") void openLinkFromClipboard();
-      else if (command === "settings") ui.setSettingsOpen(!ui.settingsOpen);
+      else if (command === "settings") {
+        const spaces = useSpacesStore.getState();
+        spaces.setSettingsPage(!spaces.settingsPage);
+        if (useReaderStore.getState().state.status === "ready") void goHome();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -84,7 +88,6 @@ export function AppShell() {
       </div>
 
       <CommandPalette />
-      <SettingsDialog />
       <SetupDialog />
 
       {focusMode && (

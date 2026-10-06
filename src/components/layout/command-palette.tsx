@@ -8,7 +8,7 @@ import {
   MessageSquare,
   Library,
   Search,
-  Settings as SettingsIcon,
+  SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
 import { searchLibrary } from "@/lib/db";
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { SUMMARY_LABEL } from "@/lib/scope";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
+import { useSpacesStore } from "@/stores/spaces-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { goHome, openSavedArticle } from "@/lib/navigate";
 import { useUiStore } from "@/stores/ui-store";
@@ -138,10 +139,13 @@ function PaletteBody({ close }: { close: () => void }) {
     },
     {
       id: "settings",
-      label: "Open settings",
-      icon: <SettingsIcon />,
+      label: "Customize Yomu",
+      icon: <SlidersHorizontal />,
       shortcut: `${MOD},`,
-      run: () => ui().setSettingsOpen(true),
+      run: () => {
+        useSpacesStore.getState().setSettingsPage(true);
+        if (useReaderStore.getState().state.status === "ready") void goHome();
+      },
     },
     {
       id: "chat",

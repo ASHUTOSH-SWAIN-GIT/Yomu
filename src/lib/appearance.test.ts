@@ -4,7 +4,7 @@ import {
   applyAppearance,
   parseReaderPrefs,
   parseTheme,
-  themeClass,
+  resolveTheme,
   type RootLike,
 } from "@/lib/appearance";
 
@@ -23,8 +23,15 @@ function fakeRoot() {
 }
 
 describe("parseTheme", () => {
-  it("accepts the four themes and defaults to system", () => {
-    for (const t of ["light", "paper", "dark", "system"]) {
+  it("accepts every theme and system, and defaults to system", () => {
+    for (const t of [
+      "light",
+      "paper",
+      "dark",
+      "system",
+      "catppuccin-mocha",
+      "gruvbox-light",
+    ]) {
       expect(parseTheme(t)).toBe(t);
     }
     expect(parseTheme(null)).toBe("system");
@@ -48,36 +55,46 @@ describe("parseReaderPrefs", () => {
   });
 });
 
-describe("themeClass", () => {
-  it("maps themes to the root class, following the OS for system", () => {
-    expect(themeClass("light", true)).toBe("");
-    expect(themeClass("paper", true)).toBe("paper");
-    expect(themeClass("dark", false)).toBe("dark");
-    expect(themeClass("system", true)).toBe("dark");
-    expect(themeClass("system", false)).toBe("");
+describe("resolveTheme", () => {
+  it("turns system into Yomu Light or Yomu Dark", () => {
+    expect(resolveTheme("system", true).id).toBe("dark");
+    expect(resolveTheme("system", false).id).toBe("light");
+    expect(resolveTheme("one-dark", false)).toMatchObject({ mode: "dark" });
+    expect(resolveTheme("catppuccin-latte", true)).toMatchObject({
+      mode: "light",
+    });
   });
 });
 
 describe("applyAppearance", () => {
-  it("sets exactly one theme class", () => {
+  it("marks dark themes dark and names any theme that is not the default", () => {
     const { root, classes } = fakeRoot();
     applyAppearance(root, "paper", false, DEFAULT_READER);
-    expect([...classes]).toEqual(["paper"]);
+    expect([...classes]).toEqual([]);
+    expect(root.dataset.theme).toBe("paper");
+
+    applyAppearance(root, "catppuccin-mocha", false, DEFAULT_READER);
+    expect([...classes]).toEqual(["dark"]);
+    expect(root.dataset.theme).toBe("catppuccin-mocha");
+
     applyAppearance(root, "dark", false, DEFAULT_READER);
     expect([...classes]).toEqual(["dark"]);
-    applyAppearance(root, "light", true, DEFAULT_READER);
+    expect(root.dataset.theme).toBeUndefined();
+
+    applyAppearance(root, "system", false, DEFAULT_READER);
     expect([...classes]).toEqual([]);
+    expect(root.dataset.theme).toBeUndefined();
   });
 
   it("writes non-default reader prefs as data attributes and clears defaults", () => {
     const { root } = fakeRoot();
     applyAppearance(root, "light", false, {
-      font: "sans",
+      font: "serif",
       size: "xl",
       measure: "narrow",
     });
     expect(root.dataset).toMatchObject({
-      readerFont: "sans",
+      readerFont: "serif",
       readerSize: "xl",
       readerMeasure: "narrow",
     });

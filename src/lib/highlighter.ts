@@ -1,4 +1,5 @@
 import { createHighlighterCore, type HighlighterCore } from "shiki/core";
+import { SHIKI_THEMES, THEMES } from "@/lib/themes";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 // Fine grained imports instead of the `shiki` convenience package: only
@@ -43,21 +44,47 @@ function getHighlighter(): Promise<HighlighterCore> {
 }
 
 /**
- * Renders a code string to highlighted HTML with both a light and dark
- * theme baked in as CSS variables (toggled by the `.dark` class), so a
- * theme switch doesn't need a re-render.
+ * Renders a code string to highlighted HTML with the light and dark code
+ * colours baked in as CSS variables (picked by the `.dark` class), plus the
+ * active colour theme's own (picked by `data-theme`, see index.css), so a
+ * light/dark switch needs no re-render and a named theme gets its real code
+ * colours. Its Shiki theme is loaded the first time it is needed.
  */
 export async function highlightCode(
   code: string,
   language: string | null,
+  themeId: string | null = null,
 ): Promise<string> {
   const highlighter = await getHighlighter();
   const lang: KnownLang | "text" =
     language && KNOWN_LANGS.has(language) ? (language as KnownLang) : "text";
 
+  const themes: Record<string, string> = {
+    light: "github-light",
+    dark: "github-dark",
+  };
+  const meta = THEMES.find((t) => t.id === themeId);
+  if (meta && meta.id !== "light" && meta.id !== "dark") {
+    const name = meta.shiki;
+    if (!highlighter.getLoadedThemes().includes(name)) {
+      const load = SHIKI_THEMES[name];
+      if (load) {
+        try {
+          const mod = (await load()) as {
+            default: Parameters<HighlighterCore["loadTheme"]>[0];
+          };
+          await highlighter.loadTheme(mod.default);
+        } catch {
+          // Unknown or failed theme: the light/dark colours still apply.
+        }
+      }
+    }
+    if (highlighter.getLoadedThemes().includes(name)) themes[meta.id] = name;
+  }
+
   return highlighter.codeToHtml(code, {
     lang: lang === "text" ? "text" : lang,
-    themes: { light: "github-light", dark: "github-dark" },
+    themes,
     defaultColor: false,
   });
 }

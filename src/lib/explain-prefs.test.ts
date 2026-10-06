@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EXPLAIN_PREFS,
+  STYLE_MAX,
+  styleInstruction,
   codeExamplesInstruction,
   explainPrefInstructions,
   levelInstruction,
@@ -19,7 +21,7 @@ describe("parseExplainPrefs", () => {
       parseExplainPrefs(
         JSON.stringify({ level: "expert", codeExamples: "nonsense" }),
       ),
-    ).toEqual({ level: "expert", codeExamples: "helpful" });
+    ).toEqual({ level: "expert", codeExamples: "helpful", style: "" });
   });
 });
 
@@ -54,9 +56,28 @@ describe("explainPrefInstructions", () => {
     const lines = explainPrefInstructions({
       level: "beginner",
       codeExamples: "always",
+      style: "",
     });
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain("new to this topic");
     expect(lines[1]).toContain("Always include");
+  });
+});
+
+describe("answer style", () => {
+  it("is passed on as written, and ignored when empty", () => {
+    expect(styleInstruction("  be thorough  ")).toContain("be thorough");
+    expect(styleInstruction("   ")).toBeNull();
+    expect(
+      explainPrefInstructions({ ...DEFAULT_EXPLAIN_PREFS, style: "in Hindi" }),
+    ).toEqual([expect.stringContaining("in Hindi")]);
+  });
+
+  it("is trimmed and capped when read back", () => {
+    const long = "x".repeat(STYLE_MAX + 50);
+    expect(
+      parseExplainPrefs(JSON.stringify({ style: ` ${long} ` })).style,
+    ).toHaveLength(STYLE_MAX);
+    expect(parseExplainPrefs(JSON.stringify({ style: 5 })).style).toBe("");
   });
 });

@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { THEMES } from "@/lib/themes";
 
 // Reads the real design tokens from index.css, so changing a colour there
 // re-checks accessibility for the theme (WCAG 2.x contrast ratios).
@@ -18,13 +19,24 @@ function tokensIn(selector: string): Record<string, string> {
   return tokens;
 }
 
-// Paper and Night override only some tokens; the rest come from Page.
+// Paper and Yomu Dark override only some tokens; the rest come from Yomu
+// Light. A named dark theme is shown with the dark class too, so its
+// missing tokens come from Yomu Dark (and it must not be missing any
+// colour, which is checked below).
 const base = tokensIn(":root");
+const dark = { ...base, ...tokensIn(":root.dark") };
 const themes: Record<string, Record<string, string>> = {
-  page: base,
-  paper: { ...base, ...tokensIn(":root.paper") },
-  night: { ...base, ...tokensIn(":root.dark") },
+  light: base,
+  paper: { ...base, ...tokensIn(':root[data-theme="paper"]') },
+  dark,
 };
+for (const t of THEMES) {
+  if (t.id === "light" || t.id === "dark" || t.id === "paper") continue;
+  themes[t.id] = {
+    ...(t.mode === "dark" ? dark : base),
+    ...tokensIn(`:root[data-theme="${t.id}"]`),
+  };
+}
 
 function luminance(hex: string): number {
   const channel = (i: number) => {
@@ -73,6 +85,26 @@ describe.each(Object.entries(themes))("%s theme contrast", (_name, tokens) => {
     expect(tokens[fg], `missing --${fg}`).toBeDefined();
     expect(tokens[bg], `missing --${bg}`).toBeDefined();
     expect(ratio(tokens[fg], tokens[bg])).toBeGreaterThanOrEqual(min);
+  });
+});
+
+describe("theme list", () => {
+  it("has a colour block for every theme, defining every colour itself", () => {
+    const colours = Object.keys(tokensIn(":root.dark"));
+    for (const t of THEMES) {
+      if (t.id === "light" || t.id === "dark" || t.id === "paper") continue;
+      const own = tokensIn(`:root[data-theme="${t.id}"]`);
+      // Nothing may leak in from Yomu Dark or Yomu Light.
+      for (const name of colours) {
+        expect(own[name], `${t.id} is missing --${name}`).toBeDefined();
+      }
+    }
+  });
+
+  it("names every theme once, with a valid pair", () => {
+    const ids = THEMES.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const t of THEMES) expect(ids).toContain(t.pair);
   });
 });
 

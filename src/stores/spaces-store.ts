@@ -41,6 +41,11 @@ interface SpacesStore {
   slots: Record<string, number>;
   setActive: (id: string) => void;
   /** The "New collection" page is open. */
+  /** The customize page (settings) is open. */
+  settingsPage: boolean;
+  setSettingsPage: (on: boolean) => void;
+  /** Forgets every collection and colour (after "delete everything"). */
+  reset: () => void;
   /** The universal chat page is open. */
   libraryChat: boolean;
   setLibraryChat: (on: boolean) => void;
@@ -66,14 +71,26 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       active: id,
       showArchive: false,
       libraryChat: false,
+      settingsPage: false,
     });
   },
 
   libraryChat: false,
-  setLibraryChat: (libraryChat) => set({ libraryChat }),
+  setLibraryChat: (libraryChat) => set({ libraryChat, settingsPage: false }),
+
+  settingsPage: false,
+  setSettingsPage: (settingsPage) => set({ settingsPage, libraryChat: false }),
 
   showArchive: false,
-  setShowArchive: (showArchive) => set({ showArchive, libraryChat: false }),
+  setShowArchive: (showArchive) =>
+    set({ showArchive, libraryChat: false, settingsPage: false }),
+
+  reset() {
+    writeStorage(EXTRA_KEY, "[]");
+    writeStorage(SLOTS_KEY, "{}");
+    set({ extra: [], slots: {} });
+    get().setActive(INBOX);
+  },
 
   createSpace(name) {
     const id = normalizeTag(name);

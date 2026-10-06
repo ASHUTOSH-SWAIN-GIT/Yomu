@@ -182,6 +182,26 @@ export async function deleteArticle(id: string): Promise<void> {
   await db.execute("DELETE FROM articles WHERE id = $1", [id]);
 }
 
+/** Deletes every chat (and its messages and highlights) but keeps the blogs. */
+export async function deleteAllChats(): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM messages");
+  await db.execute("DELETE FROM chats");
+  await db.execute("DELETE FROM highlights");
+}
+
+/** Deletes every blog; chats, tags and image records go with them. */
+export async function deleteAllArticles(): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM articles");
+  // In case foreign keys were not enforcing the cascade.
+  await db.execute("DELETE FROM article_tags");
+  await db.execute("DELETE FROM article_images");
+  await db.execute("DELETE FROM messages");
+  await db.execute("DELETE FROM chats");
+  await db.execute("DELETE FROM highlights");
+}
+
 // Chats, highlights and messages (M5). One chat per article, which maps to
 // one ACP session; `acp_session_id` is kept so the session can be resumed
 // after a restart.
