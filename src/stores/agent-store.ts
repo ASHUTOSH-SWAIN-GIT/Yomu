@@ -3,6 +3,7 @@ import { agentDiagnose, agentLogin, agentUse, agentWarm } from "@/lib/commands";
 import { logError } from "@/lib/log";
 import { isReady } from "@/lib/setup";
 import { readStorage, writeStorage } from "@/lib/storage";
+import { useModelsStore } from "@/stores/models-store";
 import { useUiStore } from "@/stores/ui-store";
 import type { AgentConfig, Diagnosis } from "@/types/agent";
 
@@ -85,12 +86,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     }
 
     try {
-      // Back to Codex if a custom agent was running.
-      // A failure to start is not fatal here: the diagnosis below explains
-      // what Codex is missing.
-      if (started && started !== "codex") {
-        await agentUse(CODEX).catch(() => {});
-      }
+      // Anything other than Codex running is switched away from in
+      // `setConfig`; here Codex is simply what is in use.
       started = "codex";
       const diagnosis = await agentDiagnose();
       const ready = isReady(diagnosis);
@@ -107,10 +104,21 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
   async setConfig(config) {
     writeStorage(CONFIG_KEY, JSON.stringify(config));
-    // A model picked for one agent means nothing to another.
+    // A model picked for one agent means nothing to another, and the list
+    // of models belongs to the agent too.
     useUiStore.getState().setChatModel(null);
-    started = null;
+    useModelsStore.getState().clear();
     set({ config });
+    if (config.kind === "codex") {
+      // Codex is the default the Rust side starts with, so it has to be told
+      // to go back to it, whatever was running. If Codex cannot start, the
+      // diagnosis below says what it is missing.
+      started = null;
+      await agentUse(CODEX).catch(() => {});
+      started = "codex";
+    } else {
+      started = null;
+    }
     await get().refreshStatus();
   },
 

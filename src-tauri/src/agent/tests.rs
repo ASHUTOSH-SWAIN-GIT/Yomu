@@ -375,3 +375,48 @@ async fn real_opencode_streams_through_the_sandbox() {
     assert!(!joined_tokens(&got).trim().is_empty());
     harness.shutdown().await;
 }
+
+/// Needs Codex and OpenCode installed and signed in:
+/// cargo test -- --ignored real_switch_between_agents
+#[tokio::test]
+#[ignore]
+async fn real_switch_between_agents_changes_the_model_list() {
+    use super::config::AgentConfig;
+    let (tx, _events) = mpsc::unbounded_channel();
+    let harness = AgentHarness::new(tx);
+    let cwd = std::env::temp_dir().join("yomu-test-switch");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+
+    harness
+        .use_agent(AgentConfig::Custom {
+            command: "opencode".into(),
+            args: vec!["acp".into()],
+            data_dirs: vec![
+                "~/.local/share/opencode".into(),
+                "~/.local/state/opencode".into(),
+                "~/.cache/opencode".into(),
+                "~/.config/opencode".into(),
+            ],
+        })
+        .await
+        .expect("opencode should start");
+    let opencode = harness.list_models(&cwd).await.unwrap();
+    println!("SWITCH opencode models: {}", opencode.len());
+
+    harness
+        .use_agent(AgentConfig::Codex)
+        .await
+        .expect("codex should start");
+    let codex = harness.list_models(&cwd).await.unwrap();
+    println!(
+        "SWITCH codex models: {} first: {:?}",
+        codex.len(),
+        codex.first().map(|m| m.id.clone())
+    );
+    assert_ne!(opencode.len(), codex.len());
+    assert!(
+        codex.iter().all(|m| !m.id.contains('/')),
+        "codex ids have no provider prefix"
+    );
+    harness.shutdown().await;
+}
