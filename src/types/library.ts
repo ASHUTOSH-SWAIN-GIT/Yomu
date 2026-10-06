@@ -36,6 +36,20 @@ export interface ArticleSummary {
   icon?: string | null;
 }
 
+/** A note the reader wrote about a paragraph. `quote` is the text they had
+ * selected when they wrote it. */
+export interface Comment {
+  id: string;
+  articleId: string;
+  blockIndex: number;
+  /** Character offsets of the selected words in the block's text. */
+  start: number;
+  end: number;
+  quote: string;
+  note: string;
+  createdAt: number;
+}
+
 /** One full-text search match. `kind` says where it matched. */
 export interface SearchHit {
   articleId: string;

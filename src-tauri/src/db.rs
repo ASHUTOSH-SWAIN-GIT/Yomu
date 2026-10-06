@@ -92,6 +92,12 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_7,
         },
+        Migration {
+            version: 8,
+            description: "highlights and comments",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_8,
+        },
     ]
 }
 
@@ -201,4 +207,26 @@ pub const MIGRATION_7: &str = r#"
 
     CREATE INDEX idx_library_messages_chat ON library_messages(chat_id);
     CREATE INDEX idx_library_chats_updated ON library_chats(updated_at);
+"#;
+
+/// The reader's own highlights and comments on an article. A row with no
+/// `note` is a highlight; with one it is a comment. A comment is anchored to
+/// a stretch of text (`start_offset`..`end_offset` in block `block_index`,
+/// the same measure as `highlights`), or, with no offsets, to the whole block
+/// (a paragraph or an image). `quote` is the text it was made on, so a
+/// re-fetched article that changed never shows it on the wrong words.
+pub const MIGRATION_8: &str = r#"
+    CREATE TABLE annotations (
+        id TEXT PRIMARY KEY,
+        article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+        block_index INTEGER NOT NULL,
+        start_offset INTEGER,
+        end_offset INTEGER,
+        quote TEXT NOT NULL DEFAULT '',
+        note TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX idx_annotations_article ON annotations(article_id);
 "#;

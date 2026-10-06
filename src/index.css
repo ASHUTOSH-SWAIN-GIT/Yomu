@@ -87,6 +87,17 @@
   --reader-measure: 64ch;
 }
 
+/* Commented words are marked in yellow, like a highlighter, in every theme
+   (dark themes get the softer wash). */
+:root {
+  --comment-mark: rgb(250 204 21 / 0.4);
+  --comment-line: #d9a400;
+}
+html.dark {
+  --comment-mark: rgb(250 204 21 / 0.26);
+  --comment-line: #facc15;
+}
+
 /* Paper: a sepia page for long evenings in daylight. */
 :root[data-theme="paper"] {
   --frame-base: #e9e1d2;
@@ -332,6 +343,16 @@
   background-color: var(--mark-fill);
   text-decoration: underline;
   text-decoration-color: var(--honey);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+}
+
+/* Words with a comment on them (and the words a new comment is being
+   written about): a soft wash and an underline. */
+::highlight(yomu-comment) {
+  background-color: var(--comment-mark);
+  text-decoration: underline;
+  text-decoration-color: var(--comment-line);
   text-decoration-thickness: 2px;
   text-underline-offset: 0.22em;
 }

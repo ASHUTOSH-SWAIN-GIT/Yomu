@@ -6,6 +6,10 @@ import { ChatResizeHandle } from "@/components/chat/chat-resize-handle";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
+import { AddCommentButton, BlockComments } from "@/components/reader/comments";
+import { useCommentHighlights } from "@/hooks/use-comment-highlights";
+import { useCommentSelection } from "@/hooks/use-comment-selection";
+import { useCommentsStore } from "@/stores/comments-store";
 import { useUiStore } from "@/stores/ui-store";
 import { readingMinutes } from "@/lib/reading";
 import { useReaderStore } from "@/stores/reader-store";
@@ -74,6 +78,13 @@ export function ReaderView() {
   );
 }
 
+/** Room needed to the right of the article box for a comment: its width
+ * (16rem) and a little air. The comment starts where the box ends, since the
+ * gap to the text is the box's own padding. */
+const COMMENT_ROOM = 272;
+/** The least the article keeps on its left when it moves aside for them. */
+const MIN_LEFT = 16;
+
 function Article({
   article,
   scrollRef,
@@ -82,49 +93,110 @@ function Article({
   scrollRef: RefObject<HTMLElement | null>;
 }) {
   useReadingProgress(scrollRef, article.id, article.progress);
+  const articleRef = useRef<HTMLElement>(null);
+  const loadedFor = useCommentsStore((s) => s.articleId);
+  const load = useCommentsStore((s) => s.load);
+  const { selection, clear } = useCommentSelection(articleRef, scrollRef);
+  useCommentHighlights(articleRef);
+
+  useEffect(() => {
+    if (loadedFor !== article.id) void load(article.id);
+  }, [article.id, loadedFor, load]);
+
+  // Comments go in the margin to the right of their paragraph. When the
+  // window is too narrow for the article to stay centred and still leave
+  // that margin, the article slides left just enough (`left` is its new left
+  // margin); when there is no room even then, comments go under their
+  // paragraph. Only these two small values are kept, so a resize never
+  // re-renders more than it must.
+  const hasComments = useCommentsStore(
+    (s) => s.items.length > 0 || s.draft !== null,
+  );
+  const [layout, setLayout] = useState<{
+    beside: boolean;
+    left: number | null;
+  }>({ beside: false, left: null });
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    const el = articleRef.current;
+    if (!scroller || !el) return;
+    const measure = () => {
+      const room = scroller.clientWidth - el.offsetWidth;
+      const next =
+        room >= 2 * COMMENT_ROOM
+          ? { beside: true, left: null }
+          : room >= COMMENT_ROOM + MIN_LEFT
+            ? { beside: true, left: Math.round(room - COMMENT_ROOM) }
+            : { beside: false, left: null };
+      setLayout((prev) =>
+        prev.beside === next.beside && prev.left === next.left ? prev : next,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [scrollRef]);
+  const { beside } = layout;
+  const shiftLeft = hasComments && layout.left !== null ? layout.left : null;
 
   const minutes = readingMinutes(article.blocks);
 
   return (
-    <article
-      // The reading preferences (typeface, size, width) are CSS variables set
-      // from the Aa menu; `max-w` is in ch of *this* element's font.
-      style={{
-        fontFamily: "var(--reader-font)",
-        fontSize: "var(--reader-size)",
-        lineHeight: "var(--reader-leading)",
-      }}
-      className="mx-auto w-full max-w-[var(--reader-measure)] px-8 pt-20 pb-24"
-    >
-      <header className="mb-[2em]">
-        <a
-          href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={article.url}
-          className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-2 font-sans text-[0.75rem] leading-none font-medium"
-        >
-          <i aria-hidden className="bg-space size-2 rounded-full" />
-          {article.site || new URL(article.url).hostname}
-          <ArrowUpRight className="size-3 opacity-60" aria-hidden />
-        </a>
-        <h1 className="text-foreground font-serif text-[2em] leading-[1.15] font-semibold tracking-[-0.02em] text-balance">
-          {article.title}
-        </h1>
-        <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-[0.8125rem] leading-normal">
-          {article.author && (
-            <span className="text-foreground font-medium">
-              {article.author}
-            </span>
+    <>
+      <article
+        ref={articleRef}
+        // The reading preferences (typeface, size, width) are CSS variables set
+        // from the Aa menu; `max-w` is in ch of *this* element's font.
+        style={{
+          fontFamily: "var(--reader-font)",
+          fontSize: "var(--reader-size)",
+          lineHeight: "var(--reader-leading)",
+          marginLeft: shiftLeft ?? undefined,
+        }}
+        className="mx-auto w-full max-w-[var(--reader-measure)] px-8 pt-20 pb-24 transition-[margin] duration-[var(--dur)] ease-[var(--ease)]"
+      >
+        <header className="mb-[2em]">
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={article.url}
+            className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-2 font-sans text-[0.75rem] leading-none font-medium"
+          >
+            <i aria-hidden className="bg-space size-2 rounded-full" />
+            {article.site || new URL(article.url).hostname}
+            <ArrowUpRight className="size-3 opacity-60" aria-hidden />
+          </a>
+          <h1 className="text-foreground font-serif text-[2em] leading-[1.15] font-semibold tracking-[-0.02em] text-balance">
+            {article.title}
+          </h1>
+          <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-[0.8125rem] leading-normal">
+            {article.author && (
+              <span className="text-foreground font-medium">
+                {article.author}
+              </span>
+            )}
+            <span>{minutes} min read</span>
+          </div>
+          <div aria-hidden className="mt-7 flex items-center gap-2">
+            <i className="bg-honey h-[3px] w-8 rounded-full" />
+            <i className="bg-border h-px flex-1" />
+          </div>
+        </header>
+        <BlockRenderer
+          blocks={article.blocks}
+          baseUrl={article.url}
+          aside={(index) => (
+            <BlockComments
+              blockIndex={index}
+              beside={beside}
+              articleRef={articleRef}
+            />
           )}
-          <span>{minutes} min read</span>
-        </div>
-        <div aria-hidden className="mt-7 flex items-center gap-2">
-          <i className="bg-honey h-[3px] w-8 rounded-full" />
-          <i className="bg-border h-px flex-1" />
-        </div>
-      </header>
-      <BlockRenderer blocks={article.blocks} baseUrl={article.url} />
-    </article>
+        />
+      </article>
+      {selection && <AddCommentButton selection={selection} onDone={clear} />}
+    </>
   );
 }

@@ -5,6 +5,7 @@ import { resolveScope, type MessageScope } from "@/lib/scope";
 import { normalizeTag } from "@/lib/tags";
 import type {
   ArticleSummary,
+  Comment,
   Chat,
   Highlight,
   RelatedArticle,
@@ -204,6 +205,68 @@ export async function deleteAllArticles(): Promise<void> {
   await db.execute("DELETE FROM messages");
   await db.execute("DELETE FROM chats");
   await db.execute("DELETE FROM highlights");
+}
+
+// ---- Comments on paragraphs (the `annotations` table, migration 8) ----
+// Only whole notes are used: the offsets columns stay empty.
+
+export async function listComments(articleId: string): Promise<Comment[]> {
+  const db = await getDb();
+  const rows = await db.select<
+    {
+      id: string;
+      article_id: string;
+      block_index: number;
+      start_offset: number | null;
+      end_offset: number | null;
+      quote: string;
+      note: string;
+      created_at: number;
+    }[]
+  >(
+    `SELECT id, article_id, block_index, start_offset, end_offset, quote, note, created_at
+     FROM annotations
+     WHERE article_id = $1 AND note IS NOT NULL AND start_offset IS NOT NULL
+     ORDER BY block_index, start_offset, created_at`,
+    [articleId],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    articleId: r.article_id,
+    blockIndex: r.block_index,
+    start: r.start_offset ?? 0,
+    end: r.end_offset ?? 0,
+    quote: r.quote,
+    note: r.note,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function addComment(
+  c: Omit<Comment, "id" | "createdAt">,
+): Promise<Comment> {
+  const db = await getDb();
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  await db.execute(
+    `INSERT INTO annotations (id, article_id, block_index, start_offset, end_offset, quote, note, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
+    [id, c.articleId, c.blockIndex, c.start, c.end, c.quote, c.note, now],
+  );
+  return { ...c, id, createdAt: now };
+}
+
+export async function updateComment(id: string, note: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE annotations SET note = $2, updated_at = $3 WHERE id = $1",
+    [id, note, Date.now()],
+  );
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM annotations WHERE id = $1", [id]);
 }
 
 // ---- Chats about the whole library (migration 7) ----
