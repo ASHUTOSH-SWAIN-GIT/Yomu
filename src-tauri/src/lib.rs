@@ -2,6 +2,7 @@ mod agent;
 mod db;
 mod env;
 mod imgcache;
+mod mcp;
 mod scraper;
 
 use std::sync::Arc;
@@ -242,8 +243,22 @@ pub fn run() {
                 .add_migrations(db::DB_URL, db::migrations())
                 .build(),
         )
-        .manage(harness)
+        .manage(Arc::clone(&harness))
         .setup(move |app| {
+            // The library as a read-only server the agent can use (see
+            // mcp.rs). If it cannot start the agent still works, with the
+            // passages Yomu puts in each question.
+            {
+                use tauri::Manager;
+                let db_path = app.path().app_data_dir()?.join("yomu.db");
+                let harness = Arc::clone(&harness);
+                tauri::async_runtime::spawn(async move {
+                    match mcp::start(db_path).await {
+                        Ok(info) => harness.set_mcp(info),
+                        Err(e) => log::error!("{e}"),
+                    }
+                });
+            }
             // Cmd+W closes a tab (handled in the page), so the default
             // menu's "Close Window" must not take that shortcut. The window
             // still closes with its red button and Cmd+Q.

@@ -8,7 +8,7 @@
 //! mock agent (see `scripts/mock-acp-agent.mjs` and `agent/tests.rs`)
 //! without a real Codex install in CI.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
@@ -149,6 +149,9 @@ fn spawn_reader(
 ) {
     tokio::spawn(async move {
         let mut lines = BufReader::new(stdout).lines();
+        // Tool calls (by id) that go to Yomu's own read-only server, learned
+        // from the updates the agent sends as it starts them.
+        let mut yomu_calls: HashSet<String> = HashSet::new();
         loop {
             let line = match lines.next_line().await {
                 Ok(Some(line)) => line,
@@ -190,8 +193,12 @@ fn spawn_reader(
                 (Some(id), Some(method)) => {
                     // The agent is asking *us* for something. Always
                     // answer, or the agent's turn hangs waiting on us.
-                    let reply = reply_to_agent_request(&method, id);
-                    let _ = notifications.send((method, message.params));
+                    let (reply, allowed) =
+                        reply_to_agent_request(&method, id, &message.params, &yomu_calls);
+                    // An allowed call is not news: only a refusal is shown.
+                    if !allowed {
+                        let _ = notifications.send((method, message.params));
+                    }
                     let mut line = serde_json::to_vec(&reply).expect("Value always serializes");
                     line.push(b'\n');
                     let mut stdin = stdin.lock().await;
@@ -199,6 +206,9 @@ fn spawn_reader(
                     let _ = stdin.flush().await;
                 }
                 (None, Some(method)) => {
+                    if method == "session/update" {
+                        note_yomu_call(&message.params, &mut yomu_calls);
+                    }
                     let _ = notifications.send((method, message.params));
                 }
                 _ => {}
@@ -222,19 +232,84 @@ fn spawn_reader(
 /// "default deny" lives: permission requests are always cancelled, and
 /// since the client advertises no `fs`/`terminal` capabilities, anything
 /// else is "method not found".
-fn reply_to_agent_request(method: &str, id: Value) -> Value {
-    if method == "session/request_permission" {
-        json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "result": { "outcome": { "outcome": "cancelled" } },
-        })
-    } else {
-        json!({
+///
+/// The exceptions, which only read: a call to a tool of Yomu's own library
+/// server (see `mcp.rs`) and fetching a web page. Each is approved once, so
+/// the agent can look things up; the second value says whether it was.
+fn reply_to_agent_request(
+    method: &str,
+    id: Value,
+    params: &Value,
+    yomu_calls: &HashSet<String>,
+) -> (Value, bool) {
+    if method != "session/request_permission" {
+        let reply = json!({
             "jsonrpc": "2.0",
             "id": id,
             "error": { "code": -32601, "message": format!("method not supported: {method}") },
+        });
+        return (reply, false);
+    }
+    // A web fetch (ACP kind "fetch"): looking something up is allowed. The
+    // agent still cannot write, run commands or read files.
+    let is_web_fetch = params.pointer("/toolCall/kind").and_then(Value::as_str) == Some("fetch");
+    let is_yomu_call = params
+        .pointer("/toolCall/toolCallId")
+        .and_then(Value::as_str)
+        .is_some_and(|call| yomu_calls.contains(call));
+    let allow_once = (is_web_fetch || is_yomu_call)
+        .then_some(params)
+        .and_then(|p| p.get("options")?.as_array())
+        .and_then(|options| {
+            options
+                .iter()
+                .find(|o| o.get("kind").and_then(Value::as_str) == Some("allow_once"))
         })
+        .and_then(|o| o.get("optionId").and_then(Value::as_str));
+    match allow_once {
+        Some(option_id) => (
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": { "outcome": { "outcome": "selected", "optionId": option_id } },
+            }),
+            true,
+        ),
+        None => (
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": { "outcome": { "outcome": "cancelled" } },
+            }),
+            false,
+        ),
+    }
+}
+
+/// The name Yomu's library server goes by when it is given to an agent.
+pub const MCP_SERVER_NAME: &str = "yomu";
+
+/// Remembers a tool call that targets Yomu's server. Agents announce a call
+/// as `tool_call` (naming the server in `rawInput.server`, or as
+/// `mcp.<server>.<tool>` in the title) before they ask permission for it by
+/// id alone.
+fn note_yomu_call(params: &Value, yomu_calls: &mut HashSet<String>) {
+    let Some(update) = params.get("update") else {
+        return;
+    };
+    if update.get("sessionUpdate").and_then(Value::as_str) != Some("tool_call") {
+        return;
+    }
+    let from_server = update.pointer("/rawInput/server").and_then(Value::as_str)
+        == Some(MCP_SERVER_NAME)
+        || update
+            .get("title")
+            .and_then(Value::as_str)
+            .is_some_and(|t| t.starts_with(&format!("mcp.{MCP_SERVER_NAME}.")));
+    if let Some(call) = update.get("toolCallId").and_then(Value::as_str) {
+        if from_server {
+            yomu_calls.insert(call.to_string());
+        }
     }
 }
 

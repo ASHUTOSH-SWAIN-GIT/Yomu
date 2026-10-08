@@ -18,6 +18,13 @@ describe("classifyError", () => {
     expect(classifyError(raw).kind).toBe(kind);
   });
 
+  it("recognises a hung agent", () => {
+    expect(
+      classifyError("The agent stopped responding (nothing for 180 seconds).")
+        .kind,
+    ).toBe("timeout");
+  });
+
   it("passes unknown errors through verbatim", () => {
     expect(classifyError("weird").message).toBe("weird");
   });

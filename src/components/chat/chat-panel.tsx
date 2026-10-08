@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { CopyButton } from "@/components/chat/copy-button";
+import { AgentActivity } from "@/components/chat/agent-activity";
 import { Markdown } from "@/components/chat/markdown";
 import { chatArtFor } from "@/lib/chat-art";
 import { openChatFullInNewTab } from "@/lib/navigate";
@@ -20,6 +21,7 @@ export function ChatPanel() {
   );
   const messages = useChatStore((s) => s.messages);
   const streaming = useChatStore((s) => s.streaming);
+  const progress = useChatStore((s) => s.progress);
   const error = useChatStore((s) => s.error);
   const ask = useChatStore((s) => s.ask);
   const stop = useChatStore((s) => s.stop);
@@ -152,6 +154,7 @@ export function ChatPanel() {
                   </li>
                 ),
               )}
+              {streaming && <AgentActivity progress={progress} />}
               {waiting && (
                 <li
                   aria-label="Thinking"

@@ -27,7 +27,7 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("Ownership in Rust (https://example.dev/post)");
     expect(prompt).toContain("Section: Borrowing");
     expect(prompt).toContain('"""\nborrow a value\n"""');
-    expect(prompt).toContain("Do not use tools");
+    expect(prompt).toContain("look things up on the web");
     expect(prompt).toContain("Explain the selected passage");
   });
 
@@ -276,7 +276,7 @@ describe("buildArticlePrompt", () => {
     const prompt = buildArticlePrompt(article, "List the key points.");
     expect(prompt).toContain("Ownership in Rust (https://example.dev/post)");
     expect(prompt).toContain("Each value has one owner.");
-    expect(prompt).toContain("Do not use tools");
+    expect(prompt).toContain("look things up on the web");
     expect(prompt.trim().endsWith("List the key points.")).toBe(true);
   });
 
@@ -309,11 +309,26 @@ describe("buildLibraryPrompt", () => {
     { articleId: "b", title: "Go generics", snippet: "type parameters" },
   ];
 
+  it("treats the saved articles as a source, not a limit", () => {
+    const prompt = buildLibraryPrompt("What is ownership?", passages, null);
+    expect(prompt).toContain("you are not limited to them");
+    expect(prompt).toContain("add your own knowledge");
+    expect(prompt).not.toContain("only what comes from");
+  });
+
+  it("offers Yomu's library tools, and only those", () => {
+    const prompt = buildLibraryPrompt("What is ownership?", passages, null);
+    expect(prompt).toContain('server named "yomu"');
+    expect(prompt).toContain("search_library");
+    expect(prompt).toContain("look things up on the web");
+    expect(prompt).toContain("Do not read local files or run commands");
+  });
+
   it("lists the supplied passages and restricts citations to them", () => {
     const prompt = buildLibraryPrompt("What is ownership?", passages, null);
     expect(prompt).toContain('- "Rust ownership": one owner at a time');
     expect(prompt).toContain('- "Go generics": type parameters');
-    expect(prompt).toContain("never cite a title that is not listed");
+    expect(prompt).toContain("Never cite a title you were not given");
     expect(prompt).toContain("Question: What is ownership?");
   });
 

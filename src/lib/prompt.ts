@@ -151,7 +151,9 @@ export function buildPrompt(
       : null;
 
   return [
-    "You are helping a developer read a technical article. Answer from the text below and your own knowledge — quote exact phrases from the article when it helps ground your answer, rather than paraphrasing loosely. Do not use tools, read files, or browse. Reply in Markdown.",
+    "You are helping a developer read a technical article. Answer from the text below and your own knowledge — quote exact phrases from the article when it helps ground your answer, rather than paraphrasing loosely. " +
+      WEB_LOOKUP +
+      " Reply in Markdown.",
     "",
     `Article: ${article.title} (${article.url})`,
     toc,
@@ -192,7 +194,9 @@ export function buildArticlePrompt(
   const body = fullArticleText(article.blocks);
   const truncated = body.length > ARTICLE_MAX_CHARS;
   return [
-    "You are helping a developer read a technical article, which is below. Treat it as the main source and quote it when that helps, but you may also use your own knowledge to explain a term, add context or answer a related question. Give complete, clear answers: thorough when the question needs it, short when it does not. Do not use tools, read files, or browse. Reply in Markdown.",
+    "You are helping a developer read a technical article, which is below. Treat it as the main source and quote it when that helps, but you may also use your own knowledge to explain a term, add context or answer a related question. Give complete, clear answers: thorough when the question needs it, short when it does not. " +
+      WEB_LOOKUP +
+      " Reply in Markdown.",
     "",
     `Article: ${article.title} (${article.url})`,
     "",
@@ -202,6 +206,18 @@ export function buildArticlePrompt(
     [instruction, ...personalizationNotes].join("\n"),
   ].join("\n");
 }
+
+/** The agent may use the web: its own knowledge and Yomu's saved blogs are
+ * sources, never limits. It still reads no local files and runs nothing
+ * (the sandbox enforces that too). */
+const WEB_LOOKUP =
+  "You may look things up on the web when that makes your answer more accurate or current (documentation, release notes, recent changes); when you do, say so and name the source. Do not read local files or run commands.";
+
+/** Tells the model about Yomu's own read-only library tools (an MCP server
+ * named "yomu", see src-tauri/src/mcp.rs). Said in a way that costs nothing
+ * for an agent that was not given them. */
+const LIBRARY_TOOLS =
+  'If you have tools from a server named "yomu", use them when the passages are not enough: search_library finds passages across the saved articles, read_article reads one (or one section of it) in full, list_articles and list_collections show what is saved, and get_comments shows the reader\'s own notes on an article. They only read.';
 
 /** Prompt for the universal chat: the whole inventory of saved articles (so
  * the model knows what exists) plus the passages that best match this
@@ -236,7 +252,11 @@ export function buildInventoryPrompt(
       ? passages.map((r) => `- "${r.title}": ${r.snippet}`).join("\n")
       : "(No saved article text matched this message.)";
   return [
-    "You are a knowledgeable assistant chatting with a developer who keeps a library of saved blogs. Answer their message fully and helpfully, from your own knowledge, whatever the topic: you are not limited to their blogs, and you must never refuse or hold back an explanation because their blogs do not cover it. Below are the titles of everything they have saved, and passages from the saved articles that best match their latest message. Use them as extra context when they are relevant, and then cite the article by its title in quotes (only titles that are listed). When the blogs are not relevant, ignore them and just answer. Do not use tools, read files, or browse. Reply in Markdown.",
+    "You are a knowledgeable assistant chatting with a developer who keeps a library of saved blogs. Answer their message fully and helpfully, from your own knowledge, whatever the topic: you are not limited to their blogs, and you must never refuse or hold back an explanation because their blogs do not cover it. Below are the titles of everything they have saved, and passages from the saved articles that best match their latest message. Use them as extra context when they are relevant, and then cite the article by its title in quotes (only titles that are listed). When the blogs are not relevant, ignore them and just answer. " +
+      LIBRARY_TOOLS +
+      " " +
+      WEB_LOOKUP +
+      " Reply in Markdown.",
     "",
     `Saved articles (${inventory.length}):`,
     (listed || "(none yet)") + more,
@@ -251,9 +271,10 @@ export function buildInventoryPrompt(
     .join("\n");
 }
 
-/** Prompt for a question across the developer's saved library. The model
- * may only draw on the passages supplied, and may only cite titles that are
- * in them, so the UI can trust and link every citation it shows. */
+/** Prompt for a question across the developer's saved library. The saved
+ * articles are a source, not a limit: the model adds its own knowledge where
+ * they fall short. It may only cite titles it was given, so the UI can trust
+ * and link every citation it shows. */
 export function buildLibraryPrompt(
   question: string,
   passages: RelatedArticle[],
@@ -265,7 +286,11 @@ export function buildLibraryPrompt(
       ? passages.map((r) => `- "${r.title}": ${r.snippet}`).join("\n")
       : "(No saved article matched this question.)";
   return [
-    "You are helping a developer search their own saved reading. Answer using only the passages below, which come from articles they saved. Cite the article title in quotes whenever you use a passage, and never cite a title that is not listed. If the passages do not answer the question, say so plainly instead of guessing. Do not use tools, read files, or browse. Reply in Markdown.",
+    "You are a knowledgeable assistant helping a developer who keeps a library of saved blogs. Answer the question fully and correctly. Use their saved articles where they help (the passages below, and anything you look up with the tools) and cite the article title in quotes when you do, but you are not limited to them: add your own knowledge wherever the articles are incomplete, out of date or silent, and never leave an answer thin or refuse because their blogs do not cover it. When it matters, make clear which parts come from their saved articles and which from general knowledge. Never cite a title you were not given. " +
+      LIBRARY_TOOLS +
+      " " +
+      WEB_LOOKUP +
+      " Reply in Markdown.",
     "",
     currentTitle
       ? `The developer is currently reading: "${currentTitle}"`

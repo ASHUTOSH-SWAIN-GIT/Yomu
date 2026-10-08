@@ -450,6 +450,32 @@ describe("stop", () => {
   });
 });
 
+describe("what the agent reports while it works", () => {
+  it("shows thinking and steps during the turn, then clears them", async () => {
+    let during = useChatStore.getState().progress;
+    m(commands.agentPrompt).mockImplementation(async (sessionId: string) => {
+      emit({ kind: "thought", session_id: sessionId, text: "Hmm." });
+      emit({
+        kind: "step",
+        session_id: sessionId,
+        id: "t1",
+        title: "Search the library",
+        status: "pending",
+      });
+      during = useChatStore.getState().progress;
+      emit({ kind: "token", session_id: sessionId, text: "Answer" });
+      emit({ kind: "done", session_id: sessionId });
+    });
+    await useChatStore.getState().explain(article, selection);
+
+    expect(during.thinking).toBe("Hmm.");
+    expect(during.steps).toEqual([
+      { id: "t1", title: "Search the library", status: "pending" },
+    ]);
+    expect(useChatStore.getState().progress.steps).toEqual([]);
+  });
+});
+
 describe("errors and retry", () => {
   it("classifies the failure, drops the partial answer, and retry re-runs the turn", async () => {
     m(commands.agentPrompt).mockRejectedValueOnce(
@@ -468,6 +494,23 @@ describe("errors and retry", () => {
     expect(s.error).toBeNull();
     expect(last(s.messages)?.text).toBe("ok now");
     expect(commands.agentPrompt).toHaveBeenCalledTimes(2);
+  });
+
+  it("a hung agent starts a fresh session on retry", async () => {
+    m(commands.agentPrompt).mockRejectedValueOnce(
+      new Error("The agent stopped responding (nothing for 180 seconds)."),
+    );
+    await useChatStore.getState().explain(article, selection);
+    const s = useChatStore.getState();
+    expect(s.error?.kind).toBe("timeout");
+    expect(s.sessionId).toBeNull();
+    expect(s.chat?.acpSessionId).toBeNull();
+
+    m(commands.agentNewSession).mockResolvedValue("s2");
+    agentReplies("back");
+    await useChatStore.getState().retry();
+    expect(commands.agentNewSession).toHaveBeenCalledTimes(2);
+    expect(commands.agentResumeSession).not.toHaveBeenCalled();
   });
 
   it("surfaces denied permission requests as an error", async () => {

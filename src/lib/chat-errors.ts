@@ -3,6 +3,7 @@ export type ChatErrorKind =
   | "logged_out"
   | "adapter_crashed"
   | "adapter_missing"
+  | "timeout"
   | "other";
 
 export interface ChatError {
@@ -25,6 +26,13 @@ export function classifyError(raw: string): ChatError {
     return {
       kind: "logged_out",
       message: "Codex isn't signed in. Sign in with ChatGPT to continue.",
+    };
+  }
+  if (/stopped responding/i.test(raw)) {
+    return {
+      kind: "timeout",
+      message:
+        "The agent stopped responding, so Yomu gave up on this answer. Retry starts a fresh session.",
     };
   }
   if (/exited|closed before responding|broken pipe/i.test(raw)) {

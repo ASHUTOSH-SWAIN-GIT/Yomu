@@ -47,4 +47,19 @@ export interface AgentModel {
 export type AgentEvent =
   | { kind: "token"; session_id: string; text: string }
   | { kind: "done"; session_id: string }
-  | { kind: "permission_request"; session_id: string; description: string };
+  | { kind: "permission_request"; session_id: string; description: string }
+  | { kind: "thought"; session_id: string; text: string }
+  | {
+      kind: "step";
+      session_id: string;
+      id: string;
+      /** Only the first event about a step is sure to have these. */
+      title: string | null;
+      status: string | null;
+    }
+  | {
+      kind: "plan";
+      session_id: string;
+      entries: { content: string; status: string }[];
+    }
+  | { kind: "usage"; session_id: string; used: number; size: number };

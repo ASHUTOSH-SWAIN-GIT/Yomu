@@ -1,6 +1,11 @@
 import { createStore } from "zustand";
 import { agentCancel, agentNewSession, agentPrompt } from "@/lib/commands";
 import { onAgentEvent } from "@/lib/agent-events";
+import {
+  applyProgress,
+  emptyProgress,
+  type Progress,
+} from "@/lib/agent-progress";
 import { applyChosenModel } from "@/lib/models";
 import { classifyError, type ChatError } from "@/lib/chat-errors";
 import {
@@ -39,6 +44,8 @@ export interface LibraryChatStore {
   deleteChat: (id: string) => Promise<void>;
   messages: LibraryMessage[];
   streaming: boolean;
+  /** What the agent is doing this turn besides writing the answer. */
+  progress: Progress;
   error: ChatError | null;
   /** Live ACP session. Not saved: a reopened chat starts a new session and
    * is given what was said so far. */
@@ -79,7 +86,7 @@ registerPart("libraryChat", (bundle) => {
           });
           break;
         case "done": {
-          set({ streaming: false });
+          set({ streaming: false, progress: emptyProgress });
           const { chatId, messages } = get();
           const last = messages[messages.length - 1];
           if (chatId && last?.role === "assistant" && last.text) {
@@ -89,6 +96,12 @@ registerPart("libraryChat", (bundle) => {
           }
           break;
         }
+        case "thought":
+        case "step":
+        case "plan":
+        case "usage":
+          set((s) => ({ progress: applyProgress(s.progress, event) }));
+          break;
         case "permission_request":
           set({
             error: {
@@ -104,7 +117,7 @@ registerPart("libraryChat", (bundle) => {
     async function run(question: string) {
       const mine = epoch;
       lastQuestion = question;
-      set({ streaming: true, error: null });
+      set({ streaming: true, error: null, progress: emptyProgress });
       try {
         let sessionId = get().sessionId;
         // A session that has not been in this conversation is told what was
@@ -144,6 +157,7 @@ registerPart("libraryChat", (bundle) => {
         // Drop a half streamed answer so Retry doesn't stack on top of it.
         set((s) => ({
           streaming: false,
+          progress: emptyProgress,
           error,
           // Retry starts a new session, in case this one went away with a
           // crashed agent.
@@ -165,6 +179,7 @@ registerPart("libraryChat", (bundle) => {
       chats: [],
       messages: [],
       streaming: false,
+      progress: emptyProgress,
       error: null,
       sessionId: null,
 
@@ -229,6 +244,7 @@ registerPart("libraryChat", (bundle) => {
             liveChatId: null,
             messages,
             streaming: false,
+            progress: emptyProgress,
             error: null,
             sessionId: null,
           });
@@ -256,6 +272,7 @@ registerPart("libraryChat", (bundle) => {
           liveChatId: null,
           messages: [],
           streaming: false,
+          progress: emptyProgress,
           error: null,
           sessionId: null,
         });

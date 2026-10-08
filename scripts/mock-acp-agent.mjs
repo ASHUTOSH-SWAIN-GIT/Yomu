@@ -16,6 +16,7 @@ import readline from "node:readline";
 let sessionCounter = 0;
 const sessions = new Map(); // sessionId -> modeId
 const models = new Map(); // sessionId -> modelId
+const mcpServers = new Map(); // sessionId -> mcpServers given at session/new
 let requestCounter = 0;
 const pendingClientReplies = new Map();
 const cancelled = new Set();
@@ -43,6 +44,83 @@ async function handlePrompt(id, { sessionId, prompt }) {
   // Report attached images so tests can assert the wire format.
   const image = (prompt ?? []).find((part) => part.type === "image");
   if (image) reply += ` [image ${image.mimeType} ${image.data?.length}]`;
+
+  // "STALL" hangs: nothing is sent and the prompt never answers, like an
+  // agent that has wedged (the harness must give up on its own).
+  if (text.includes("STALL")) return;
+
+  // "RICH" sends what a real agent sends besides words.
+  if (text.includes("RICH")) {
+    const update = (u) => notify("session/update", { sessionId, update: u });
+    update({
+      sessionUpdate: "agent_thought_chunk",
+      content: { type: "text", text: "Let me look." },
+    });
+    update({
+      sessionUpdate: "tool_call",
+      toolCallId: "t1",
+      title: "Search the library",
+      kind: "search",
+      status: "pending",
+    });
+    update({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "t1",
+      status: "completed",
+    });
+    update({
+      sessionUpdate: "plan",
+      entries: [{ content: "Answer", priority: "high", status: "in_progress" }],
+    });
+    update({ sessionUpdate: "usage_update", used: 1200, size: 200000 });
+  }
+
+  // "SHOW_MCP" reports the MCP servers the client gave this session.
+  if (text.includes("SHOW_MCP")) {
+    reply = `mcp ${JSON.stringify(mcpServers.get(sessionId) ?? [])}`;
+  }
+
+  // "MCPCALL" / "OTHERCALL" call a tool the way Codex does: announce the
+  // call (naming its server), then ask permission for it by id alone.
+  if (text.includes("MCPCALL") || text.includes("OTHERCALL")) {
+    const server = text.includes("MCPCALL") ? "yomu" : "other";
+    notify("session/update", {
+      sessionId,
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "c1",
+        title: `mcp.${server}.search_library`,
+        kind: "execute",
+        status: "in_progress",
+        rawInput: { server, tool: "search_library", arguments: {} },
+      },
+    });
+    const answer = await askClient("session/request_permission", {
+      sessionId,
+      toolCall: { toolCallId: "c1", kind: "execute", status: "pending" },
+      options: [
+        { optionId: "allow_once", name: "Allow", kind: "allow_once" },
+        { optionId: "reject_once", name: "Reject", kind: "reject_once" },
+      ],
+    });
+    const outcome = answer?.result?.outcome;
+    reply = `call outcome: ${outcome?.outcome}/${outcome?.optionId ?? "-"}`;
+  }
+
+  // "FETCHCALL" asks to fetch a web page; "RUNCALL" asks to run a command.
+  if (text.includes("FETCHCALL") || text.includes("RUNCALL")) {
+    const kind = text.includes("FETCHCALL") ? "fetch" : "execute";
+    const answer = await askClient("session/request_permission", {
+      sessionId,
+      toolCall: { toolCallId: "w1", kind, status: "pending" },
+      options: [
+        { optionId: "allow_once", name: "Allow", kind: "allow_once" },
+        { optionId: "reject_once", name: "Reject", kind: "reject_once" },
+      ],
+    });
+    const outcome = answer?.result?.outcome;
+    reply = `call outcome: ${outcome?.outcome}/${outcome?.optionId ?? "-"}`;
+  }
 
   if (text.includes("PERMISSION")) {
     const answer = await askClient("session/request_permission", {
@@ -110,7 +188,10 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
 
   switch (method) {
     case "initialize":
-      respond(id, { protocolVersion: 1, agentCapabilities: {} });
+      respond(id, {
+        protocolVersion: 1,
+        agentCapabilities: { mcpCapabilities: { http: true } },
+      });
       break;
     case "session/new": {
       const sessionId = `mock-session-${++sessionCounter}`;
@@ -118,6 +199,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       // Like Codex, the session starts on the model from the user's config,
       // which here is one the account does not offer.
       models.set(sessionId, "retired[low]");
+      mcpServers.set(sessionId, params.mcpServers ?? []);
       respond(id, {
         sessionId,
         models: {
@@ -131,8 +213,10 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       break;
     }
     case "session/resume":
-      if (sessions.has(params.sessionId)) respond(id, {});
-      else respondError(id, "session not found");
+      if (sessions.has(params.sessionId)) {
+        mcpServers.set(params.sessionId, params.mcpServers ?? []);
+        respond(id, {});
+      } else respondError(id, "session not found");
       break;
     case "session/set_mode":
       if (!sessions.has(params.sessionId)) respondError(id, "unknown session");

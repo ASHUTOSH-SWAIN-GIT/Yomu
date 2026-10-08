@@ -20,6 +20,11 @@ import {
   relatedArticles as findRelatedArticles,
   setChatSession,
 } from "@/lib/db";
+import {
+  applyProgress,
+  emptyProgress,
+  type Progress,
+} from "@/lib/agent-progress";
 import { priorExplanations as findPriorExplanations } from "@/lib/exchanges";
 import { explainPrefInstructions } from "@/lib/explain-prefs";
 import { logError } from "@/lib/log";
@@ -62,6 +67,8 @@ export interface ChatStore {
   /** Every passage explained in this article, painted in the reader. */
   highlights: Highlight[];
   streaming: boolean;
+  /** What the agent is doing this turn besides writing the answer. */
+  progress: Progress;
   error: ChatError | null;
   loadForArticle: (articleId: string | null) => Promise<void>;
   explain: (article: StoredArticle, selection: Selection) => Promise<void>;
@@ -177,7 +184,7 @@ registerPart(
           case "done": {
             const { chat, messages } = get();
             const last = messages[messages.length - 1];
-            set({ streaming: false });
+            set({ streaming: false, progress: emptyProgress });
             if (chat && last?.role === "assistant" && last.text) {
               void addMessage(
                 chat.id,
@@ -189,6 +196,12 @@ registerPart(
             }
             break;
           }
+          case "thought":
+          case "step":
+          case "plan":
+          case "usage":
+            set((s) => ({ progress: applyProgress(s.progress, event) }));
+            break;
           case "permission_request":
             // Denied on the Rust side (agent/rpc.rs); tell the user why
             // the agent may not have done what it wanted.
@@ -239,7 +252,7 @@ registerPart(
         sendsArticle = true,
       ) {
         lastBuild = build;
-        set({ streaming: true, error: null });
+        set({ streaming: true, error: null, progress: emptyProgress });
         try {
           const { sessionId, fresh } = await ensureSession(chat);
           const alreadySent = fullContextSentFor.has(sessionId);
@@ -258,7 +271,16 @@ registerPart(
           // Drop a half streamed answer so Retry doesn't stack on top of it.
           set((s) => ({
             streaming: false,
+            progress: emptyProgress,
             error,
+            // A hung session is not trusted again: Retry starts a new one,
+            // which is given the article and the conversation afresh.
+            ...(error.kind === "timeout"
+              ? {
+                  sessionId: null,
+                  chat: s.chat ? { ...s.chat, acpSessionId: null } : s.chat,
+                }
+              : {}),
             messages:
               s.messages[s.messages.length - 1]?.role === "assistant"
                 ? s.messages.slice(0, -1)
@@ -368,6 +390,7 @@ registerPart(
         messages: [],
         highlights: [],
         streaming: false,
+        progress: emptyProgress,
         error: null,
 
         async loadForArticle(articleId) {
@@ -378,6 +401,7 @@ registerPart(
             messages: [],
             highlights: [],
             streaming: false,
+            progress: emptyProgress,
             error: null,
           });
           lastBuild = null;

@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex as StdMutex};
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -8,8 +9,9 @@ use tokio::process::Command;
 use tokio::sync::{mpsc, Mutex};
 
 use super::config::AgentConfig;
-use super::events::AgentEvent;
-use super::rpc::{NotificationSender, RpcClient};
+use super::events::{AgentEvent, PlanEntry};
+use super::rpc::{NotificationSender, RpcClient, MCP_SERVER_NAME};
+use crate::mcp::McpInfo;
 
 /// Real Codex ACP adapter, pinned (ROADMAP.md risk: "pin versions").
 /// This constant plus the notification mapping below is the "swappable
@@ -147,7 +149,22 @@ pub struct AgentHarness {
     models: StdMutex<ModelState>,
     /// Which agent to start; changed from the settings.
     config: Arc<StdMutex<AgentConfig>>,
+    /// When each session last sent anything, to tell a slow turn from one
+    /// that has hung.
+    activity: Arc<StdMutex<HashMap<String, Instant>>>,
+    /// How long a turn may stay silent before it is given up on.
+    idle_timeout: Duration,
+    /// Where Yomu's library server is, once it has started; given to every
+    /// session of an agent that can use it.
+    mcp: StdMutex<Option<McpInfo>>,
 }
+
+/// A turn that sends nothing (no words, thoughts or steps) for this long is
+/// treated as hung. Generous, because a model can think for a while before
+/// its first word.
+const TURN_IDLE_TIMEOUT: Duration = Duration::from_secs(180);
+/// How often a running turn is checked against the timeout.
+const IDLE_CHECK: Duration = Duration::from_millis(250);
 
 /// A model the account can use, for the picker in the chat.
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -175,6 +192,9 @@ const MAX_MODEL_SWITCHES: usize = 4;
 struct Connection {
     client: Arc<RpcClient>,
     notify_tx: NotificationSender,
+    /// The agent said (at `initialize`) that it can use an MCP server over
+    /// HTTP.
+    http_mcp: bool,
 }
 
 impl AgentHarness {
@@ -187,6 +207,9 @@ impl AgentHarness {
             command_factory: Box::new(move || command_for(&for_factory.lock().unwrap())),
             models: StdMutex::default(),
             config,
+            activity: Arc::default(),
+            idle_timeout: TURN_IDLE_TIMEOUT,
+            mcp: StdMutex::default(),
         }
     }
 
@@ -201,7 +224,37 @@ impl AgentHarness {
             command_factory: Box::new(command_factory),
             models: StdMutex::default(),
             config: Arc::new(StdMutex::new(AgentConfig::default())),
+            activity: Arc::default(),
+            idle_timeout: TURN_IDLE_TIMEOUT,
+            mcp: StdMutex::default(),
         }
+    }
+
+    /// Tells the harness where Yomu's library server is. Sessions started
+    /// from now on can look the library up themselves.
+    pub fn set_mcp(&self, info: McpInfo) {
+        *self.mcp.lock().unwrap() = Some(info);
+    }
+
+    /// The `mcpServers` list for a new or resumed session: Yomu's library
+    /// server when there is one and the agent can use it, else nothing.
+    fn mcp_servers(&self, conn: &Connection) -> Value {
+        match (&*self.mcp.lock().unwrap(), conn.http_mcp) {
+            (Some(info), true) => json!([{
+                "type": "http",
+                "name": MCP_SERVER_NAME,
+                "url": info.url,
+                "headers": [{ "name": "Authorization", "value": format!("Bearer {}", info.token) }],
+            }]),
+            _ => json!([]),
+        }
+    }
+
+    /// For tests: a short silence limit, so a hung turn fails fast.
+    #[cfg(test)]
+    pub fn with_idle_timeout(mut self, idle_timeout: Duration) -> Self {
+        self.idle_timeout = idle_timeout;
+        self
     }
 
     /// Switches to another agent: stops the current one and forgets what it
@@ -238,18 +291,27 @@ impl AgentHarness {
 
         let command =
             (self.command_factory)().ok_or_else(|| format!("`{AGENT_LABEL}` is not available"))?;
-        let conn = spawn_agent(command, self.event_tx.clone()).inspect_err(|e| {
-            log::error!("{e}");
-        })?;
+        let conn = spawn_agent(command, self.event_tx.clone(), Arc::clone(&self.activity))
+            .inspect_err(|e| {
+                log::error!("{e}");
+            })?;
         // No fs/terminal capabilities: the agent can't ask us to touch
         // files or run commands, on top of the read-only mode below.
-        conn.client
+        let init = conn
+            .client
             .request(
                 "initialize",
                 json!({ "protocolVersion": 1, "clientCapabilities": {} }),
             )
             .await
             .inspect_err(|e| log::error!("agent initialize failed: {e}"))?;
+        let conn = Connection {
+            http_mcp: init
+                .pointer("/agentCapabilities/mcpCapabilities/http")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            ..conn
+        };
 
         *guard = Some(conn.clone());
         Ok(conn)
@@ -264,7 +326,7 @@ impl AgentHarness {
             .client
             .request(
                 "session/new",
-                json!({ "cwd": cwd.to_string_lossy(), "mcpServers": [] }),
+                json!({ "cwd": cwd.to_string_lossy(), "mcpServers": self.mcp_servers(&conn) }),
             )
             .await?;
         let session_id = result
@@ -291,7 +353,7 @@ impl AgentHarness {
                 json!({
                     "sessionId": session_id,
                     "cwd": cwd.to_string_lossy(),
-                    "mcpServers": [],
+                    "mcpServers": self.mcp_servers(&conn),
                 }),
             )
             .await?;
@@ -327,7 +389,7 @@ impl AgentHarness {
         // again, a few times at most.
         let mut tried = HashSet::new();
         loop {
-            match conn.client.request("session/prompt", params.clone()).await {
+            match self.prompt_request(&conn, session_id, params.clone()).await {
                 Ok(_) => break,
                 Err(e) => {
                     if is_model_rejected(&e)
@@ -348,6 +410,53 @@ impl AgentHarness {
             json!({ "sessionId": session_id }),
         ));
         Ok(())
+    }
+
+    /// Sends `session/prompt` and waits for the turn to end, but gives up
+    /// (and asks the agent to stop) if the session goes quiet for longer than
+    /// the idle timeout, so a hung agent cannot freeze a chat forever.
+    async fn prompt_request(
+        &self,
+        conn: &Connection,
+        session_id: &str,
+        params: Value,
+    ) -> Result<Value, String> {
+        self.touch(session_id);
+        let request = conn.client.request("session/prompt", params);
+        tokio::pin!(request);
+        loop {
+            tokio::select! {
+                result = &mut request => return result,
+                _ = tokio::time::sleep(IDLE_CHECK) => {
+                    if self.idle_for(session_id) > self.idle_timeout {
+                        let _ = conn
+                            .client
+                            .notify("session/cancel", json!({ "sessionId": session_id }))
+                            .await;
+                        log::error!("agent went quiet for {:?}; giving up on the turn", self.idle_timeout);
+                        return Err(format!(
+                            "The agent stopped responding (nothing for {} seconds).",
+                            self.idle_timeout.as_secs()
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    fn touch(&self, session_id: &str) {
+        self.activity
+            .lock()
+            .unwrap()
+            .insert(session_id.to_string(), Instant::now());
+    }
+
+    fn idle_for(&self, session_id: &str) -> Duration {
+        self.activity
+            .lock()
+            .unwrap()
+            .get(session_id)
+            .map_or(Duration::ZERO, Instant::elapsed)
     }
 
     /// Starts the agent process ahead of the first prompt so the user
@@ -626,11 +735,19 @@ fn pick_model(current: Option<&str>, available: &[&str]) -> Option<String> {
 fn spawn_agent(
     command: Command,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
+    activity: Arc<StdMutex<HashMap<String, Instant>>>,
 ) -> Result<Connection, String> {
     let (notify_tx, mut notification_rx) = mpsc::unbounded_channel::<(String, Value)>();
 
     tokio::spawn(async move {
         while let Some((method, params)) = notification_rx.recv().await {
+            // Anything from a session shows it is alive.
+            if let Some(id) = params.get("sessionId").and_then(Value::as_str) {
+                activity
+                    .lock()
+                    .unwrap()
+                    .insert(id.to_string(), Instant::now());
+            }
             if let Some(event) = parse_notification(&method, &params) {
                 let _ = event_tx.send(event);
             }
@@ -642,6 +759,7 @@ fn spawn_agent(
     Ok(Connection {
         client: Arc::new(client),
         notify_tx,
+        http_mcp: false,
     })
 }
 
@@ -652,17 +770,54 @@ fn parse_notification(method: &str, params: &Value) -> Option<AgentEvent> {
         TURN_FINISHED => Some(AgentEvent::Done { session_id }),
         "session/update" => {
             let update = params.get("update")?;
-            if update.get("sessionUpdate")?.as_str()? != "agent_message_chunk" {
-                return None;
+            let text_of = |update: &Value| -> Option<String> {
+                let content = update.get("content")?;
+                if content.get("type")?.as_str()? != "text" {
+                    return None;
+                }
+                Some(content.get("text")?.as_str()?.to_string())
+            };
+            let string_at = |key: &str| update.get(key).and_then(Value::as_str).map(str::to_string);
+            match update.get("sessionUpdate")?.as_str()? {
+                "agent_message_chunk" => Some(AgentEvent::Token {
+                    session_id,
+                    text: text_of(update)?,
+                }),
+                "agent_thought_chunk" => Some(AgentEvent::Thought {
+                    session_id,
+                    text: text_of(update)?,
+                }),
+                "tool_call" | "tool_call_update" => Some(AgentEvent::Step {
+                    session_id,
+                    id: string_at("toolCallId")?,
+                    title: string_at("title"),
+                    status: string_at("status"),
+                }),
+                "plan" => Some(AgentEvent::Plan {
+                    session_id,
+                    entries: update
+                        .get("entries")?
+                        .as_array()?
+                        .iter()
+                        .filter_map(|e| {
+                            Some(PlanEntry {
+                                content: e.get("content")?.as_str()?.to_string(),
+                                status: e
+                                    .get("status")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("pending")
+                                    .to_string(),
+                            })
+                        })
+                        .collect(),
+                }),
+                "usage_update" => Some(AgentEvent::Usage {
+                    session_id,
+                    used: update.get("used")?.as_u64()?,
+                    size: update.get("size")?.as_u64()?,
+                }),
+                _ => None,
             }
-            let content = update.get("content")?;
-            if content.get("type")?.as_str()? != "text" {
-                return None;
-            }
-            Some(AgentEvent::Token {
-                session_id,
-                text: content.get("text")?.as_str()?.to_string(),
-            })
         }
         // Already denied in rpc.rs; surfaced so the UI can say why an
         // action didn't happen.

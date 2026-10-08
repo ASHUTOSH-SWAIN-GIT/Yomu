@@ -460,3 +460,227 @@ async fn real_switch_between_agents_changes_the_model_list() {
     );
     harness.shutdown().await;
 }
+
+#[tokio::test]
+async fn forwards_thoughts_steps_plans_and_usage() {
+    let mut f = fixture("rich").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness.prompt(&session, "RICH").await.unwrap();
+    let events = until_done(&mut f.events).await;
+
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, AgentEvent::Thought { text, .. } if text == "Let me look.")));
+    // The start of a step names it; its update only says how it went.
+    assert!(events.iter().any(|e| matches!(e,
+        AgentEvent::Step { id, title: Some(t), status: Some(s), .. }
+            if id == "t1" && t == "Search the library" && s == "pending")));
+    assert!(events.iter().any(|e| matches!(e,
+        AgentEvent::Step { id, title: None, status: Some(s), .. }
+            if id == "t1" && s == "completed")));
+    assert!(events.iter().any(|e| matches!(e,
+        AgentEvent::Plan { entries, .. }
+            if entries.len() == 1 && entries[0].content == "Answer"
+                && entries[0].status == "in_progress")));
+    assert!(events.iter().any(|e| matches!(
+        e,
+        AgentEvent::Usage {
+            used: 1200,
+            size: 200000,
+            ..
+        }
+    )));
+    // The words still arrive too.
+    assert!(joined_tokens(&events).contains("RICH"));
+}
+
+#[tokio::test]
+async fn a_hung_turn_is_given_up_on() {
+    let (tx, _events) = mpsc::unbounded_channel();
+    let cwd = std::env::temp_dir().join("yomu-test-stall");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+    let harness = AgentHarness::new_for_tests(tx, mock_agent_command)
+        .with_idle_timeout(Duration::from_millis(600));
+    let session = harness.new_session(&cwd).await.unwrap();
+
+    let started = std::time::Instant::now();
+    let err = harness.prompt(&session, "STALL").await.unwrap_err();
+    assert!(err.contains("stopped responding"), "{err}");
+    assert!(started.elapsed() < Duration::from_secs(4));
+
+    // The agent itself is fine: the next turn on a new session works.
+    let next = harness.new_session(&cwd).await.unwrap();
+    harness.prompt(&next, "hello").await.unwrap();
+}
+
+#[tokio::test]
+async fn a_slow_turn_that_keeps_talking_is_not_cut_off() {
+    let (tx, mut events) = mpsc::unbounded_channel();
+    let cwd = std::env::temp_dir().join("yomu-test-slow-ok");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+    // Longer than the limit overall (200 words at 20 ms), but never silent
+    // for as long as the limit.
+    let harness = AgentHarness::new_for_tests(tx, mock_agent_command)
+        .with_idle_timeout(Duration::from_millis(800));
+    let session = harness.new_session(&cwd).await.unwrap();
+    harness.prompt(&session, "SLOW").await.unwrap();
+    let events = until_done(&mut events).await;
+    assert!(joined_tokens(&events).contains("word"));
+}
+
+fn library_server() -> crate::mcp::McpInfo {
+    crate::mcp::McpInfo {
+        url: "http://127.0.0.1:9/mcp".into(),
+        token: "secret".into(),
+    }
+}
+
+#[tokio::test]
+async fn sessions_get_the_library_server_when_the_agent_can_use_it() {
+    let mut f = fixture("mcp-given").await;
+    f.harness.set_mcp(library_server());
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness.prompt(&session, "SHOW_MCP").await.unwrap();
+    let reply = joined_tokens(&until_done(&mut f.events).await);
+
+    assert!(reply.contains(r#""name":"yomu""#), "{reply}");
+    assert!(reply.contains(r#""type":"http""#));
+    assert!(reply.contains("http://127.0.0.1:9/mcp"));
+    assert!(reply.contains(r#""value":"Bearer secret""#));
+
+    // A resumed session is given it again.
+    f.harness.resume_session(&session, &f.cwd).await.unwrap();
+    f.harness.prompt(&session, "SHOW_MCP").await.unwrap();
+    assert!(joined_tokens(&until_done(&mut f.events).await).contains("Bearer secret"));
+}
+
+#[tokio::test]
+async fn sessions_get_no_server_before_it_has_started() {
+    let mut f = fixture("mcp-none").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness.prompt(&session, "SHOW_MCP").await.unwrap();
+    let reply = joined_tokens(&until_done(&mut f.events).await);
+    assert!(reply.contains("mcp []"), "{reply}");
+}
+
+#[tokio::test]
+async fn a_call_to_the_library_server_is_allowed_and_not_reported() {
+    let mut f = fixture("mcp-allow").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness.prompt(&session, "MCPCALL").await.unwrap();
+    let events = until_done(&mut f.events).await;
+
+    assert!(joined_tokens(&events).contains("call outcome: selected/allow_once"));
+    // Nothing to apologise for, so the chat is not told of a refusal.
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, AgentEvent::PermissionRequest { .. })));
+    // The step itself is shown.
+    assert!(events.iter().any(|e| matches!(e,
+        AgentEvent::Step { title: Some(t), .. } if t == "mcp.yomu.search_library")));
+}
+
+#[tokio::test]
+async fn a_call_to_any_other_tool_is_still_denied() {
+    let mut f = fixture("mcp-deny").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+    f.harness.prompt(&session, "OTHERCALL").await.unwrap();
+    let events = until_done(&mut f.events).await;
+
+    assert!(joined_tokens(&events).contains("call outcome: cancelled/-"));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, AgentEvent::PermissionRequest { .. })));
+}
+
+/// Opt-in: the real Codex, through the real sandbox, using Yomu's library
+/// server on a copy of the app's own database. Needs a signed-in Codex and a
+/// database with saved blogs. `cargo test real_codex_uses_the_library -- --ignored --nocapture`.
+#[tokio::test]
+#[ignore]
+async fn real_codex_uses_the_library_server() {
+    let data = PathBuf::from(std::env::var("HOME").unwrap())
+        .join("Library/Application Support/com.yomu.app");
+    let copy = std::env::temp_dir().join("yomu-real-mcp");
+    let _ = std::fs::remove_dir_all(&copy);
+    std::fs::create_dir_all(&copy).unwrap();
+    for name in ["yomu.db", "yomu.db-wal", "yomu.db-shm"] {
+        let _ = std::fs::copy(data.join(name), copy.join(name));
+    }
+
+    let (tx, mut events) = mpsc::unbounded_channel();
+    let harness = AgentHarness::new(tx);
+    harness.set_mcp(crate::mcp::start(copy.join("yomu.db")).await.unwrap());
+    let cwd = std::env::temp_dir().join("yomu-test-real-mcp");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+
+    let session = harness.new_session(&cwd).await.unwrap();
+    harness
+        .prompt(
+            &session,
+            "Use your yomu tools: call list_articles, then reply with the titles of the blogs it returns, one per line. Nothing else.",
+        )
+        .await
+        .unwrap();
+    let all = until_done_with(&mut events, 180).await;
+    for e in &all {
+        if !matches!(e, AgentEvent::Token { .. }) {
+            println!("{e:?}");
+        }
+    }
+    println!("REPLY: {}", joined_tokens(&all));
+    assert!(all.iter().any(|e| matches!(e,
+        AgentEvent::Step { title: Some(t), .. } if t.contains("yomu"))));
+    assert!(!all
+        .iter()
+        .any(|e| matches!(e, AgentEvent::PermissionRequest { .. })));
+    harness.shutdown().await;
+}
+
+#[tokio::test]
+async fn fetching_a_web_page_is_allowed_but_running_a_command_is_not() {
+    let mut f = fixture("web").await;
+    let session = f.harness.new_session(&f.cwd).await.unwrap();
+
+    f.harness.prompt(&session, "FETCHCALL").await.unwrap();
+    let fetched = until_done(&mut f.events).await;
+    assert!(joined_tokens(&fetched).contains("call outcome: selected/allow_once"));
+    assert!(!fetched
+        .iter()
+        .any(|e| matches!(e, AgentEvent::PermissionRequest { .. })));
+
+    f.harness.prompt(&session, "RUNCALL").await.unwrap();
+    let ran = until_done(&mut f.events).await;
+    assert!(joined_tokens(&ran).contains("call outcome: cancelled/-"));
+    assert!(ran
+        .iter()
+        .any(|e| matches!(e, AgentEvent::PermissionRequest { .. })));
+}
+
+/// Opt-in: the real Codex, through the real sandbox, looks something up on
+/// the web. `cargo test real_codex_can_use_the_web -- --ignored --nocapture`.
+#[tokio::test]
+#[ignore]
+async fn real_codex_can_use_the_web() {
+    let (tx, mut events) = mpsc::unbounded_channel();
+    let harness = AgentHarness::new(tx);
+    let cwd = std::env::temp_dir().join("yomu-test-real-web");
+    tokio::fs::create_dir_all(&cwd).await.unwrap();
+    let session = harness.new_session(&cwd).await.unwrap();
+    harness
+        .prompt(
+            &session,
+            "Look on the web for the title of the newest post on https://blog.rust-lang.org/ and reply with just that title and the URL you used.",
+        )
+        .await
+        .unwrap();
+    let all = until_done_with(&mut events, 180).await;
+    for e in &all {
+        if !matches!(e, AgentEvent::Token { .. }) {
+            println!("{e:?}");
+        }
+    }
+    println!("REPLY: {}", joined_tokens(&all));
+    assert!(all.iter().any(|e| matches!(e, AgentEvent::Step { .. })));
+    harness.shutdown().await;
+}

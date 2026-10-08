@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/chat/composer";
+import { AgentActivity } from "@/components/chat/agent-activity";
 import { CopyButton } from "@/components/chat/copy-button";
 import { Markdown } from "@/components/chat/markdown";
 import { useAgentStore } from "@/stores/agent-store";
@@ -19,6 +20,7 @@ const IDEAS = [
 export function LibraryChat() {
   const messages = useLibraryChatStore((s) => s.messages);
   const streaming = useLibraryChatStore((s) => s.streaming);
+  const progress = useLibraryChatStore((s) => s.progress);
   const error = useLibraryChatStore((s) => s.error);
   const ask = useLibraryChatStore((s) => s.ask);
   const stop = useLibraryChatStore((s) => s.stop);
@@ -116,6 +118,7 @@ export function LibraryChat() {
               </li>
             ),
           )}
+          {streaming && <AgentActivity progress={progress} />}
           {waiting && (
             <li
               aria-label="Thinking"
