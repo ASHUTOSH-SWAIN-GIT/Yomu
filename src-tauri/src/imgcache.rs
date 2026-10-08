@@ -78,7 +78,10 @@ async fn download(client: &reqwest::Client, url: &str, dir: &Path) -> Option<Str
     let stem = file_stem(url);
     if let Some(existing) = find_existing(dir, &stem) {
         // Reuse counts as use, so what you still read is evicted last.
-        if let Ok(file) = std::fs::File::options().write(true).open(dir.join(&existing)) {
+        if let Ok(file) = std::fs::File::options()
+            .write(true)
+            .open(dir.join(&existing))
+        {
             let _ = file.set_modified(std::time::SystemTime::now());
         }
         return Some(existing);

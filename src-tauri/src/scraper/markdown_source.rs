@@ -34,7 +34,7 @@ pub async fn try_fetch(client: &reqwest::Client, canonical: &Url) -> Option<Scra
         if blocks.is_empty() {
             continue;
         }
-        let title = extract_title(&mut blocks, canonical);
+        let title = extract_title(&mut blocks, canonical, front_matter_title(&markdown));
         return Some(ScrapedArticle {
             // The page itself, not the raw file: that is what the reader
             // links to and what a re-fetch should read.
@@ -143,7 +143,7 @@ fn looks_like_markdown(content_type: Option<&str>, body: &str) -> bool {
 /// Falls back to the URL's last path segment, then the host.
 const TITLE_SEARCH_WINDOW: usize = 6;
 
-fn extract_title(blocks: &mut Vec<Block>, canonical: &Url) -> String {
+fn extract_title(blocks: &mut Vec<Block>, canonical: &Url, front_title: Option<String>) -> String {
     let found = blocks
         .iter()
         .take(TITLE_SEARCH_WINDOW)
@@ -154,12 +154,24 @@ fn extract_title(blocks: &mut Vec<Block>, canonical: &Url) -> String {
         };
         return text;
     }
+    if let Some(title) = front_title {
+        return title;
+    }
     canonical
         .path_segments()
         .and_then(|mut s| s.next_back())
         .filter(|s| !s.is_empty())
         .map(titleize_slug)
         .unwrap_or_else(|| canonical.host_str().unwrap_or("unknown").to_string())
+}
+
+/// The `title:` of a leading YAML front matter block, if any.
+fn front_matter_title(markdown: &str) -> Option<String> {
+    let rest = markdown.strip_prefix("---\n")?;
+    let block = &rest[..rest.find("\n---")?];
+    let line = block.lines().find_map(|l| l.strip_prefix("title:"))?;
+    let title = line.trim().trim_matches(|c| c == '"' || c == '\'').trim();
+    (!title.is_empty()).then(|| title.to_string())
 }
 
 /// "getting-started.md" -> "Getting Started": drops a trailing Markdown
@@ -556,6 +568,18 @@ fn consume_table_row<'a>(iter: &mut impl Iterator<Item = Event<'a>>, end: TagEnd
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn title_comes_from_front_matter_before_the_slug() {
+        let md = "---\ntitle: 'Architecture decisions in Neon'\nauthors:\n  - x\n---\n\nBody paragraph that is long enough.";
+        let mut blocks = markdown_to_blocks(md);
+        let title = extract_title(
+            &mut blocks,
+            &url("https://x.dev/blog/architecture-decisions-in-neon"),
+            front_matter_title(md),
+        );
+        assert_eq!(title, "Architecture decisions in Neon");
+    }
+
     use super::*;
 
     fn url(s: &str) -> Url {
@@ -751,14 +775,14 @@ mod tests {
             Block::Paragraph { spans: vec![] },
         ];
         assert_eq!(
-            extract_title(&mut blocks, &url("https://x.dev/p")),
+            extract_title(&mut blocks, &url("https://x.dev/p"), None),
             "My Page"
         );
         assert_eq!(blocks.len(), 1); // the heading was removed
 
         let mut no_heading = vec![Block::Paragraph { spans: vec![] }];
         assert_eq!(
-            extract_title(&mut no_heading, &url("https://x.dev/getting-started")),
+            extract_title(&mut no_heading, &url("https://x.dev/getting-started"), None),
             "Getting Started"
         );
     }
@@ -778,7 +802,7 @@ mod tests {
             Block::Paragraph { spans: vec![] },
         ];
         assert_eq!(
-            extract_title(&mut blocks, &url("https://x.dev/docs/quickstart")),
+            extract_title(&mut blocks, &url("https://x.dev/docs/quickstart"), None),
             "Quickstart"
         );
         // The preamble stays; only the heading itself is removed.
@@ -797,7 +821,7 @@ mod tests {
             text: "Too Late".into(),
         });
         assert_eq!(
-            extract_title(&mut blocks, &url("https://x.dev/fallback-name")),
+            extract_title(&mut blocks, &url("https://x.dev/fallback-name"), None),
             "Fallback Name"
         );
     }

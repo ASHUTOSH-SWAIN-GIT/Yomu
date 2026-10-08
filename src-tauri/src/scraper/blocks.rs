@@ -135,11 +135,21 @@ fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>
                 }
             }
         }
-        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+        "h1" | "h2" | "h3" | "h4" => {
             let level = tag[1..].parse().unwrap_or(2);
             let text = clean_heading(&collect_text(el));
             if !text.is_empty() {
                 blocks.push(Block::Heading { level, text });
+            }
+        }
+        // h5/h6 are captions and callout titles in practice, not sections.
+        "h5" | "h6" => {
+            let spans: Vec<Span> = collect_spans(el)
+                .into_iter()
+                .map(|s| Span { bold: true, ..s })
+                .collect();
+            if spans.iter().any(|s| !s.text.trim().is_empty()) {
+                blocks.push(Block::Paragraph { spans });
             }
         }
         "p" => {
@@ -592,6 +602,23 @@ fn extract_language_from_class(class: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn h5_and_h6_become_bold_paragraphs() {
+        let blocks = html_to_blocks(
+            "<img src=\"https://x.dev/a.jpg\"><h6>Engelbart practicing</h6><h4>Real</h4>",
+        );
+        assert_eq!(blocks.len(), 3);
+        assert!(matches!(blocks[0], Block::Image { .. }));
+        match &blocks[1] {
+            Block::Paragraph { spans } => {
+                assert!(spans.iter().all(|s| s.bold));
+                assert_eq!(spans[0].text, "Engelbart practicing");
+            }
+            other => panic!("expected paragraph, got {other:?}"),
+        }
+        assert!(matches!(&blocks[2], Block::Heading { level: 4, text } if text == "Real"));
+    }
+
+    #[test]
     fn an_infobox_keeps_only_its_label_value_rows() {
         let html = r#"<table class="infobox"><tr><th colspan="2">Rust</th></tr>
             <tr><td colspan="2"><img src="x.png"></td></tr>
@@ -618,8 +645,17 @@ mod tests {
         let Block::Paragraph { spans } = &blocks[0] else {
             panic!("{blocks:?}")
         };
-        assert_eq!(spans.iter().map(|s| s.text.as_str()).collect::<String>(), "Rust is fast.");
-        assert_eq!(blocks[1], Block::Heading { level: 2, text: "History".into() });
+        assert_eq!(
+            spans.iter().map(|s| s.text.as_str()).collect::<String>(),
+            "Rust is fast."
+        );
+        assert_eq!(
+            blocks[1],
+            Block::Heading {
+                level: 2,
+                text: "History".into()
+            }
+        );
     }
 
     #[test]
@@ -654,7 +690,10 @@ mod tests {
             panic!("expected one quote, got {blocks:?}");
         };
         assert!(spans[0].bold && spans[0].text == "tip");
-        assert_eq!(spans.iter().map(|s| s.text.as_str()).collect::<String>(), "tip\nUse cargo.");
+        assert_eq!(
+            spans.iter().map(|s| s.text.as_str()).collect::<String>(),
+            "tip\nUse cargo."
+        );
     }
 
     use super::*;

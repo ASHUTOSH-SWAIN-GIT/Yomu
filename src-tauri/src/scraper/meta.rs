@@ -112,10 +112,49 @@ pub fn clean_title(document: &Html, raw: &str) -> String {
         .and_then(|el| el.value().attr("content"))
         .map(super::blocks::clean_heading)
         .filter(|t| !t.is_empty());
-    match og {
+    let title = match og {
         Some(og) if raw.contains(og.as_str()) => og,
         _ => raw.to_string(),
+    };
+    // Some sites set og:title to the same "Title | Site" string; the page's
+    // own h1 is then the clean title. Only used when the title is exactly
+    // the h1 plus a separator and a suffix, so a logo h1 can't replace it.
+    let h1 = Selector::parse("h1")
+        .ok()
+        .and_then(|sel| document.select(&sel).next())
+        .map(|el| super::blocks::clean_heading(&el.text().collect::<String>()))
+        .filter(|t| !t.is_empty());
+    if let Some(h1) = h1 {
+        if let Some(rest) = title.strip_prefix(h1.as_str()) {
+            let rest = rest.trim_start();
+            if ["\u{2014}", "\u{2013}", "|", "-", "\u{b7}", ":"]
+                .iter()
+                .any(|sep| rest.starts_with(sep))
+            {
+                return h1;
+            }
+        }
     }
+    title
+}
+
+/// The visible byline: links to author pages, for sites whose meta tags and
+/// JSON-LD name no person. Takes every author link in the first one's
+/// parent, so a multi-author byline is kept whole.
+pub fn extract_byline_author(document: &Html) -> Option<String> {
+    let selector =
+        Selector::parse(r#"a[rel~="author"], a[href*="/author/"], a[href*="/authors/"]"#).ok()?;
+    let first = document.select(&selector).next()?;
+    let parent = scraper::ElementRef::wrap(first.parent()?)?;
+    let mut names: Vec<String> = Vec::new();
+    for link in parent.select(&selector) {
+        let name = link.text().collect::<Vec<_>>().join(" ");
+        let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !name.is_empty() && !name.starts_with('@') && !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    (!names.is_empty()).then(|| names.join(", "))
 }
 
 /// The `<title>` without its trailing " - Site" / " | Site" suffix.
@@ -123,7 +162,7 @@ pub fn extract_title_tag(document: &Html) -> Option<String> {
     let selector = Selector::parse("title").ok()?;
     let raw: String = document.select(&selector).next()?.text().collect();
     let raw = super::blocks::clean_heading(&raw);
-    let title = [" - ", " | ", " \u{2013} "]
+    let title = [" - ", " | ", " \u{2013} ", " \u{2014} ", " \u{b7} "]
         .iter()
         .filter_map(|sep| raw.rsplit_once(sep).map(|(left, _)| left))
         .min_by_key(|left| left.len())
@@ -196,6 +235,49 @@ mod tests {
         assert_eq!(
             clean_title(&Html::parse_document("<head></head>"), "T"),
             "T"
+        );
+    }
+
+    #[test]
+    fn clean_title_uses_h1_when_title_is_h1_plus_suffix() {
+        for (raw, h1) in [
+            (
+                "Handling hot shards \u{2014} PlanetScale",
+                "Handling hot shards",
+            ),
+            ("Handling hot shards | Figma Blog", "Handling hot shards"),
+        ] {
+            let doc = Html::parse_document(&format!(
+                r#"<head><title>{raw}</title><meta property="og:title" content="{raw}"></head><body><h1>{h1}</h1></body>"#
+            ));
+            assert_eq!(clean_title(&doc, raw), h1);
+        }
+        let doc = Html::parse_document("<body><h1>Blog</h1></body>");
+        assert_eq!(clean_title(&doc, "Post | Blog"), "Post | Blog");
+    }
+
+    #[test]
+    fn title_tag_drops_em_dash_suffix() {
+        let doc = Html::parse_document("<head><title>A \u{2014} Site</title></head>");
+        assert_eq!(extract_title_tag(&doc), Some("A".to_string()));
+    }
+
+    #[test]
+    fn byline_collects_author_links() {
+        let doc = Html::parse_document(
+            r#"<h1>T</h1><p><a href="/blog/author/etienne">Etienne Berube</a>, <a href="/blog/author/nickholden">Nick Holden</a>, <a href="/blog/author/sinjo">Chris Sinjakli</a> | <time>Oct 6</time></p>"#,
+        );
+        assert_eq!(
+            extract_byline_author(&doc).as_deref(),
+            Some("Etienne Berube, Nick Holden, Chris Sinjakli")
+        );
+        let doc = Html::parse_document(
+            r#"<p><a href="/blog/author/sam">Sam Lambert</a> [<a href="https://x.com/samlambert">@samlambert</a>]</p>"#,
+        );
+        assert_eq!(extract_byline_author(&doc).as_deref(), Some("Sam Lambert"));
+        assert_eq!(
+            extract_byline_author(&Html::parse_document("<p>hi</p>")),
+            None
         );
     }
 

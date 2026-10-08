@@ -13,6 +13,8 @@ mod rules;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use once_cell::sync::Lazy;
+use regex::Regex;
 use scraper::Html;
 use serde::Serialize;
 use thiserror::Error;
@@ -215,6 +217,7 @@ fn extract(
         // Readability discards image-only containers, <picture>, and lazy
         // images, so swap them for text placeholders first (see images.rs).
         let (tokenized, found_images) = images::tokenize_images(html, &final_parsed);
+        let tokenized = protect_whitespace(&strip_utility_classes(&tokenized));
         let mut html_bytes = tokenized.as_bytes();
         let product = readability::extractor::extract(&mut html_bytes, &final_parsed)
             .map_err(|_| ScrapeError::ExtractionFailed)?;
@@ -222,8 +225,13 @@ fn extract(
             "" => host.clone(),
             t => meta::clean_title(&original_document, t),
         };
-        let blocks = blocks::html_to_blocks_with_base(&product.content, Some(&final_parsed));
-        (images::restore_image_tokens(blocks, &found_images), title)
+        let content = product.content.replace(KEEP_MARK, "");
+        let blocks = blocks::html_to_blocks_with_base(&content, Some(&final_parsed));
+        let blocks = images::restore_image_tokens(blocks, &found_images);
+        (
+            widen_to_siblings(blocks, &original_document, &final_parsed),
+            title,
+        )
     };
     if blocks.is_empty() {
         return Err(ScrapeError::ExtractionFailed);
@@ -247,7 +255,8 @@ fn extract(
     let structured = jsonld::extract(&original_document);
     let author = structured
         .author
-        .or_else(|| meta::extract_author(&original_document));
+        .or_else(|| meta::extract_author(&original_document))
+        .or_else(|| meta::extract_byline_author(&original_document));
     let site = structured
         .site_name
         .unwrap_or_else(|| meta::extract_site_name(&original_document, &host));
@@ -263,6 +272,126 @@ fn extract(
         blocks,
         scraped_at: now_millis(),
     })
+}
+
+/// Readability deletes whitespace-only text nodes, which loses the newlines
+/// between code lines and the space in `a<!-- --> <!-- -->b`. A private-use
+/// char (not whitespace, so it survives) marks them; it's removed afterwards.
+const KEEP_MARK: char = '\u{E000}';
+
+static PRE_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?is)<pre\b.*?</pre>").expect("valid regex"));
+static GAP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r">(\s+)<").expect("valid regex"));
+static INLINE_GAP_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r">([ \t]+)<").expect("valid regex"));
+static CLASS_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"\bclass\s*=\s*"([^"]*)""#).expect("valid regex"));
+
+fn protect_whitespace(html: &str) -> String {
+    let keep = format!(">{KEEP_MARK}$1<");
+    let html = PRE_RE.replace_all(html, |caps: &regex::Captures| {
+        GAP_RE.replace_all(&caps[0], keep.as_str()).into_owned()
+    });
+    // Spaces and tabs only: pretty-printed newlines between blocks stay
+    // removable, so indentation doesn't count as content.
+    INLINE_GAP_RE.replace_all(&html, keep.as_str()).into_owned()
+}
+
+/// Readability's "unlikely candidate" filter matches words like `header`
+/// anywhere in a class, including Tailwind arbitrary values such as
+/// `min-h-[calc(100vh-var(--spacing-header))]`, and drops the whole element.
+/// Utility tokens with variants or arbitrary values are never semantic names.
+fn strip_utility_classes(html: &str) -> String {
+    CLASS_RE
+        .replace_all(html, |caps: &regex::Captures| {
+            let kept: Vec<&str> = caps[1]
+                .split_whitespace()
+                .filter(|t| !t.contains(['[', ']', ':', '(', '/']))
+                .collect();
+            format!("class=\"{}\"", kept.join(" "))
+        })
+        .into_owned()
+}
+
+/// Text with all whitespace removed, so spans split mid-sentence compare equal.
+fn squash(text: &str) -> String {
+    text.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
+fn plain_text(el: scraper::ElementRef) -> String {
+    squash(&el.text().collect::<String>())
+}
+
+fn block_text(block: &Block) -> Option<String> {
+    match block {
+        Block::Paragraph { spans } => {
+            Some(spans.iter().map(|s| s.text.as_str()).collect::<String>())
+        }
+        _ => None,
+    }
+}
+
+/// Readability keeps only its top candidate, so an article whose body is
+/// split across sibling containers comes back cut short. Finds the paragraphs
+/// the result starts and ends with in the page, and when their shared
+/// container's parent holds clearly more prose, reads that instead.
+fn widen_to_siblings(blocks: Vec<Block>, doc: &Html, base: &url::Url) -> Vec<Block> {
+    use scraper::{ElementRef, Selector};
+    let paras: Vec<String> = blocks
+        .iter()
+        .filter_map(block_text)
+        .map(|t| squash(&t))
+        .filter(|t| !t.is_empty())
+        .collect();
+    if paras.len() < 2 {
+        return blocks;
+    }
+    let head = |t: &str| t.chars().take(60).collect::<String>();
+    let (first, last) = (head(&paras[0]), head(&paras[paras.len() - 1]));
+    let Ok(p_sel) = Selector::parse("p") else {
+        return blocks;
+    };
+    let Some(start) = doc
+        .select(&p_sel)
+        .find(|p| plain_text(*p).starts_with(&first))
+    else {
+        return blocks;
+    };
+    let Some(container) = start
+        .ancestors()
+        .filter_map(ElementRef::wrap)
+        .find(|a| plain_text(*a).contains(&last))
+    else {
+        return blocks;
+    };
+    // Prose length, ignoring paragraphs in navigation-like regions.
+    let prose = |root: ElementRef| -> usize {
+        root.select(&p_sel)
+            .filter(|p| {
+                !p.ancestors()
+                    .filter_map(ElementRef::wrap)
+                    .any(|a| matches!(a.value().name(), "nav" | "aside" | "footer" | "form"))
+            })
+            .map(|p| plain_text(p).len())
+            .sum()
+    };
+    let own = prose(container);
+    // Wrapper divs often hold the same prose; climb a few levels until one
+    // holds clearly more.
+    let parent = container
+        .ancestors()
+        .filter_map(ElementRef::wrap)
+        .take(4)
+        .take_while(|a| !matches!(a.value().name(), "body" | "html"))
+        .find(|a| prose(*a) * 10 >= own * 13);
+    let Some(parent) = parent.filter(|_| own > 0) else {
+        return blocks;
+    };
+    let widened = blocks::html_to_blocks_with_base(&parent.inner_html(), Some(base));
+    if word_count(&widened) > word_count(&blocks) {
+        widened
+    } else {
+        blocks
+    }
 }
 
 /// Docs pages start their content with an `h1` that repeats the title the
@@ -292,6 +421,79 @@ pub fn canonical_url(raw_url: &str) -> Result<String, ScrapeError> {
 #[cfg(test)]
 mod extract_tests {
     use super::*;
+
+    fn long(word: &str) -> String {
+        format!("{word} is a sentence long enough to look like real article prose. ").repeat(6)
+    }
+
+    #[test]
+    fn readability_keeps_code_newlines_and_inline_spaces() {
+        let (a, b, c) = (long("Alpha"), long("Beta"), long("Gamma"));
+        let html = format!(
+            r#"<html><head><title>T</title></head><body><article><h2>Intro</h2><p>{a}</p>
+            <p>On PlanetScale.<!-- --> <!-- -->This works. {b}</p>
+            <pre class="shiki"><code><span class="line"><span>CREATE TABLE t (</span></span>
+<span class="line"><span>  id int</span></span>
+<span class="line"><span>)</span></span></code></pre><p>{c}</p></article></body></html>"#
+        );
+        let base = url::Url::parse("https://blog.example/post").unwrap();
+        let article = extract(&html, "https://blog.example/post", &base).expect("extracts");
+        let text = article
+            .blocks
+            .iter()
+            .filter_map(block_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("PlanetScale. This"), "{text}");
+        assert!(article.blocks.iter().any(|b| matches!(
+            b, Block::Code { content, .. } if content == "CREATE TABLE t (\n  id int\n)"
+        )));
+    }
+
+    #[test]
+    fn tailwind_arbitrary_classes_do_not_hide_the_article() {
+        let html = format!(
+            r##"<html><body><a href="#main">skip</a><main id="main-content" class="min-h-[calc(100vh-var(--spacing-header)-640px)] col-start-2"><article><h2>Intro</h2><p>{}</p><p>{}</p></article></main><footer>x</footer></body></html>"##,
+            long("Alpha"),
+            long("Beta")
+        );
+        let base = url::Url::parse("https://blog.example/post").unwrap();
+        let article = extract(&html, "https://blog.example/post", &base).expect("extracts");
+        assert!(article
+            .blocks
+            .iter()
+            .any(|b| matches!(b, Block::Heading { text, .. } if text == "Intro")));
+        let text = article
+            .blocks
+            .iter()
+            .filter_map(block_text)
+            .collect::<String>();
+        assert!(text.contains("Alpha") && text.contains("Beta"));
+    }
+
+    #[test]
+    fn article_split_across_sibling_containers_is_recovered() {
+        let html = format!(
+            r#"<html><body><nav>menu</nav><section><div><div><h2>Part A</h2><p>{}</p><p>{}</p><h3>Syncing</h3></div><div><p>{}</p><h3>Takeaways</h3><p>{}</p></div></div></section></body></html>"#,
+            long("Alpha"),
+            long("Beta"),
+            long("Gamma"),
+            long("Delta")
+        );
+        let base = url::Url::parse("https://blog.example/post").unwrap();
+        let article = extract(&html, "https://blog.example/post", &base).expect("extracts");
+        let text = article
+            .blocks
+            .iter()
+            .filter_map(block_text)
+            .collect::<String>();
+        assert!(article
+            .blocks
+            .iter()
+            .any(|b| matches!(b, Block::Heading { text, .. } if text == "Takeaways")));
+        assert!(text.contains("Delta"));
+        assert!(!text.contains("menu"));
+    }
 
     /// Readability strips <picture> and src-less <img>; `extract` must still
     /// return these images (regression: every Medium image was lost).
@@ -438,5 +640,45 @@ mod markdown_frontmatter_check {
         let json = serde_json::to_string(&article.blocks).unwrap();
         assert!(!json.contains("url: /guide"), "frontmatter leaked: {json}");
         println!("first block: {:?}", article.blocks.first());
+    }
+}
+
+/// Opt-in: scrapes the URLs in `YOMU_SCRAPE_URLS` (one per line) and writes
+/// each result as JSON into the folder `YOMU_SCRAPE_OUT`, printing a summary
+/// line per URL. `cargo test scrape_urls -- --ignored --nocapture`.
+#[cfg(test)]
+mod scrape_from_env {
+    #[tokio::test]
+    #[ignore]
+    async fn scrape_urls() {
+        let urls = std::env::var("YOMU_SCRAPE_URLS").unwrap_or_default();
+        let out = std::env::var("YOMU_SCRAPE_OUT").unwrap_or_default();
+        if !out.is_empty() {
+            std::fs::create_dir_all(&out).unwrap();
+        }
+        for (i, url) in urls
+            .lines()
+            .map(str::trim)
+            .filter(|u| !u.is_empty())
+            .enumerate()
+        {
+            let start = std::time::Instant::now();
+            match super::scrape(url, None).await {
+                Ok(a) => {
+                    if !out.is_empty() {
+                        let json = serde_json::to_string_pretty(&a.blocks).unwrap();
+                        std::fs::write(format!("{out}/{i:02}.json"), json).unwrap();
+                    }
+                    println!(
+                        "{i:02} OK {:>5} ms {:>4} blocks title={:?} author={:?} {url}",
+                        start.elapsed().as_millis(),
+                        a.blocks.len(),
+                        a.title,
+                        a.author
+                    );
+                }
+                Err(e) => println!("{i:02} ERROR {e} {url}"),
+            }
+        }
     }
 }

@@ -98,6 +98,18 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_8,
         },
+        Migration {
+            version: 9,
+            description: "inbox: links saved to read later",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_9,
+        },
+        Migration {
+            version: 10,
+            description: "followed blogs and their new posts",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_10,
+        },
     ]
 }
 
@@ -229,4 +241,32 @@ pub const MIGRATION_8: &str = r#"
     );
 
     CREATE INDEX idx_annotations_article ON annotations(article_id);
+"#;
+
+/// Articles saved by a link sent from elsewhere (or found in a followed
+/// blog) wait in the Inbox until they are first opened.
+pub const MIGRATION_9: &str = "ALTER TABLE articles ADD COLUMN inbox INTEGER NOT NULL DEFAULT 0;";
+
+/// Blogs the reader follows, and the posts found in their feeds. A post
+/// stays in `feed_items` (so it is never offered twice) until the reader
+/// opens or dismisses it; the article itself is only fetched on opening.
+pub const MIGRATION_10: &str = r#"
+    CREATE TABLE feeds (
+        id TEXT PRIMARY KEY,
+        feed_url TEXT UNIQUE NOT NULL,
+        site_url TEXT,
+        title TEXT NOT NULL,
+        added_at INTEGER NOT NULL,
+        last_checked INTEGER
+    );
+
+    CREATE TABLE feed_items (
+        feed_id TEXT NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
+        url TEXT NOT NULL,
+        title TEXT NOT NULL,
+        published_at INTEGER,
+        found_at INTEGER NOT NULL,
+        dismissed INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (feed_id, url)
+    );
 "#;
