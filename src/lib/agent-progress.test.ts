@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   applyProgress,
   attachTrace,
+  contextFill,
+  contextIsFull,
   emptyProgress,
   hasProgress,
   stepTitle,
@@ -132,5 +134,23 @@ describe("attachTrace", () => {
     expect(attachTrace(answered, emptyProgress)).toBe(answered);
     const asked = [{ role: "user", text: "q" }];
     expect(attachTrace(asked, worked)).toBe(asked);
+  });
+});
+
+describe("context", () => {
+  it("is how much of the model's memory is used", () => {
+    expect(contextFill({ used: 50, size: 200 })).toBe(0.25);
+    expect(contextFill({ used: 500, size: 200 })).toBe(1);
+  });
+
+  it("is zero when it is not known", () => {
+    expect(contextFill(null)).toBe(0);
+    expect(contextFill({ used: 10, size: 0 })).toBe(0);
+    expect(contextIsFull(null)).toBe(false);
+  });
+
+  it("is full at 85%", () => {
+    expect(contextIsFull({ used: 84, size: 100 })).toBe(false);
+    expect(contextIsFull({ used: 85, size: 100 })).toBe(true);
   });
 });

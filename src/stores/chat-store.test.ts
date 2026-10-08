@@ -513,6 +513,44 @@ describe("errors and retry", () => {
     expect(commands.agentResumeSession).not.toHaveBeenCalled();
   });
 
+  it("an error from the agent keeps its kind, and a refused model starts a fresh session", async () => {
+    m(commands.agentPrompt).mockRejectedValueOnce({
+      kind: "model_unavailable",
+      message: "Codex can't use that model on your plan.",
+    });
+    await useChatStore.getState().explain(article, selection);
+    const s = useChatStore.getState();
+    expect(s.error).toEqual({
+      kind: "model_unavailable",
+      message: "Codex can't use that model on your plan.",
+    });
+    expect(s.sessionId).toBeNull();
+    expect(s.chat?.acpSessionId).toBeNull();
+  });
+
+  it("moves to a fresh session, sending the article again, when the memory is nearly full", async () => {
+    m(commands.agentPrompt).mockImplementationOnce(
+      async (sessionId: string) => {
+        emit({ kind: "usage", session_id: sessionId, used: 90, size: 100 });
+        emit({ kind: "token", session_id: sessionId, text: "one" });
+        emit({ kind: "done", session_id: sessionId });
+      },
+    );
+    await useChatStore.getState().explain(article, selection);
+    expect(useChatStore.getState().context).toEqual({ used: 90, size: 100 });
+
+    m(commands.agentNewSession).mockResolvedValue("s2");
+    agentReplies("two");
+    await useChatStore.getState().ask(article, "and then?");
+    expect(commands.agentNewSession).toHaveBeenCalledTimes(2);
+    expect(m(commands.agentPrompt).mock.calls[1][0]).toBe("s2");
+    // The fresh session is given the article again.
+    expect(m(commands.agentPrompt).mock.calls[1][1]).toContain(
+      "Ownership in Rust",
+    );
+    expect(useChatStore.getState().context).toBeNull();
+  });
+
   it("surfaces denied permission requests as an error", async () => {
     agentReplies("x");
     await useChatStore.getState().explain(article, selection);

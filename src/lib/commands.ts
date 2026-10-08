@@ -98,6 +98,11 @@ export async function agentWarm(): Promise<void> {
   return invoke("agent_warm");
 }
 
+/** Whether the agent runs inside an operating-system sandbox here. */
+export async function agentSandboxed(): Promise<boolean> {
+  return invoke<boolean>("agent_sandboxed");
+}
+
 /** Stops the turn in flight; the streamed text so far is kept. */
 export async function agentCancel(sessionId: string): Promise<void> {
   return invoke("agent_cancel", { sessionId });

@@ -3,6 +3,8 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { CopyButton } from "@/components/chat/copy-button";
 import { AgentActivity } from "@/components/chat/agent-activity";
+import { ContextNote } from "@/components/chat/context-note";
+import { ErrorNote } from "@/components/chat/error-note";
 import { SourceChips } from "@/components/chat/source-link";
 import { hasProgress } from "@/lib/agent-progress";
 import { Markdown } from "@/components/chat/markdown";
@@ -24,6 +26,7 @@ export function ChatPanel() {
   const messages = useChatStore((s) => s.messages);
   const streaming = useChatStore((s) => s.streaming);
   const progress = useChatStore((s) => s.progress);
+  const contextUsage = useChatStore((s) => s.context);
   const error = useChatStore((s) => s.error);
   const ask = useChatStore((s) => s.ask);
   const stop = useChatStore((s) => s.stop);
@@ -190,28 +193,7 @@ export function ChatPanel() {
               )}
             </ul>
           )}
-          {error && (
-            <div
-              role="alert"
-              className="text-destructive border-destructive/40 mt-4 flex flex-col gap-2 rounded-2xl border px-4 py-3 text-[0.8125rem]"
-            >
-              {error.message}
-              <button
-                type="button"
-                onClick={() =>
-                  error.kind === "logged_out" ||
-                  error.kind === "adapter_missing"
-                    ? setSetupOpen(true)
-                    : void retry()
-                }
-                className="self-start font-medium underline underline-offset-2"
-              >
-                {error.kind === "logged_out" || error.kind === "adapter_missing"
-                  ? "Open setup"
-                  : "Try again"}
-              </button>
-            </div>
-          )}
+          {error && <ErrorNote error={error} onRetry={retry} />}
           <div ref={endRef} />
         </div>
       </div>
@@ -231,6 +213,7 @@ export function ChatPanel() {
             ready ? "Ask about this article" : "Set up Explain to chat"
           }
         />
+        <ContextNote usage={contextUsage} />
       </div>
     </aside>
   );

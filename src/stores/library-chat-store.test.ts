@@ -121,6 +121,39 @@ describe("saved library chats", () => {
     expect(h.prompts[1]).not.toContain("The conversation so far:");
   });
 
+  it("moves to a fresh session, telling it what was said, when the memory is nearly full", async () => {
+    await store().ask("one");
+    emit({
+      kind: "usage",
+      session_id: store().sessionId!,
+      used: 90,
+      size: 100,
+    });
+    await answer("1");
+    expect(store().context).toEqual({ used: 90, size: 100 });
+    const before = h.sessions;
+
+    await store().ask("two");
+    expect(h.sessions).toBe(before + 1);
+    expect(h.prompts[1]).toContain("The conversation so far:");
+    // The new session starts with an empty memory.
+    expect(store().context).toBeNull();
+  });
+
+  it("stays in the same session while there is room", async () => {
+    await store().ask("one");
+    emit({
+      kind: "usage",
+      session_id: store().sessionId!,
+      used: 40,
+      size: 100,
+    });
+    await answer("1");
+    const before = h.sessions;
+    await store().ask("two");
+    expect(h.sessions).toBe(before);
+  });
+
   it("deletes a chat, and leaves the screen when it was the open one", async () => {
     await store().ask("to delete");
     await answer("ok");

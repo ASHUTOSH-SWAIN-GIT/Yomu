@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { agentFindCommand } from "@/lib/commands";
+import { agentFindCommand, agentSandboxed } from "@/lib/commands";
 import { PRESETS, presetOf } from "@/lib/agents";
 import { joinWords, splitWords } from "@/lib/shell-words";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,13 @@ export function AgentSection() {
   const [installed, setInstalled] = useState<Record<string, string | null>>({});
   const [found, setFound] = useState<string | null | undefined>(undefined);
   const [testing, setTesting] = useState(false);
+  // False where the agent cannot be fenced in (Windows, an old Linux kernel).
+  const [sandboxed, setSandboxed] = useState<boolean | null>(null);
+  useEffect(() => {
+    agentSandboxed()
+      .then(setSandboxed)
+      .catch(() => setSandboxed(null));
+  }, []);
 
   // Look the program up as the user types, so a typo shows up straight away.
   useEffect(() => {
@@ -208,6 +215,12 @@ export function AgentSection() {
           </div>
         </Card>
       </div>
+      {sandboxed === false && (
+        <p role="note" className="text-muted-foreground mt-4 text-[0.8125rem]">
+          This computer can't fence the agent in, so it runs with your own
+          permissions.
+        </p>
+      )}
     </>
   );
 }

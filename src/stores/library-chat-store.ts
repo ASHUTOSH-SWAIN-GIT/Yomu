@@ -4,7 +4,9 @@ import { onAgentEvent } from "@/lib/agent-events";
 import {
   applyProgress,
   attachTrace,
+  contextIsFull,
   emptyProgress,
+  type ContextUsage,
   type Progress,
 } from "@/lib/agent-progress";
 import { applyChosenModel } from "@/lib/models";
@@ -49,6 +51,8 @@ export interface LibraryChatStore {
   streaming: boolean;
   /** What the agent is doing this turn besides writing the answer. */
   progress: Progress;
+  /** How full the session's memory is, as last reported. */
+  context: ContextUsage | null;
   error: ChatError | null;
   /** Live ACP session. Not saved: a reopened chat starts a new session and
    * is given what was said so far. */
@@ -106,8 +110,13 @@ registerPart("libraryChat", (bundle) => {
         case "thought":
         case "step":
         case "plan":
-        case "usage":
           set((s) => ({ progress: applyProgress(s.progress, event) }));
+          break;
+        case "usage":
+          set((s) => ({
+            progress: applyProgress(s.progress, event),
+            context: { used: event.used, size: event.size },
+          }));
           break;
         case "permission_request":
           set({
@@ -126,6 +135,10 @@ registerPart("libraryChat", (bundle) => {
       lastQuestion = question;
       set({ streaming: true, error: null, progress: emptyProgress });
       try {
+        // A session whose memory is nearly full is left behind; the new one
+        // is told what was said so far (below).
+        if (contextIsFull(get().context))
+          set({ sessionId: null, context: null });
         let sessionId = get().sessionId;
         // A session that has not been in this conversation is told what was
         // said so far (a reopened chat, or one that had to be restarted).
@@ -158,9 +171,7 @@ registerPart("libraryChat", (bundle) => {
       } catch (err) {
         if (mine !== epoch) return;
         logError("library chat turn failed", err);
-        const error = classifyError(
-          err instanceof Error ? err.message : String(err),
-        );
+        const error = classifyError(err);
         // Drop a half streamed answer so Retry doesn't stack on top of it.
         set((s) => ({
           streaming: false,
@@ -187,6 +198,7 @@ registerPart("libraryChat", (bundle) => {
       messages: [],
       streaming: false,
       progress: emptyProgress,
+      context: null,
       error: null,
       sessionId: null,
 
@@ -252,6 +264,7 @@ registerPart("libraryChat", (bundle) => {
             messages,
             streaming: false,
             progress: emptyProgress,
+            context: null,
             error: null,
             sessionId: null,
           });
@@ -280,6 +293,7 @@ registerPart("libraryChat", (bundle) => {
           messages: [],
           streaming: false,
           progress: emptyProgress,
+          context: null,
           error: null,
           sessionId: null,
         });

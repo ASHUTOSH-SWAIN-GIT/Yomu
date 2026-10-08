@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/chat/composer";
 import { AgentActivity } from "@/components/chat/agent-activity";
+import { ContextNote } from "@/components/chat/context-note";
+import { ErrorNote } from "@/components/chat/error-note";
 import { SourceChips } from "@/components/chat/source-link";
 import { hasProgress } from "@/lib/agent-progress";
 import { CopyButton } from "@/components/chat/copy-button";
@@ -23,6 +25,7 @@ export function LibraryChat() {
   const messages = useLibraryChatStore((s) => s.messages);
   const streaming = useLibraryChatStore((s) => s.streaming);
   const progress = useLibraryChatStore((s) => s.progress);
+  const contextUsage = useLibraryChatStore((s) => s.context);
   const error = useLibraryChatStore((s) => s.error);
   const ask = useLibraryChatStore((s) => s.ask);
   const stop = useLibraryChatStore((s) => s.stop);
@@ -150,34 +153,8 @@ export function LibraryChat() {
       <div className="mx-auto w-full max-w-[52rem] shrink-0 px-6 pb-4">
         {box}
         <div className="mt-2">{context}</div>
+        <ContextNote usage={contextUsage} />
       </div>
-    </div>
-  );
-}
-
-function ErrorNote({
-  error,
-  onRetry,
-}: {
-  error: { kind: string; message: string };
-  onRetry: () => Promise<void>;
-}) {
-  const setSetupOpen = useUiStore((s) => s.setSetupOpen);
-  const needsSetup =
-    error.kind === "logged_out" || error.kind === "adapter_missing";
-  return (
-    <div
-      role="alert"
-      className="text-destructive border-destructive/40 mt-4 flex flex-col gap-2 rounded-2xl border px-4 py-3 text-[0.8125rem]"
-    >
-      {error.message}
-      <button
-        type="button"
-        onClick={() => (needsSetup ? setSetupOpen(true) : void onRetry())}
-        className="self-start font-medium underline underline-offset-2"
-      >
-        {needsSetup ? "Open setup" : "Try again"}
-      </button>
     </div>
   );
 }

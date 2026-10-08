@@ -243,6 +243,25 @@ impl AgentHarness {
         }
     }
 
+    /// What to call the agent in a message: "Codex", or the program's name
+    /// for one the user set up.
+    fn agent_name(&self) -> String {
+        match &*self.config.lock().unwrap() {
+            AgentConfig::Codex => "Codex".to_string(),
+            AgentConfig::Custom { command, .. } => std::path::Path::new(command.trim())
+                .file_name()
+                .map_or_else(
+                    || "The agent".to_string(),
+                    |n| n.to_string_lossy().into_owned(),
+                ),
+        }
+    }
+
+    /// Turns a raw error into one the chat can act on (see `errors.rs`).
+    pub fn explain_error(&self, raw: String) -> super::errors::AgentError {
+        super::errors::classify(&raw, &self.agent_name())
+    }
+
     /// Tells the harness where Yomu's library server is. Sessions started
     /// from now on can look the library up themselves.
     pub fn set_mcp(&self, info: McpInfo) {

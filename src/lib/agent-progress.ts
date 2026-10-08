@@ -77,6 +77,25 @@ export function applyProgress(p: Progress, event: AgentEvent): Progress {
   }
 }
 
+/** How much of the model's memory (context window) a chat has used. */
+export type ContextUsage = { used: number; size: number };
+
+/** Past this share, the next turn starts a fresh session instead of
+ * squeezing into a nearly full one. */
+export const CONTEXT_FULL = 0.85;
+/** Past this share, the chat says it is getting long. */
+export const CONTEXT_LONG = 0.7;
+
+/** 0 to 1: how full the model's memory is; 0 when it is not known. */
+export function contextFill(usage: ContextUsage | null): number {
+  if (!usage || usage.size <= 0) return 0;
+  return Math.min(1, usage.used / usage.size);
+}
+
+export function contextIsFull(usage: ContextUsage | null): boolean {
+  return contextFill(usage) >= CONTEXT_FULL;
+}
+
 /** Keeps what the agent did with the answer it led to, so it can still be
  * looked at once the turn is over. */
 export function attachTrace<M extends { role: string; trace?: Progress }>(

@@ -23,7 +23,9 @@ import {
 import {
   applyProgress,
   attachTrace,
+  contextIsFull,
   emptyProgress,
+  type ContextUsage,
   type Progress,
 } from "@/lib/agent-progress";
 import { priorExplanations as findPriorExplanations } from "@/lib/exchanges";
@@ -72,6 +74,8 @@ export interface ChatStore {
   streaming: boolean;
   /** What the agent is doing this turn besides writing the answer. */
   progress: Progress;
+  /** How full the session's memory is, as last reported. */
+  context: ContextUsage | null;
   error: ChatError | null;
   loadForArticle: (articleId: string | null) => Promise<void>;
   explain: (article: StoredArticle, selection: Selection) => Promise<void>;
@@ -206,8 +210,13 @@ registerPart(
           case "thought":
           case "step":
           case "plan":
-          case "usage":
             set((s) => ({ progress: applyProgress(s.progress, event) }));
+            break;
+          case "usage":
+            set((s) => ({
+              progress: applyProgress(s.progress, event),
+              context: { used: event.used, size: event.size },
+            }));
             break;
           case "permission_request":
             // Denied on the Rust side (agent/rpc.rs); tell the user why
@@ -229,6 +238,13 @@ registerPart(
       async function ensureSession(
         chat: Chat,
       ): Promise<{ sessionId: string; fresh: boolean }> {
+        // A session whose memory is nearly full is left behind: a new one is
+        // told the article and the recent conversation again, so the chat
+        // carries on instead of failing or forgetting at random.
+        if (contextIsFull(get().context)) {
+          set({ sessionId: null, context: null });
+          chat = { ...chat, acpSessionId: null };
+        }
         const current = get().sessionId;
         if (current) return { sessionId: current, fresh: false };
 
@@ -272,17 +288,16 @@ registerPart(
           else await agentPrompt(sessionId, text);
         } catch (err) {
           logError("explain turn failed", err);
-          const error = classifyError(
-            err instanceof Error ? err.message : String(err),
-          );
+          const error = classifyError(err);
           // Drop a half streamed answer so Retry doesn't stack on top of it.
           set((s) => ({
             streaming: false,
             progress: emptyProgress,
             error,
-            // A hung session is not trusted again: Retry starts a new one,
-            // which is given the article and the conversation afresh.
-            ...(error.kind === "timeout"
+            // A hung session, or one stuck on a model the plan cannot use,
+            // is not trusted again: Retry starts a new one, which is given
+            // the article and the conversation afresh.
+            ...(error.kind === "timeout" || error.kind === "model_unavailable"
               ? {
                   sessionId: null,
                   chat: s.chat ? { ...s.chat, acpSessionId: null } : s.chat,
@@ -398,6 +413,7 @@ registerPart(
         highlights: [],
         streaming: false,
         progress: emptyProgress,
+        context: null,
         error: null,
 
         async loadForArticle(articleId) {
@@ -409,6 +425,7 @@ registerPart(
             highlights: [],
             streaming: false,
             progress: emptyProgress,
+            context: null,
             error: null,
           });
           lastBuild = null;

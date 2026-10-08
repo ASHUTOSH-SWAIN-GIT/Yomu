@@ -686,3 +686,19 @@ async fn real_codex_can_use_the_web() {
     assert!(all.iter().any(|e| matches!(e, AgentEvent::Step { .. })));
     harness.shutdown().await;
 }
+
+#[tokio::test]
+async fn errors_name_the_agent_that_is_in_use() {
+    let f = fixture("error-names").await;
+    let said = |h: &AgentHarness| h.explain_error("not logged in".into()).message;
+    assert!(said(&f.harness).starts_with("Codex isn't signed in"));
+
+    f.harness
+        .set_agent(AgentConfig::Custom {
+            command: "/opt/bin/opencode".into(),
+            args: vec![],
+            data_dirs: vec![],
+        })
+        .await;
+    assert!(said(&f.harness).starts_with("opencode isn't signed in"));
+}

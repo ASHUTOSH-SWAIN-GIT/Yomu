@@ -134,8 +134,21 @@ async fn fresh_temp_dir() -> Result<std::path::PathBuf, String> {
 }
 
 #[tauri::command]
-async fn agent_new_session(harness: tauri::State<'_, Arc<AgentHarness>>) -> Result<String, String> {
-    harness.new_session(&fresh_temp_dir().await?).await
+async fn agent_new_session(
+    harness: tauri::State<'_, Arc<AgentHarness>>,
+) -> Result<String, agent::AgentError> {
+    let cwd = fresh_temp_dir().await.map_err(agent::AgentError::from)?;
+    harness
+        .new_session(&cwd)
+        .await
+        .map_err(|e| harness.explain_error(e))
+}
+
+/// Whether the agent runs inside an operating-system sandbox on this
+/// computer; Settings says so when it does not.
+#[tauri::command]
+fn agent_sandboxed() -> bool {
+    agent::sandboxed()
 }
 
 /// Re-attaches to a session saved from an earlier app run (M5: "persist
@@ -145,10 +158,12 @@ async fn agent_new_session(harness: tauri::State<'_, Arc<AgentHarness>>) -> Resu
 async fn agent_resume_session(
     session_id: String,
     harness: tauri::State<'_, Arc<AgentHarness>>,
-) -> Result<(), String> {
+) -> Result<(), agent::AgentError> {
+    let cwd = fresh_temp_dir().await.map_err(agent::AgentError::from)?;
     harness
-        .resume_session(&session_id, &fresh_temp_dir().await?)
+        .resume_session(&session_id, &cwd)
         .await
+        .map_err(|e| harness.explain_error(e))
 }
 
 /// Switches to the agent chosen in the settings and starts it, so a wrong
@@ -206,15 +221,21 @@ async fn agent_prompt(
     text: String,
     image_url: Option<String>,
     harness: tauri::State<'_, Arc<AgentHarness>>,
-) -> Result<(), String> {
+) -> Result<(), agent::AgentError> {
     let Some(url) = image_url else {
-        return harness.prompt(&session_id, &text).await;
+        return harness
+            .prompt(&session_id, &text)
+            .await
+            .map_err(|e| harness.explain_error(e));
     };
-    let client = scraper::http_client().map_err(|e| e.to_string())?;
-    let image = imgcache::load_for_agent(&client, &imgcache::images_dir(&app)?, &url).await?;
+    let client = scraper::http_client().map_err(|e| agent::AgentError::other(e.to_string()))?;
+    let image = imgcache::load_for_agent(&client, &imgcache::images_dir(&app)?, &url)
+        .await
+        .map_err(agent::AgentError::from)?;
     harness
         .prompt_with_image(&session_id, &text, Some((image.mime, &image.base64)))
         .await
+        .map_err(|e| harness.explain_error(e))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -301,6 +322,7 @@ pub fn run() {
             agent_new_session,
             agent_resume_session,
             agent_warm,
+            agent_sandboxed,
             agent_use,
             agent_find_command,
             agent_list_models,
