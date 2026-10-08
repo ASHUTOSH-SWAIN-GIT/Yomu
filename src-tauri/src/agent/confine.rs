@@ -95,11 +95,21 @@ pub fn policy(
 pub fn policy_for_this_machine(extra_read: &[PathBuf], extra_write: &[PathBuf]) -> Policy {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let path = std::env::var("PATH").unwrap_or_default();
-    let roots = node_roots(home.as_deref(), &path);
+    policy_for(home.as_deref(), &path, extra_read, extra_write)
+}
+
+/// [`policy_for_this_machine`] for a given home folder and `PATH`.
+fn policy_for(
+    home: Option<&Path>,
+    path: &str,
+    extra_read: &[PathBuf],
+    extra_write: &[PathBuf],
+) -> Policy {
+    let roots = node_roots(home, path);
     let entries: Vec<PathBuf> = std::fs::read_dir("/")
         .map(|d| d.flatten().map(|e| e.path()).collect())
         .unwrap_or_default();
-    policy(home.as_deref(), &roots, &entries, extra_read, extra_write)
+    policy(home, &roots, &entries, extra_read, extra_write)
 }
 
 #[cfg(target_os = "linux")]
@@ -350,6 +360,30 @@ mod linux_tests {
         std::fs::remove_dir_all(&f.dir).unwrap();
     }
 
+    /// The control: the very same commands succeed without the sandbox, so
+    /// the denials in the other tests come from it and from nothing else (not
+    /// a missing file, not the user the tests run as).
+    #[test]
+    fn the_same_commands_work_without_the_sandbox() {
+        let f = fixture("control");
+        let secret = f.home.join("Documents/secret.txt");
+        let outside = std::env::temp_dir().join(format!("yomu-control-{}", std::process::id()));
+        let out = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!(
+                "cat {} && echo x > {}",
+                secret.display(),
+                outside.display()
+            ))
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        assert!(String::from_utf8_lossy(&out.stdout).contains("the-secret-words"));
+        assert!(outside.exists());
+        std::fs::remove_file(&outside).unwrap();
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
     #[test]
     fn personal_files_in_home_cannot_be_read() {
         if !supported() {
@@ -407,6 +441,77 @@ mod linux_tests {
 
         let (ok, out) = run(&f.policy, "echo discarded > /dev/null");
         assert!(ok, "{out}");
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
+    /// Where `program` is on `PATH`, if it is.
+    fn find_on_path(program: &str) -> Option<PathBuf> {
+        let path = std::env::var("PATH").ok()?;
+        std::env::split_paths(&path)
+            .map(|dir| dir.join(program))
+            .find(|p| p.is_file())
+    }
+
+    /// The agent is a Node program, so the real thing: Node starts under the
+    /// policy and does its job, and still cannot touch what is shut.
+    #[test]
+    fn real_node_runs_inside_the_sandbox_and_cannot_reach_personal_files() {
+        if !supported() {
+            return;
+        }
+        // A Node kept inside the real home folder would be shut off from the
+        // fixture's home; that is the normal case on a developer's machine.
+        let real_home = std::env::var_os("HOME").map(PathBuf::from);
+        match (find_on_path("node"), real_home) {
+            (None, _) => return eprintln!("SKIPPED: no node on PATH"),
+            (Some(node), Some(ref home)) if node.starts_with(home) => {
+                return eprintln!("SKIPPED: node lives inside the home folder")
+            }
+            _ => {}
+        }
+        let f = fixture("node");
+        let path = std::env::var("PATH").unwrap_or_default();
+        let policy = policy_for(Some(&f.home), &path, &[], &[]);
+        let node = |script: &str| -> (bool, String) {
+            let mut command = std::process::Command::new("node");
+            command.arg("-e").arg(script).current_dir("/");
+            confine(&mut command, &policy).unwrap();
+            let out = command.output().unwrap();
+            let text = format!(
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+            (out.status.success(), text)
+        };
+        let js = |s: &Path| format!("{:?}", s.to_string_lossy());
+
+        let (ok, out) = node("console.log(process.platform)");
+        assert!(ok && out.contains("linux"), "{out}");
+        // The npm cache is the one place it may write in home.
+        let cache = f.home.join(".npm/from-node.txt");
+        let (ok, out) = node(&format!("require('fs').writeFileSync({}, 'x')", js(&cache)));
+        assert!(ok && cache.exists(), "{out}");
+        // Everything else in home stays shut, to Node and to what Node starts.
+        let secret = f.home.join("Documents/secret.txt");
+        let (ok, out) = node(&format!("require('fs').readFileSync({})", js(&secret)));
+        assert!(!ok && !out.contains("the-secret-words"), "{out}");
+        let (ok, _) = node(&format!(
+            "require('child_process').execSync('cat ' + {})",
+            js(&secret)
+        ));
+        assert!(!ok);
+        let elsewhere = f.home.join("Documents/new.txt");
+        let (ok, _) = node(&format!(
+            "require('fs').writeFileSync({}, 'x')",
+            js(&elsewhere)
+        ));
+        assert!(!ok && !elsewhere.exists());
+        // The network stays open: the agent cannot work without it.
+        let (ok, out) = node(
+            "const s = require('net').createServer().listen(0, '127.0.0.1', () => { console.log('listening'); s.close(); })",
+        );
+        assert!(ok && out.contains("listening"), "{out}");
         std::fs::remove_dir_all(&f.dir).unwrap();
     }
 
