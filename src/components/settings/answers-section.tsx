@@ -16,15 +16,8 @@ export function AnswersSection() {
   const [style, setStyle] = useState(prefs.style);
 
   return (
-    <Section
-      id="answers"
-      title="AI answers"
-      note="Applies to every chat, with any agent."
-    >
-      <Setting
-        label="Skill level"
-        hint="Beginner explains plainly and defines jargon. Expert skips the basics."
-      >
+    <Section id="answers" title="AI answers">
+      <Setting label="Skill level">
         <Segmented<ExplainLevel>
           label="Skill level"
           value={prefs.level}
@@ -37,17 +30,13 @@ export function AnswersSection() {
         />
       </Setting>
 
-      <Setting
-        stacked
-        label="Answer style"
-        hint="An instruction added to every chat, such as “be thorough”, “use short answers” or “reply in Hindi”."
-      >
+      <Setting stacked label="Answer style">
         <textarea
           value={style}
           onChange={(e) => setStyle(e.target.value.slice(0, STYLE_MAX))}
           onBlur={() => setPrefs({ style })}
           rows={3}
-          placeholder="Nothing extra"
+          placeholder="e.g. keep answers short, reply in Hindi"
           aria-label="Answer style"
           className="bg-muted placeholder:text-muted-foreground w-full resize-none rounded-xl px-4 py-3 text-[0.875rem] outline-none"
         />
@@ -56,14 +45,7 @@ export function AnswersSection() {
         </div>
       </Setting>
 
-      <Setting
-        label="Default model"
-        hint={
-          chatModel
-            ? "Used for new chats, and picked from the list of models you can use. Choose an effort under a model to set that too."
-            : "Auto: Yomu picks a model you can use. Choose one to always start with it."
-        }
-      >
+      <Setting label="Default model">
         <div className="flex items-center gap-2">
           <ModelPicker />
           {chatModel && (

@@ -9,18 +9,11 @@ export function ReadingSection() {
   const setBlockImages = useUiStore((s) => s.setBlockRemoteImages);
 
   return (
-    <Section
-      id="reading"
-      title="Appearance and reading"
-      note="Applied everywhere, straight away."
-    >
-      <Setting
-        label="Theme"
-        hint="Popular editor themes, or Auto to follow your Mac's light or dark mode."
-      >
+    <Section id="reading" title="Appearance and reading">
+      <Setting label="Theme">
         <ThemePicker />
       </Setting>
-      <Setting label="Typeface" hint="How article text is set.">
+      <Setting label="Typeface">
         <FontPicker />
       </Setting>
 
@@ -42,10 +35,7 @@ export function ReadingSection() {
         </p>
       </div>
 
-      <Setting
-        label="Block remote images"
-        hint="Images are not fetched from the web, which stops sites from seeing you read. Images already saved on this computer still show."
-      >
+      <Setting label="Block remote images">
         <Switch
           checked={blockImages}
           onChange={setBlockImages}

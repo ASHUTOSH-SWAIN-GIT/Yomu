@@ -16,6 +16,11 @@ describe("shortcutFor", () => {
     ["b", "toggle-sidebar"],
     ["j", "focus-ask"],
     [".", "focus-mode"],
+    ["n", "new-chat"],
+    ["e", "toggle-chat"],
+    ["/", "shortcuts"],
+    ["t", "new-tab"],
+    ["w", "close-tab"],
   ])("Cmd+%s is %s", (k, id) => {
     expect(shortcutFor(key(k))).toBe(id);
   });
@@ -24,6 +29,23 @@ describe("shortcutFor", () => {
     expect(shortcutFor(key("K", { metaKey: false, ctrlKey: true }))).toBe(
       "palette",
     );
+  });
+
+  it("switches tabs with Cmd+Shift+] / [ and Ctrl+Tab", () => {
+    expect(shortcutFor(key("}", { shiftKey: true }))).toBe("next-tab");
+    expect(shortcutFor(key("[", { shiftKey: true }))).toBe("prev-tab");
+    expect(shortcutFor(key("Tab", { metaKey: false, ctrlKey: true }))).toBe(
+      "next-tab",
+    );
+    expect(
+      shortcutFor(
+        key("Tab", { metaKey: false, ctrlKey: true, shiftKey: true }),
+      ),
+    ).toBe("prev-tab");
+  });
+
+  it("Cmd+Shift+H goes home", () => {
+    expect(shortcutFor(key("h", { shiftKey: true }))).toBe("home");
   });
 
   it("Cmd+Shift+V pastes a link, and other shifted keys do nothing", () => {
@@ -38,7 +60,7 @@ describe("shortcutFor", () => {
     expect(shortcutFor(key("0"))).toBeNull();
   });
 
-  it("leaves Cmd+E to the Ask bar", () => {
-    expect(shortcutFor(key("e"))).toBeNull();
+  it("ignores keys that are not shortcuts", () => {
+    expect(shortcutFor(key("q"))).toBeNull();
   });
 });

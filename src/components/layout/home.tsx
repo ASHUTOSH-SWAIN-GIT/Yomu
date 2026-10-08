@@ -6,6 +6,7 @@ import { SettingsPage } from "@/components/settings/settings-page";
 import { LibraryList } from "@/components/layout/home-library";
 import { Welcome } from "@/components/layout/home-welcome";
 import { useAgentStore } from "@/stores/agent-store";
+import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
@@ -19,9 +20,9 @@ export function Home() {
   const openUrl = useReaderStore((s) => s.openUrl);
   const articles = useLibraryStore((s) => s.articles);
   const slots = useSpacesStore((s) => s.slots);
-  const showArchive = useSpacesStore((s) => s.showArchive);
-  const libraryChat = useSpacesStore((s) => s.libraryChat);
-  const settingsPage = useSpacesStore((s) => s.settingsPage);
+  const showArchive = useViewStore((s) => s.showArchive);
+  const libraryChat = useViewStore((s) => s.libraryChat);
+  const settingsPage = useViewStore((s) => s.settingsPage);
 
   const agentStatus = useAgentStore((s) => s.status);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);

@@ -15,13 +15,20 @@ import {
 import { SiteFavicon } from "@/components/layout/article-cover";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { articlesInSpace, buildSpaces, INBOX } from "@/lib/spaces";
+import { WithContextMenu } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { removeCollection } from "@/lib/collections";
-import { goHome, openSavedArticle } from "@/lib/navigate";
+import {
+  goHome,
+  openArticleInNewTab,
+  openChatInNewTab,
+  openSavedArticle,
+} from "@/lib/navigate";
 import { useReaderStore } from "@/stores/reader-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useSpacesStore } from "@/stores/spaces-store";
+import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 
 const FOLDED_KEY = "yomu-sidebar-folded";
@@ -36,10 +43,10 @@ export function LibrarySidebar() {
   const extra = useSpacesStore((s) => s.extra);
   const slots = useSpacesStore((s) => s.slots);
   const setActive = useSpacesStore((s) => s.setActive);
-  const showArchive = useSpacesStore((s) => s.showArchive);
-  const setShowArchive = useSpacesStore((s) => s.setShowArchive);
-  const libraryChat = useSpacesStore((s) => s.libraryChat);
-  const setLibraryChat = useSpacesStore((s) => s.setLibraryChat);
+  const showArchive = useViewStore((s) => s.showArchive);
+  const setShowArchive = useViewStore((s) => s.setShowArchive);
+  const libraryChat = useViewStore((s) => s.libraryChat);
+  const setLibraryChat = useViewStore((s) => s.setLibraryChat);
   const resetChat = useLibraryChatStore((s) => s.reset);
   const chatId = useLibraryChatStore((s) => s.chatId);
   const liveChatId = useLibraryChatStore((s) => s.liveChatId);
@@ -76,8 +83,8 @@ export function LibrarySidebar() {
   // The collection last clicked: it is the one whose options show.
   const [selected, setSelected] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
-  const settingsPage = useSpacesStore((s) => s.settingsPage);
-  const setSettingsPage = useSpacesStore((s) => s.setSettingsPage);
+  const settingsPage = useViewStore((s) => s.settingsPage);
+  const setSettingsPage = useViewStore((s) => s.setSettingsPage);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const peek = useUiStore((s) => s.sidebarPeek);
   const peekSidebar = useUiStore((s) => s.peekSidebar);
@@ -262,27 +269,36 @@ export function LibrarySidebar() {
                 <ul className="mt-0.5 mb-1 flex flex-col gap-px">
                   {blogs.map((a) => (
                     <li key={a.id}>
-                      <button
-                        type="button"
-                        onClick={() => void openSavedArticle(a.id)}
-                        title={a.title}
-                        aria-current={readingId === a.id ? "page" : undefined}
-                        className={cn(
-                          "focus-visible:ring-ring/60 flex h-7 w-full items-center gap-2 rounded-md pr-2 pl-7 text-left text-[0.75rem] outline-none focus-visible:ring-2",
-                          readingId === a.id
-                            ? "bg-accent text-foreground font-medium"
-                            : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
-                        )}
+                      <WithContextMenu
+                        items={[
+                          {
+                            label: "Open in new tab",
+                            onSelect: () => openArticleInNewTab(a.id),
+                          },
+                        ]}
                       >
-                        <SiteFavicon
-                          url={a.canonicalUrl}
-                          icon={a.icon}
-                          site={a.site}
-                        />
-                        <span className="min-w-0 flex-1 truncate">
-                          {a.title}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => void openSavedArticle(a.id)}
+                          title={a.title}
+                          aria-current={readingId === a.id ? "page" : undefined}
+                          className={cn(
+                            "focus-visible:ring-ring/60 flex h-7 w-full items-center gap-2 rounded-md pr-2 pl-7 text-left text-[0.75rem] outline-none focus-visible:ring-2",
+                            readingId === a.id
+                              ? "bg-accent text-foreground font-medium"
+                              : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                          )}
+                        >
+                          <SiteFavicon
+                            url={a.canonicalUrl}
+                            icon={a.icon}
+                            site={a.site}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {a.title}
+                          </span>
+                        </button>
+                      </WithContextMenu>
                     </li>
                   ))}
                 </ul>
@@ -404,8 +420,8 @@ function PreviousChats({ leave }: { leave: () => void }) {
   const chatId = useLibraryChatStore((s) => s.chatId);
   const openChat = useLibraryChatStore((s) => s.openChat);
   const deleteChat = useLibraryChatStore((s) => s.deleteChat);
-  const libraryChat = useSpacesStore((s) => s.libraryChat);
-  const setLibraryChat = useSpacesStore((s) => s.setLibraryChat);
+  const libraryChat = useViewStore((s) => s.libraryChat);
+  const setLibraryChat = useViewStore((s) => s.setLibraryChat);
   const reading = useReaderStore((s) => s.state.status === "ready");
   const [confirming, setConfirming] = useState<string | null>(null);
   // The whole section folds shut, like a collection does.
@@ -447,29 +463,38 @@ function PreviousChats({ leave }: { leave: () => void }) {
           const open = !reading && libraryChat && chatId === chat.id;
           return (
             <li key={chat.id} className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirming(null);
-                  void openChat(chat.id);
-                  setLibraryChat(true);
-                  leave();
-                }}
-                title={chat.title}
-                aria-current={open ? "page" : undefined}
-                className={cn(
-                  "focus-visible:ring-ring/60 flex h-[30px] w-full items-center gap-2.5 rounded-md pr-8 pl-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2",
-                  open
-                    ? "bg-accent text-foreground font-medium"
-                    : "text-foreground/80 hover:bg-accent/70 hover:text-foreground",
-                )}
+              <WithContextMenu
+                items={[
+                  {
+                    label: "Open in new tab",
+                    onSelect: () => openChatInNewTab(chat.id),
+                  },
+                ]}
               >
-                <MessageCircle
-                  className="text-muted-foreground size-4 shrink-0"
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1 truncate">{chat.title}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirming(null);
+                    void openChat(chat.id);
+                    setLibraryChat(true);
+                    leave();
+                  }}
+                  title={chat.title}
+                  aria-current={open ? "page" : undefined}
+                  className={cn(
+                    "focus-visible:ring-ring/60 flex h-[30px] w-full items-center gap-2.5 rounded-md pr-8 pl-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2",
+                    open
+                      ? "bg-accent text-foreground font-medium"
+                      : "text-foreground/80 hover:bg-accent/70 hover:text-foreground",
+                  )}
+                >
+                  <MessageCircle
+                    className="text-muted-foreground size-4 shrink-0"
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 truncate">{chat.title}</span>
+                </button>
+              </WithContextMenu>
               {open && (
                 <button
                   type="button"

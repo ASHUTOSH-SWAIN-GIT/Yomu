@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { normText, rangeInBlock } from "@/lib/text-ranges";
 import { useCommentsStore } from "@/stores/comments-store";
+import { useIsActiveTab } from "@/stores/tabs";
 
 /** The range some words cover on the page, if they are still there (a
  * re-fetched article that changed shows nothing rather than the wrong
@@ -30,13 +31,21 @@ export function useCommentHighlights(
   const draft = useCommentsStore((s) => s.draft);
   const activeId = useCommentsStore((s) => s.activeId);
   const setActive = useCommentsStore((s) => s.setActive);
+  // The highlight registry is shared by the whole window, so only the tab on
+  // screen may paint into it.
+  const tabActive = useIsActiveTab();
   // The painted words of each saved comment, for finding what is under the
   // pointer.
   const painted = useRef<{ id: string; range: Range }[]>([]);
 
   useEffect(() => {
     const article = articleRef.current;
-    if (!article || typeof CSS === "undefined" || !("highlights" in CSS)) {
+    if (
+      !tabActive ||
+      !article ||
+      typeof CSS === "undefined" ||
+      !("highlights" in CSS)
+    ) {
       return;
     }
     painted.current = [];
@@ -62,7 +71,7 @@ export function useCommentHighlights(
       CSS.highlights.delete("yomu-comment");
       CSS.highlights.delete("yomu-comment-active");
     };
-  }, [articleRef, items, draft, activeId]);
+  }, [articleRef, items, draft, activeId, tabActive]);
 
   // Pointing at commented words makes them (and their comment) react.
   useEffect(() => {

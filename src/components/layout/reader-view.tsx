@@ -13,6 +13,7 @@ import { AddCommentButton, BlockComments } from "@/components/reader/comments";
 import { useCommentHighlights } from "@/hooks/use-comment-highlights";
 import { useCommentSelection } from "@/hooks/use-comment-selection";
 import { useCommentsStore } from "@/stores/comments-store";
+import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 import { readingMinutes } from "@/lib/reading";
 import { useReaderStore } from "@/stores/reader-store";
@@ -20,22 +21,22 @@ import type { StoredArticle } from "@/types/library";
 
 export function ReaderView() {
   const state = useReaderStore((s) => s.state);
-  const chatOpen = useUiStore((s) => s.chatOpen);
-  const chatFull = useUiStore((s) => s.chatFull);
+  const chatOpen = useViewStore((s) => s.chatOpen);
+  const chatFull = useViewStore((s) => s.chatFull);
   const chatWidth = useUiStore((s) => s.chatWidth);
   const [resizing, setResizing] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
   const focusMode = useUiStore((s) => s.focusMode);
   const scrollRef = useRef<HTMLElement>(null);
+  const setPastTitle = useViewStore((s) => s.setPastTitle);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const onScroll = () =>
-      useUiStore.getState().setPastTitle(el.scrollTop > 140);
+    const onScroll = () => setPastTitle(el.scrollTop > 140);
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [setPastTitle]);
 
   return (
     <div ref={rowRef} className="flex h-full">

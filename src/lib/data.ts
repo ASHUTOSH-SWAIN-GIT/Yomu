@@ -2,31 +2,34 @@ import { pruneImages } from "@/lib/commands";
 import { deleteAllArticles, deleteAllChats } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { writeStorage } from "@/lib/storage";
-import { useChatStore } from "@/stores/chat-store";
-import { useImageStore } from "@/stores/image-store";
-import { useLibraryChatStore } from "@/stores/library-chat-store";
+import "@/stores/chat-store";
+import "@/stores/image-store";
+import "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
-import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
+import { allBundles, partOf, resetTabs } from "@/stores/tabs";
 
 /** Deletes every chat. The blogs, collections and highlights-free reading
  * stay as they are. */
 export async function clearAllChats() {
   await deleteAllChats();
-  await useLibraryChatStore.getState().reset();
-  await useLibraryChatStore.getState().loadChats();
-  // Reload the open blog's chat, which is now empty.
-  const reader = useReaderStore.getState().state;
-  await useChatStore
-    .getState()
-    .loadForArticle(reader.status === "ready" ? reader.article.id : null);
+  for (const tab of allBundles()) {
+    const libraryChat = partOf(tab, "libraryChat").getState();
+    await libraryChat.reset();
+    await libraryChat.loadChats();
+    // Reload the open blog's chat, which is now empty.
+    const reader = partOf(tab, "reader").getState().state;
+    await partOf(tab, "chat")
+      .getState()
+      .loadForArticle(reader.status === "ready" ? reader.article.id : null);
+  }
 }
 
 /** Deletes cached images (they are downloaded again when a blog is opened). */
 export async function clearImageCache(): Promise<number> {
   const removed = await pruneImages([]);
   // Nothing is cached any more, so the open blog must not point at files.
-  useImageStore.setState({ files: {} });
+  allBundles().forEach((tab) => partOf(tab, "images").setState({ files: {} }));
   return removed;
 }
 
@@ -38,11 +41,8 @@ export async function deleteEverything() {
   } catch (err) {
     logError("clearing the image cache failed", err);
   }
-  useReaderStore.getState().reset();
-  await useLibraryChatStore.getState().reset();
-  await useLibraryChatStore.getState().loadChats();
-  await useChatStore.getState().loadForArticle(null);
-  useImageStore.setState({ files: {} });
+  // Every tab goes: what they showed is gone.
+  resetTabs();
   useSpacesStore.getState().reset();
   writeStorage("yomu-sidebar-folded", "[]");
   await useLibraryStore.getState().refresh();

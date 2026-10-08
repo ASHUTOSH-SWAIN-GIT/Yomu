@@ -16,6 +16,7 @@ import { useAgentStore } from "@/stores/agent-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useCommentsStore } from "@/stores/comments-store";
 import { useUiStore } from "@/stores/ui-store";
+import { useViewStore } from "@/stores/view-store";
 import type { Comment, StoredArticle } from "@/types/library";
 
 const buttonClass =
@@ -34,6 +35,7 @@ export function AddCommentButton({
 }) {
   const startDraft = useCommentsStore((s) => s.startDraft);
   const explain = useChatStore((s) => s.explain);
+  const setChatOpen = useViewStore((s) => s.setChatOpen);
   const { rect, anchor } = selection;
   // Above the selection, or under it when there is no room above.
   const above = rect.top > 56;
@@ -54,11 +56,10 @@ export function AddCommentButton({
         onClick={() => {
           // Without a connected agent there is nothing to ask; show how to
           // set one up instead.
-          const ui = useUiStore.getState();
           if (useAgentStore.getState().status !== "ready")
-            ui.setSetupOpen(true);
+            useUiStore.getState().setSetupOpen(true);
           else {
-            ui.setChatOpen(true);
+            setChatOpen(true);
             void explain(article, {
               blockIndex: anchor.blockIndex,
               startOffset: anchor.start,

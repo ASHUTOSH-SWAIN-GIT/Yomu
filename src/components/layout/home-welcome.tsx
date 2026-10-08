@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { openSampleArticle } from "@/lib/sample-article";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
-import { useSpacesStore } from "@/stores/spaces-store";
+import { useViewStore } from "@/stores/view-store";
 
 /** What a new reader sees before saving anything: four illustrated cards,
  * one per thing Yomu does, each a shortcut to trying it. */
@@ -33,8 +33,8 @@ const STEPS = [
 ] as const;
 
 export function Welcome() {
-  const setLibraryChat = useSpacesStore((s) => s.setLibraryChat);
-  const setSettingsPage = useSpacesStore((s) => s.setSettingsPage);
+  const setLibraryChat = useViewStore((s) => s.setLibraryChat);
+  const setSettingsPage = useViewStore((s) => s.setSettingsPage);
   const resetChat = useLibraryChatStore((s) => s.reset);
   const actions = [
     () => void openSampleArticle(),

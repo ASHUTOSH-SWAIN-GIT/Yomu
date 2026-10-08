@@ -10,7 +10,7 @@ import { goHome } from "@/lib/navigate";
 import { cn } from "@/lib/utils";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useReaderStore } from "@/stores/reader-store";
-import { useSpacesStore } from "@/stores/spaces-store";
+import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 
 /** Every chat you have had with your blogs, with a box to search them.
@@ -36,7 +36,7 @@ function Body({ close }: { close: () => void }) {
   const chatId = useLibraryChatStore((s) => s.chatId);
   const openChat = useLibraryChatStore((s) => s.openChat);
   const deleteChat = useLibraryChatStore((s) => s.deleteChat);
-  const setLibraryChat = useSpacesStore((s) => s.setLibraryChat);
+  const setLibraryChat = useViewStore((s) => s.setLibraryChat);
   const reading = useReaderStore((s) => s.state.status === "ready");
   const [query, setQuery] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);

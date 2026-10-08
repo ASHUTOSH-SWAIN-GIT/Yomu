@@ -244,6 +244,24 @@ pub fn run() {
         )
         .manage(harness)
         .setup(move |app| {
+            // Cmd+W closes a tab (handled in the page), so the default
+            // menu's "Close Window" must not take that shortcut. The window
+            // still closes with its red button and Cmd+Q.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{Menu, MenuItemKind, WINDOW_SUBMENU_ID};
+                let menu = Menu::default(app.handle())?;
+                if let Some(MenuItemKind::Submenu(window)) = menu.get(WINDOW_SUBMENU_ID) {
+                    for item in window.items()? {
+                        if let MenuItemKind::Predefined(p) = &item {
+                            if p.text()? == "Close Window" {
+                                window.remove(&item)?;
+                            }
+                        }
+                    }
+                }
+                app.set_menu(menu)?;
+            }
             // Forwards normalized agent events (see agent/events.rs) to
             // the frontend as they arrive. The chat panel listens for
             // "agent-event" and filters by sessionId.

@@ -5,8 +5,10 @@ import {
   Focus,
   Image as ImageIcon,
   Link as LinkIcon,
+  Keyboard,
   MessageSquare,
   Library,
+  Plus,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -20,9 +22,10 @@ import { cn } from "@/lib/utils";
 import { SUMMARY_LABEL } from "@/lib/scope";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
-import { useSpacesStore } from "@/stores/spaces-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { goHome, openSavedArticle } from "@/lib/navigate";
+import { useViewStore } from "@/stores/view-store";
+import { openTab } from "@/stores/tabs";
 import { useUiStore } from "@/stores/ui-store";
 import type { SearchHit } from "@/types/library";
 
@@ -102,6 +105,7 @@ function PaletteBody({ close }: { close: () => void }) {
       id: "library",
       label: "Go to Home",
       icon: <Library />,
+      shortcut: `${MOD}⇧H`,
       run: () => void goHome(),
     },
     {
@@ -143,7 +147,7 @@ function PaletteBody({ close }: { close: () => void }) {
       icon: <SlidersHorizontal />,
       shortcut: `${MOD},`,
       run: () => {
-        useSpacesStore.getState().setSettingsPage(true);
+        useViewStore.getState().setSettingsPage(true);
         if (useReaderStore.getState().state.status === "ready") void goHome();
       },
     },
@@ -151,8 +155,23 @@ function PaletteBody({ close }: { close: () => void }) {
       id: "chat",
       label: "Show or hide the chat",
       icon: <MessageSquare />,
-      shortcut: `${MOD}J`,
-      run: () => ui().setChatOpen(!ui().chatOpen),
+      shortcut: `${MOD}E`,
+      run: () =>
+        useViewStore.getState().setChatOpen(!useViewStore.getState().chatOpen),
+    },
+    {
+      id: "new-tab",
+      label: "New tab",
+      icon: <Plus />,
+      shortcut: `${MOD}T`,
+      run: () => openTab(),
+    },
+    {
+      id: "shortcuts",
+      label: "Keyboard shortcuts",
+      icon: <Keyboard />,
+      shortcut: `${MOD}/`,
+      run: () => ui().setShortcutsOpen(true),
     },
     {
       id: "images",

@@ -41,11 +41,7 @@ export function DataSection() {
   }
 
   return (
-    <Section
-      id="data"
-      title="Data"
-      note="Everything stays on this computer. Nothing is sent anywhere except to the agent you chose, when you ask a question."
-    >
+    <Section id="data" title="Data">
       <Setting label="Where it is kept" hint={info?.dataDir ?? "Looking…"}>
         <Button
           size="sm"
@@ -74,10 +70,7 @@ export function DataSection() {
         />
       </div>
 
-      <Setting
-        label="Clear saved images"
-        hint="Frees the space. Images are downloaded again the next time you open a blog online."
-      >
+      <Setting label="Clear saved images">
         <Button
           size="sm"
           variant="secondary"
@@ -89,10 +82,7 @@ export function DataSection() {
         </Button>
       </Setting>
 
-      <Setting
-        label="Delete all chats"
-        hint="Removes every conversation, with every blog and library chat. Your blogs and collections stay."
-      >
+      <Setting label="Delete all chats">
         {confirming === "chats" ? (
           <Confirm
             question="Delete all chats?"
@@ -112,10 +102,7 @@ export function DataSection() {
         )}
       </Setting>
 
-      <Setting
-        label="Delete everything"
-        hint="Removes every blog, collection, chat and saved image. Your choices on this page stay. This cannot be undone."
-      >
+      <Setting label="Delete everything" hint="This cannot be undone.">
         {confirming === "everything" ? (
           <Confirm
             question="Delete everything?"

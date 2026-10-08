@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { createStore } from "zustand";
 import { canonicalizeUrl, scrapeUrl } from "@/lib/commands";
 import {
   getArticleByCanonicalUrl,
@@ -8,6 +8,7 @@ import {
 import { saveToDefaultCollection } from "@/lib/default-collection";
 import { logError } from "@/lib/log";
 import { useLibraryStore } from "@/stores/library-store";
+import { registerPart, tabStore } from "@/stores/tabs";
 import type { StoredArticle } from "@/types/library";
 
 export type ReaderState =
@@ -16,7 +17,7 @@ export type ReaderState =
   | { status: "error"; url: string; message: string }
   | { status: "ready"; article: StoredArticle };
 
-interface ReaderStore {
+export interface ReaderStore {
   state: ReaderState;
   /** Opens a pasted URL: serves it from the library if already saved
    * (no network), otherwise scrapes it and saves the result. */
@@ -30,64 +31,68 @@ interface ReaderStore {
   openArticle: (id: string) => Promise<void>;
 }
 
-export const useReaderStore = create<ReaderStore>((set) => ({
-  state: { status: "empty" },
+registerPart("reader", () =>
+  createStore<ReaderStore>((set) => ({
+    state: { status: "empty" },
 
-  async openUrl(url) {
-    set({ state: { status: "loading", url } });
-    try {
-      const canonicalUrl = await canonicalizeUrl(url);
-      const cached = await getArticleByCanonicalUrl(canonicalUrl);
-      if (cached) {
-        set({ state: { status: "ready", article: cached } });
-        return;
+    async openUrl(url) {
+      set({ state: { status: "loading", url } });
+      try {
+        const canonicalUrl = await canonicalizeUrl(url);
+        const cached = await getArticleByCanonicalUrl(canonicalUrl);
+        if (cached) {
+          set({ state: { status: "ready", article: cached } });
+          return;
+        }
+
+        const scraped = await scrapeUrl(url);
+        const saved = await upsertArticle(scraped);
+        set({ state: { status: "ready", article: saved } });
+        // A failure to file it must not lose the blog that was just saved.
+        await saveToDefaultCollection(saved.id).catch((err) =>
+          logError("saving to the default collection failed", err),
+        );
+        await useLibraryStore.getState().refresh();
+      } catch (err) {
+        logError(`opening ${url} failed`, err);
+        set({
+          state: {
+            status: "error",
+            url,
+            message: err instanceof Error ? err.message : String(err),
+          },
+        });
       }
+    },
 
-      const scraped = await scrapeUrl(url);
-      const saved = await upsertArticle(scraped);
-      set({ state: { status: "ready", article: saved } });
-      // A failure to file it must not lose the blog that was just saved.
-      await saveToDefaultCollection(saved.id).catch((err) =>
-        logError("saving to the default collection failed", err),
-      );
-      await useLibraryStore.getState().refresh();
-    } catch (err) {
-      logError(`opening ${url} failed`, err);
-      set({
-        state: {
-          status: "error",
-          url,
-          message: err instanceof Error ? err.message : String(err),
-        },
-      });
-    }
-  },
+    async rescrape(article) {
+      try {
+        const saved = await upsertArticle(await scrapeUrl(article.url));
+        set({ state: { status: "ready", article: saved } });
+        await useLibraryStore.getState().refresh();
+      } catch (err) {
+        logError(`re-scrape of ${article.url} failed`, err);
+        set({
+          state: {
+            status: "error",
+            url: article.url,
+            message: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
+    },
 
-  async rescrape(article) {
-    try {
-      const saved = await upsertArticle(await scrapeUrl(article.url));
-      set({ state: { status: "ready", article: saved } });
-      await useLibraryStore.getState().refresh();
-    } catch (err) {
-      logError(`re-scrape of ${article.url} failed`, err);
-      set({
-        state: {
-          status: "error",
-          url: article.url,
-          message: err instanceof Error ? err.message : String(err),
-        },
-      });
-    }
-  },
+    reset() {
+      set({ state: { status: "empty" } });
+    },
 
-  reset() {
-    set({ state: { status: "empty" } });
-  },
+    async openArticle(id) {
+      const article = await getArticleById(id);
+      if (article) {
+        set({ state: { status: "ready", article } });
+      }
+    },
+  })),
+);
 
-  async openArticle(id) {
-    const article = await getArticleById(id);
-    if (article) {
-      set({ state: { status: "ready", article } });
-    }
-  },
-}));
+export const useReaderStore = tabStore("reader");

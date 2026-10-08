@@ -10,7 +10,10 @@ import { CollectionPicker } from "@/components/layout/collection-picker";
 import { UpdateBanner } from "@/components/layout/update-banner";
 import { resolveTheme } from "@/lib/appearance";
 import { goHome } from "@/lib/navigate";
+import { TabStrip } from "@/components/layout/tab-strip";
+import { useTabsStore } from "@/stores/tabs";
 import { useReaderStore } from "@/stores/reader-store";
+import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 
 const ICON_BUTTON =
@@ -20,9 +23,9 @@ const ICON_BUTTON =
  * you are reading, and the theme. */
 export function TopBar() {
   const reader = useReaderStore((s) => s.state);
-  const pastTitle = useUiStore((s) => s.pastTitle);
-  const chatOpen = useUiStore((s) => s.chatOpen);
-  const setChatOpen = useUiStore((s) => s.setChatOpen);
+  const pastTitle = useViewStore((s) => s.pastTitle);
+  const chatOpen = useViewStore((s) => s.chatOpen);
+  const setChatOpen = useViewStore((s) => s.setChatOpen);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const peekSidebar = useUiStore((s) => s.peekSidebar);
@@ -36,6 +39,7 @@ export function TopBar() {
   );
   const dark = shown.mode === "dark";
 
+  const tabbed = useTabsStore((s) => s.ids.length > 1);
   const article = reader.status === "ready" ? reader.article : null;
   const title = article?.title ?? null;
 
@@ -53,30 +57,37 @@ export function TopBar() {
         >
           <PanelLeft className="size-4" aria-hidden />
         </button>
-        {title ? (
-          <button
-            type="button"
-            onClick={() => void goHome()}
-            aria-label="Back to Home"
-            className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-1 rounded-md px-1.5 outline-none focus-visible:ring-2"
-          >
-            <ChevronLeft className="size-3.5" aria-hidden />
-            Home
-          </button>
-        ) : (
-          <span className="px-1.5 font-medium">Home</span>
-        )}
+        {!tabbed &&
+          (title ? (
+            <button
+              type="button"
+              onClick={() => void goHome()}
+              aria-label="Back to Home"
+              className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 flex h-8 items-center gap-1 rounded-md px-1.5 outline-none focus-visible:ring-2"
+            >
+              <ChevronLeft className="size-3.5" aria-hidden />
+              Home
+            </button>
+          ) : (
+            <span className="px-1.5 font-medium">Home</span>
+          ))}
       </div>
 
-      <p
-        className={
-          "text-muted-foreground min-w-0 flex-1 truncate text-center text-[0.8125rem] transition-opacity duration-[var(--dur)] " +
-          (pastTitle ? "opacity-100" : "opacity-0")
-        }
-        title={title ?? undefined}
-      >
-        {title}
-      </p>
+      {/* With several tabs, the tabs are the header: they say what each page
+          is, so the back button and the title are not repeated. */}
+      {tabbed ? (
+        <TabStrip />
+      ) : (
+        <p
+          className={
+            "text-muted-foreground min-w-0 flex-1 truncate text-center text-[0.8125rem] transition-opacity duration-[var(--dur)] " +
+            (pastTitle ? "opacity-100" : "opacity-0")
+          }
+          title={title ?? undefined}
+        >
+          {title}
+        </p>
+      )}
 
       <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
         <UpdateBanner />

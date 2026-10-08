@@ -4,9 +4,11 @@ import { Composer } from "@/components/chat/composer";
 import { CopyButton } from "@/components/chat/copy-button";
 import { Markdown } from "@/components/chat/markdown";
 import { chatArtFor } from "@/lib/chat-art";
+import { openChatFullInNewTab } from "@/lib/navigate";
 import { useAgentStore } from "@/stores/agent-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useReaderStore } from "@/stores/reader-store";
+import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 
 /** The chat beside the article: ask anything about what you are reading. The
@@ -22,10 +24,10 @@ export function ChatPanel() {
   const ask = useChatStore((s) => s.ask);
   const stop = useChatStore((s) => s.stop);
   const retry = useChatStore((s) => s.retry);
-  const chatOpen = useUiStore((s) => s.chatOpen);
-  const setChatOpen = useUiStore((s) => s.setChatOpen);
-  const full = useUiStore((s) => s.chatFull);
-  const setFull = useUiStore((s) => s.setChatFull);
+  const chatOpen = useViewStore((s) => s.chatOpen);
+  const setChatOpen = useViewStore((s) => s.setChatOpen);
+  const full = useViewStore((s) => s.chatFull);
+  const setFull = useViewStore((s) => s.setChatFull);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const ready = useAgentStore((s) => s.status) === "ready";
 
@@ -81,7 +83,9 @@ export function ChatPanel() {
         </div>
         <button
           type="button"
-          onClick={() => setFull(!full)}
+          onClick={() =>
+            full ? setFull(false) : void openChatFullInNewTab(article.id)
+          }
           aria-label={full ? "Exit full screen" : "Full screen"}
           title={full ? "Exit full screen (Esc)" : "Full screen"}
           className={iconButton}

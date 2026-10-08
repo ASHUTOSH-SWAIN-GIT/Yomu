@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { AllChatsDialog } from "@/components/layout/all-chats-dialog";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
-import { ReaderView } from "@/components/layout/reader-view";
+import { TabPages } from "@/components/layout/tab-pages";
+import { ShortcutsDialog } from "@/components/layout/shortcuts-dialog";
 import { SetupDialog } from "@/components/layout/setup-dialog";
 import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
@@ -17,7 +18,9 @@ import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
+import { closeTab, openTab, switchTab, useTabsStore } from "@/stores/tabs";
 import { useUiStore } from "@/stores/ui-store";
+import { useViewStore } from "@/stores/view-store";
 
 /**
  * The window: a tab strip across the top and, on the library page, the
@@ -61,15 +64,35 @@ export function AppShell() {
       else if (command === "toggle-sidebar") ui.setSidebarOpen(!ui.sidebarOpen);
       else if (command === "focus-ask") {
         if (useReaderStore.getState().state.status !== "ready") return;
-        ui.setChatOpen(true);
+        useViewStore.getState().setChatOpen(true);
+        // Every open tab has a chat box; the active tab's is the one marked.
         requestAnimationFrame(() =>
-          document.getElementById("chat-input")?.focus(),
+          document
+            .querySelector<HTMLElement>('[data-tab-active="true"] #chat-input')
+            ?.focus(),
         );
       } else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
       else if (command === "paste-link") void openLinkFromClipboard();
-      else if (command === "settings") {
-        const spaces = useSpacesStore.getState();
-        spaces.setSettingsPage(!spaces.settingsPage);
+      else if (command === "new-tab") openTab();
+      else if (command === "close-tab")
+        closeTab(useTabsStore.getState().activeId);
+      else if (command === "next-tab") switchTab(1);
+      else if (command === "prev-tab") switchTab(-1);
+      else if (command === "shortcuts") ui.setShortcutsOpen(!ui.shortcutsOpen);
+      else if (command === "toggle-chat") {
+        const view = useViewStore.getState();
+        if (useReaderStore.getState().state.status === "ready")
+          view.setChatOpen(!view.chatOpen);
+      } else if (command === "home") {
+        useViewStore.getState().showHome();
+        void goHome();
+      } else if (command === "new-chat") {
+        void useLibraryChatStore.getState().reset();
+        useViewStore.getState().setLibraryChat(true);
+        if (useReaderStore.getState().state.status === "ready") void goHome();
+      } else if (command === "settings") {
+        const view = useViewStore.getState();
+        view.setSettingsPage(!view.settingsPage);
         if (useReaderStore.getState().state.status === "ready") void goHome();
       }
     }
@@ -110,7 +133,7 @@ export function AppShell() {
         <div className="bg-background relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {!focusMode && <TopBar />}
           <div className="relative min-h-0 flex-1 overflow-hidden">
-            <ReaderView />
+            <TabPages />
           </div>
         </div>
       </div>
@@ -118,6 +141,7 @@ export function AppShell() {
       <CommandPalette />
       <AllChatsDialog />
       <SetupDialog />
+      <ShortcutsDialog />
 
       {focusMode && (
         // A thin hover zone along the top edge reveals the way out; it is

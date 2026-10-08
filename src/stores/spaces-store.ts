@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { INBOX, assignSlots } from "@/lib/spaces";
 import { normalizeTag } from "@/lib/tags";
+import { useViewStore } from "@/stores/view-store";
 
 const ACTIVE_KEY = "yomu-space";
 const EXTRA_KEY = "yomu-spaces-extra";
@@ -41,17 +42,8 @@ interface SpacesStore {
   slots: Record<string, number>;
   setActive: (id: string) => void;
   /** The "New collection" page is open. */
-  /** The customize page (settings) is open. */
-  settingsPage: boolean;
-  setSettingsPage: (on: boolean) => void;
   /** Forgets every collection and colour (after "delete everything"). */
   reset: () => void;
-  /** The universal chat page is open. */
-  libraryChat: boolean;
-  setLibraryChat: (on: boolean) => void;
-  /** The library shows archived articles instead of the active space. */
-  showArchive: boolean;
-  setShowArchive: (on: boolean) => void;
   /** Creates a space from a name; returns its id, or null if the name is empty. */
   createSpace: (name: string) => string | null;
   /** Forgets a space you created. Its articles are untagged by the caller. */
@@ -67,23 +59,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
 
   setActive(id) {
     writeStorage(ACTIVE_KEY, id);
-    set({
-      active: id,
-      showArchive: false,
-      libraryChat: false,
-      settingsPage: false,
-    });
+    set({ active: id });
+    // Picking a collection leaves whichever page the tab was on.
+    useViewStore.getState().showHome();
   },
-
-  libraryChat: false,
-  setLibraryChat: (libraryChat) => set({ libraryChat, settingsPage: false }),
-
-  settingsPage: false,
-  setSettingsPage: (settingsPage) => set({ settingsPage, libraryChat: false }),
-
-  showArchive: false,
-  setShowArchive: (showArchive) =>
-    set({ showArchive, libraryChat: false, settingsPage: false }),
 
   reset() {
     writeStorage(EXTRA_KEY, "[]");

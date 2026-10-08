@@ -63,20 +63,14 @@ describe("spaces-store", () => {
     expect(store.getState().extra).toEqual([]);
   });
 
-  it("shows one page at a time: settings, the chat or a list", async () => {
+  it("picking a collection leaves the settings page", async () => {
     stubStorage();
     const store = await freshStore();
-    store.getState().setSettingsPage(true);
-    expect(store.getState().settingsPage).toBe(true);
-    store.getState().setLibraryChat(true);
-    expect(store.getState().settingsPage).toBe(false);
-    store.getState().setSettingsPage(true);
-    expect(store.getState().libraryChat).toBe(false);
-    store.getState().setShowArchive(true);
-    expect(store.getState().settingsPage).toBe(false);
-    store.getState().setSettingsPage(true);
+    // Same module instance the store imported (freshStore reset the cache).
+    const { useViewStore } = await import("@/stores/view-store");
+    useViewStore.getState().setSettingsPage(true);
     store.getState().setActive("inbox");
-    expect(store.getState().settingsPage).toBe(false);
+    expect(useViewStore.getState().settingsPage).toBe(false);
   });
 
   it("forgets every collection and colour on reset", async () => {

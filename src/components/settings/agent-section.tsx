@@ -6,14 +6,14 @@ import { PRESETS, presetOf } from "@/lib/agents";
 import { joinWords, splitWords } from "@/lib/shell-words";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
-import { useSpacesStore } from "@/stores/spaces-store";
+import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 
 /** Which agent Yomu talks to: Codex, one of the presets (Claude Code, Gemini
  * CLI, OpenCode), or any program that speaks ACP over stdio. */
 export function AgentSection() {
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
-  const setSettingsPage = useSpacesStore((s) => s.setSettingsPage);
+  const setSettingsPage = useViewStore((s) => s.setSettingsPage);
   const config = useAgentStore((s) => s.config);
   const status = useAgentStore((s) => s.status);
   const customError = useAgentStore((s) => s.customError);
@@ -83,7 +83,6 @@ export function AgentSection() {
         <Card
           on={usingCodex}
           title="Codex"
-          note="Your local Codex, signed in with your ChatGPT plan. Needs Node.js."
           badge={
             usingCodex
               ? status === "ready"
@@ -118,7 +117,7 @@ export function AgentSection() {
               key={preset.id}
               on={on}
               title={preset.label}
-              note={found ? preset.note : preset.missing}
+              note={found ? undefined : preset.missing}
               badge={on ? agentBadge : found ? "Installed" : undefined}
               onSelect={() => {
                 if (found) void setConfig(preset.config);
@@ -139,7 +138,6 @@ export function AgentSection() {
         <Card
           on={usingCustom}
           title="Custom agent"
-          note="Any program that speaks ACP (the Agent Client Protocol) over stdio."
           badge={usingCustom ? agentBadge : undefined}
           onSelect={() => {
             if (command.trim()) void applyCustom();
@@ -182,10 +180,6 @@ export function AgentSection() {
                 spellCheck={false}
                 className="bg-muted placeholder:text-muted-foreground h-9 w-full rounded-lg px-3 font-mono text-[0.8125rem] outline-none"
               />
-              <span className="text-muted-foreground mt-1 block text-[0.6875rem]">
-                Where the agent keeps its own state, such as its sign-in. These
-                are the only folders it may write to.
-              </span>
             </Field>
             <div className="flex items-center gap-3">
               <Button
@@ -214,13 +208,6 @@ export function AgentSection() {
           </div>
         </Card>
       </div>
-
-      <p className="text-muted-foreground mt-4 text-[0.8125rem] leading-relaxed">
-        Safety: whichever agent you use runs read-only in an empty temporary
-        folder. On macOS the whole process is sandboxed: it cannot write files
-        (apart from its own data folders) or read your documents. This cannot be
-        turned off.
-      </p>
     </>
   );
 }
@@ -235,7 +222,7 @@ function Card({
 }: {
   on: boolean;
   title: string;
-  note: string;
+  note?: string;
   badge?: string;
   onSelect: () => void;
   children?: React.ReactNode;
@@ -272,7 +259,9 @@ function Card({
               </span>
             )}
           </span>
-          <span className="text-muted-foreground text-[0.75rem]">{note}</span>
+          {note && (
+            <span className="text-muted-foreground text-[0.75rem]">{note}</span>
+          )}
         </span>
       </button>
       <div className="pl-7">{children}</div>

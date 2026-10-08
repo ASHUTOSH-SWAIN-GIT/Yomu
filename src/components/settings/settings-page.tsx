@@ -41,11 +41,7 @@ export function SettingsPage() {
       <div className="border-border mt-10 border-t" />
       <AnswersSection />
       <div className="border-border mt-10 border-t" />
-      <Section
-        id="agent"
-        title="Agent"
-        note="Choose which agent answers your questions."
-      >
+      <Section id="agent" title="Agent">
         <AgentSection />
       </Section>
       <div className="border-border mt-10 border-t" />

@@ -50,18 +50,9 @@ interface UiState {
   /** The command palette (Cmd/Ctrl+K). */
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
-  /** The article title has scrolled out of view (the top bar shows it). */
-  pastTitle: boolean;
-  setPastTitle: (past: boolean) => void;
-  /** The chat panel on the right of an article. */
-  chatOpen: boolean;
-  setChatOpen: (open: boolean) => void;
   /** The model picked in the chat's picker; null leaves it to Yomu. */
   chatModel: string | null;
   setChatModel: (id: string | null) => void;
-  /** The chat panel fills the whole page instead of sitting beside it. */
-  chatFull: boolean;
-  setChatFull: (full: boolean) => void;
   /** Width in pixels of the side panel; dragged by its left edge. */
   chatWidth: number;
   /** `save` writes it down, for the end of a drag (not every move). */
@@ -70,6 +61,9 @@ interface UiState {
   /** The dialog listing every chat with the library. */
   allChatsOpen: boolean;
   setAllChatsOpen: (open: boolean) => void;
+  /** The keyboard shortcuts sheet (Cmd/Ctrl+/). */
+  shortcutsOpen: boolean;
+  setShortcutsOpen: (open: boolean) => void;
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
   /** Skill level and code-example preference, applied to every explain
@@ -118,8 +112,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
-  pastTitle: false,
-  setPastTitle: (pastTitle) => set({ pastTitle }),
   chatModel: read(CHAT_MODEL_KEY) || null,
   setChatModel: (chatModel) => {
     write(CHAT_MODEL_KEY, chatModel ?? "");
@@ -133,12 +125,10 @@ export const useUiStore = create<UiState>((set, get) => ({
     if (save) write(CHAT_WIDTH_KEY, String(Math.round(chatWidth)));
     set({ chatWidth });
   },
-  chatFull: false,
-  setChatFull: (chatFull) => set({ chatFull }),
-  chatOpen: false,
-  setChatOpen: (chatOpen) => set({ chatOpen }),
   allChatsOpen: false,
   setAllChatsOpen: (allChatsOpen) => set({ allChatsOpen }),
+  shortcutsOpen: false,
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   setupOpen: false,
   setSetupOpen: (setupOpen) => set({ setupOpen }),
   explainPrefs: parseExplainPrefs(read(EXPLAIN_PREFS_KEY)),
