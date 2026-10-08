@@ -22,6 +22,7 @@ import {
 } from "@/lib/db";
 import {
   applyProgress,
+  attachTrace,
   emptyProgress,
   type Progress,
 } from "@/lib/agent-progress";
@@ -52,6 +53,8 @@ export interface ChatMessage {
   /** What the message is about; decides whether it shows in a margin note
    * or in the thread sheet (see lib/scope.ts). */
   scope?: MessageScope;
+  /** What the agent did to produce this answer (this run only). */
+  trace?: Progress;
 }
 
 const EXPLAIN_LABEL = "Explain this";
@@ -184,7 +187,11 @@ registerPart(
           case "done": {
             const { chat, messages } = get();
             const last = messages[messages.length - 1];
-            set({ streaming: false, progress: emptyProgress });
+            set((s) => ({
+              streaming: false,
+              progress: emptyProgress,
+              messages: attachTrace(s.messages, s.progress),
+            }));
             if (chat && last?.role === "assistant" && last.text) {
               void addMessage(
                 chat.id,

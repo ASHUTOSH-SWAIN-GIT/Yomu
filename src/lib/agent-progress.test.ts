@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   applyProgress,
+  attachTrace,
   emptyProgress,
   hasProgress,
   stepTitle,
+  type Progress,
 } from "@/lib/agent-progress";
 
 const sid = "s1";
@@ -102,5 +104,33 @@ describe("applyProgress", () => {
         }),
       ),
     ).toBe(true);
+  });
+});
+
+describe("attachTrace", () => {
+  const worked = applyProgress(emptyProgress, {
+    kind: "thought",
+    session_id: sid,
+    text: "x",
+  });
+
+  it("puts what the agent did on the answer it led to", () => {
+    const messages = [
+      { role: "user", text: "q" },
+      { role: "assistant", text: "a" },
+    ];
+    const out = attachTrace<{ role: string; text: string; trace?: Progress }>(
+      messages,
+      worked,
+    );
+    expect(out[1].trace).toBe(worked);
+    expect(out[0]).toBe(messages[0]);
+  });
+
+  it("leaves a turn that did nothing visible, or an unanswered one, alone", () => {
+    const answered = [{ role: "assistant", text: "a" }];
+    expect(attachTrace(answered, emptyProgress)).toBe(answered);
+    const asked = [{ role: "user", text: "q" }];
+    expect(attachTrace(asked, worked)).toBe(asked);
   });
 });

@@ -57,3 +57,6 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+landlock = "0.4"

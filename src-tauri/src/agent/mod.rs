@@ -1,4 +1,7 @@
 mod config;
+// Policy code is plain data and is tested everywhere; only Linux applies it.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+mod confine;
 mod events;
 mod harness;
 mod rpc;

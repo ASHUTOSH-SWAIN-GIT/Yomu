@@ -22,6 +22,43 @@ export async function openSavedArticle(articleId: string) {
   await useReaderStore.getState().openArticle(articleId);
 }
 
+/** Brings the paragraph into view and flashes it, so the eye finds it. The
+ * page may still be loading (and restoring where you left off), so it keeps
+ * trying for a moment and settles once more after the layout does. */
+function showParagraph(block: number) {
+  let tries = 0;
+  const find = () =>
+    document.querySelector<HTMLElement>(
+      `[data-tab-active="true"] [data-block-index="${block}"]`,
+    );
+  const attempt = () => {
+    const el = find();
+    if (!el) {
+      if (++tries < 25) setTimeout(attempt, 120);
+      return;
+    }
+    el.scrollIntoView({ block: "center" });
+    el.classList.remove("source-flash");
+    void el.offsetWidth; // so the animation can run again
+    el.classList.add("source-flash");
+    setTimeout(() => find()?.scrollIntoView({ block: "center" }), 350);
+    setTimeout(() => el.classList.remove("source-flash"), 2400);
+  };
+  attempt();
+}
+
+/** Opens a saved article, at a paragraph when one is named (a source link in
+ * an answer), in this tab or a new one. */
+export async function openSource(
+  articleId: string,
+  block: number | null,
+  inNewTab: boolean,
+) {
+  if (inNewTab) openTab();
+  await openSavedArticle(articleId);
+  if (block !== null) showParagraph(block);
+}
+
 /** Opens a saved article in a new tab. */
 export function openArticleInNewTab(articleId: string) {
   openTab();

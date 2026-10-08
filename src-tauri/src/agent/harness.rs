@@ -41,63 +41,77 @@ fn default_command() -> Option<Command> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        // TODO(ROADMAP.md M4): no OS-level write/network confinement on
-        // this platform yet. Linux (Landlock/bubblewrap) and Windows
-        // (AppContainer) equivalents are a known, documented gap -- Codex's
-        // own declared sandbox isn't a substitute (see sandbox.rs's doc
-        // comment for why). Runs unconfined until one is built.
         let mut command = Command::new("npx");
         command.args(["-y", "@agentclientprotocol/codex-acp@1.13.1"]);
-        Some(command)
+        Some(confined(command, &[], &[]))
     }
 }
 
-/// `~/x` as the full path in the user's home folder; anything else as given.
-/// Lets a saved argument such as `--cache ~/.npm/yomu` name a folder.
+/// Starts `command` inside the same rules as macOS where this system can
+/// enforce them: Landlock on Linux (see `confine.rs`). Windows has no
+/// equivalent built yet (see docs/windows-sandbox.md), and an older Linux
+/// kernel has no Landlock; there the agent runs as it is, and says so in
+/// the log. `read` and `write` are a custom agent's own folders.
 #[cfg(not(target_os = "macos"))]
-fn expand_home(arg: &str) -> String {
-    match (arg.strip_prefix("~/"), std::env::var_os("HOME")) {
-        (Some(rest), Some(home)) => std::path::Path::new(&home)
-            .join(rest)
-            .to_string_lossy()
-            .into_owned(),
-        _ => arg.to_string(),
+fn confined(
+    mut command: Command,
+    read: &[std::path::PathBuf],
+    write: &[std::path::PathBuf],
+) -> Command {
+    #[cfg(target_os = "linux")]
+    {
+        if super::confine::available() {
+            let policy = super::confine::policy_for_this_machine(read, write);
+            if let Err(e) = super::confine::confine(command.as_std_mut(), &policy) {
+                log::warn!("{e}; the agent runs without the sandbox");
+            }
+            // Node fails if its working directory is unreadable, and home
+            // is locked, so never inherit the app's.
+            command.current_dir(std::env::temp_dir());
+        } else {
+            log::warn!("this kernel has no Landlock; the agent runs without the sandbox");
+        }
     }
+    #[cfg(not(target_os = "linux"))]
+    log::warn!("no sandbox for the agent on this system yet");
+    let _ = (read, write);
+    command
 }
 
 /// Builds the command for an agent the user set up, in the same sandbox as
-/// Codex on macOS: writes denied everywhere except its own data folder, and
-/// reads of home limited to the program's folder and that data folder.
+/// Codex where there is one: writes denied everywhere except its own data
+/// folder, and reads of home limited to the program's folder and that data
+/// folder.
 fn custom_command(command: &str, args: &[String], data_dirs: &[String]) -> Option<Command> {
     let command = command.trim();
     if command.is_empty() {
         return None;
     }
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    let expand = |p: &str| match (p.strip_prefix("~/"), &home) {
+        (Some(rest), Some(h)) => h.join(rest),
+        _ => std::path::PathBuf::from(p),
+    };
+    let program_dir = super::status::resolve_command(command)
+        .and_then(|p| p.parent().map(std::path::Path::to_path_buf));
+    // An argument that is itself a file (`node ~/agents/my-agent.js`) is
+    // part of the program, so its folder is readable too -- unless that
+    // folder is the home folder itself, which would unlock everything.
+    let script_dirs = args
+        .iter()
+        .map(|a| expand(a))
+        .filter(|p| p.is_file())
+        .filter_map(|p| p.parent().map(std::path::Path::to_path_buf))
+        .filter(|dir| Some(dir) != home.as_ref());
+    let read: Vec<_> = program_dir.into_iter().chain(script_dirs).collect();
+    let write: Vec<_> = data_dirs
+        .iter()
+        .map(|d| d.trim())
+        .filter(|d| !d.is_empty())
+        .map(expand)
+        .collect();
     #[cfg(target_os = "macos")]
     {
-        let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
-        let expand = |p: &str| match (p.strip_prefix("~/"), &home) {
-            (Some(rest), Some(h)) => h.join(rest),
-            _ => std::path::PathBuf::from(p),
-        };
-        let program_dir = super::status::resolve_command(command)
-            .and_then(|p| p.parent().map(std::path::Path::to_path_buf));
-        // An argument that is itself a file (`node ~/agents/my-agent.js`) is
-        // part of the program, so its folder is readable too -- unless that
-        // folder is the home folder itself, which would unlock everything.
-        let script_dirs = args
-            .iter()
-            .map(|a| expand(a))
-            .filter(|p| p.is_file())
-            .filter_map(|p| p.parent().map(std::path::Path::to_path_buf))
-            .filter(|dir| Some(dir) != home.as_ref());
-        let read: Vec<_> = program_dir.into_iter().chain(script_dirs).collect();
-        let write: Vec<_> = data_dirs
-            .iter()
-            .map(|d| d.trim())
-            .filter(|d| !d.is_empty())
-            .map(expand)
-            .collect();
         let mut cmd = Command::new("sandbox-exec");
         cmd.current_dir(std::env::temp_dir())
             .arg("-p")
@@ -109,10 +123,9 @@ fn custom_command(command: &str, args: &[String], data_dirs: &[String]) -> Optio
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = data_dirs;
         let mut cmd = Command::new(command);
-        cmd.args(args.iter().map(|a| expand_home(a)));
-        Some(cmd)
+        cmd.args(args.iter().map(|a| expand(a)));
+        Some(confined(cmd, &read, &write))
     }
 }
 

@@ -326,8 +326,8 @@ describe("buildLibraryPrompt", () => {
 
   it("lists the supplied passages and restricts citations to them", () => {
     const prompt = buildLibraryPrompt("What is ownership?", passages, null);
-    expect(prompt).toContain('- "Rust ownership": one owner at a time');
-    expect(prompt).toContain('- "Go generics": type parameters');
+    expect(prompt).toContain('- "Rust ownership" (id: a): one owner at a time');
+    expect(prompt).toContain('- "Go generics" (id: b): type parameters');
     expect(prompt).toContain("Never cite a title you were not given");
     expect(prompt).toContain("Question: What is ownership?");
   });
@@ -360,14 +360,14 @@ describe("buildInventoryPrompt", () => {
       "what about sqlite?",
       [{ articleId: "1", title: "Fast SQLite", snippet: "WAL mode helps" }],
       [
-        { title: "Fast SQLite", site: "a.dev" },
-        { title: "Rust ownership", site: "" },
+        { id: "1", title: "Fast SQLite", site: "a.dev" },
+        { id: "2", title: "Rust ownership", site: "" },
       ],
     );
     expect(prompt).toContain("Saved articles (2):");
-    expect(prompt).toContain('- "Fast SQLite" (a.dev)');
-    expect(prompt).toContain('- "Rust ownership"');
-    expect(prompt).toContain('- "Fast SQLite": WAL mode helps');
+    expect(prompt).toContain('- "Fast SQLite" (id: 1) (a.dev)');
+    expect(prompt).toContain('- "Rust ownership" (id: 2)');
+    expect(prompt).toContain('- "Fast SQLite" (id: 1): WAL mode helps');
     expect(prompt.trim().endsWith("Message: what about sqlite?")).toBe(true);
   });
 
@@ -375,6 +375,16 @@ describe("buildInventoryPrompt", () => {
     const prompt = buildInventoryPrompt("hi", [], []);
     expect(prompt).toContain("(none yet)");
     expect(prompt).toContain("No saved article text matched");
+  });
+
+  it("tells the agent how to link to a saved blog, by the ids it is given", () => {
+    for (const prompt of [
+      buildInventoryPrompt("hi", [], []),
+      buildLibraryPrompt("hi", [], null),
+    ]) {
+      expect(prompt).toContain("yomu:<id>#<paragraph>");
+      expect(prompt).toContain("using only ids you were given");
+    }
   });
 
   it("does not limit the agent to the saved blogs", () => {

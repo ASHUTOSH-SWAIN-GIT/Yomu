@@ -195,6 +195,106 @@ mod tests {
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 
+    /// Real processes under a real profile: what the rules say is what
+    /// happens. (macOS only, like the module.)
+    struct Fixture {
+        dir: PathBuf,
+        home: PathBuf,
+        profile: String,
+    }
+
+    fn fixture(name: &str) -> Fixture {
+        // Seatbelt matches real paths, and the temp folder is behind a link.
+        let dir = std::fs::canonicalize(std::env::temp_dir())
+            .unwrap()
+            .join(format!("yomu-sandbox-{name}-{}", std::process::id()));
+        let home = dir.join("home");
+        std::fs::create_dir_all(home.join(".npm")).unwrap();
+        std::fs::create_dir_all(home.join("Documents")).unwrap();
+        std::fs::write(home.join("Documents/secret.txt"), "the-secret-words").unwrap();
+        std::fs::write(home.join(".npm/cached.txt"), "package").unwrap();
+        let profile = build(Some(&home), &[], &[]);
+        Fixture { dir, home, profile }
+    }
+
+    /// Runs `script` in `sh` under the profile: whether it succeeded, and
+    /// what it printed.
+    fn run(profile: &str, script: &str) -> (bool, String) {
+        let out = std::process::Command::new("sandbox-exec")
+            .args(["-p", profile, "--", "sh", "-c", script])
+            .current_dir(std::env::temp_dir())
+            .output()
+            .unwrap();
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        (out.status.success(), text)
+    }
+
+    #[test]
+    fn the_agent_still_runs_and_reads_the_system() {
+        let f = fixture("system");
+        let (ok, out) = run(&f.profile, "cat /etc/hosts > /dev/null && echo fine");
+        assert!(ok && out.contains("fine"), "{out}");
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
+    #[test]
+    fn personal_files_in_home_cannot_be_read() {
+        let f = fixture("reads");
+        let secret = f.home.join("Documents/secret.txt");
+        let (ok, out) = run(&f.profile, &format!("cat '{}'", secret.display()));
+        assert!(
+            !ok && !out.contains("the-secret-words"),
+            "the secret was readable: {out}"
+        );
+        let cached = f.home.join(".npm/cached.txt");
+        let (ok, out) = run(&f.profile, &format!("cat '{}'", cached.display()));
+        assert!(ok && out.contains("package"), "{out}");
+        let (ok, _) = run(&f.profile, &format!("ls '{}/Documents'", f.home.display()));
+        assert!(!ok);
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
+    #[test]
+    fn writes_are_denied_except_the_npm_cache_and_dev_null() {
+        let f = fixture("writes");
+        let (ok, out) = run(
+            &f.profile,
+            &format!("echo x > '{}/.npm/new.txt'", f.home.display()),
+        );
+        assert!(ok, "the npm cache must be writable: {out}");
+
+        let outside = f.dir.join("outside.txt");
+        let docs = f.home.join("Documents/new.txt");
+        for target in [outside.as_path(), docs.as_path(), Path::new("/tmp/yomu-x")] {
+            let (ok, _) = run(&f.profile, &format!("echo x > '{}'", target.display()));
+            assert!(!ok, "wrote to {}", target.display());
+            assert!(!target.exists());
+        }
+        let doc = f.home.join("Documents/secret.txt");
+        let (ok, _) = run(&f.profile, &format!("rm '{}'", doc.display()));
+        assert!(!ok && doc.exists());
+
+        let (ok, out) = run(&f.profile, "echo discarded > /dev/null");
+        assert!(ok, "{out}");
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
+    #[test]
+    fn what_the_agent_starts_is_confined_too() {
+        let f = fixture("children");
+        let secret = f.home.join("Documents/secret.txt");
+        let (ok, out) = run(
+            &f.profile,
+            &format!("sh -c 'sh -c \"cat {}\"'", secret.display()),
+        );
+        assert!(!ok && !out.contains("the-secret-words"), "{out}");
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
     #[test]
     fn escapes_quotes_and_backslashes_in_paths() {
         let p = build(Some(Path::new(r#"/Users/we"ird"#)), &[], &[]);

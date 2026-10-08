@@ -1,8 +1,10 @@
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { SourceLink } from "@/components/chat/source-link";
 import { CodeBlock } from "@/components/reader/code-block";
+import { parseSourceHref } from "@/lib/source-links";
 
 /**
  * Renders agent replies. Reuses the reader's Shiki `CodeBlock` and KaTeX
@@ -16,6 +18,11 @@ export function Markdown({ children }: { children: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
+        // Links to saved blogs (yomu:<id>#<paragraph>) are ours; anything
+        // else keeps the usual safe-link rules.
+        urlTransform={(url) =>
+          parseSourceHref(url) ? url : defaultUrlTransform(url)
+        }
         components={{
           pre: ({ children }) => <>{children}</>,
           code({ className, children }) {
@@ -35,16 +42,21 @@ export function Markdown({ children }: { children: string }) {
               />
             );
           },
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const source = parseSourceHref(href);
+            if (source)
+              return <SourceLink source={source}>{children}</SourceLink>;
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                {children}
+              </a>
+            );
+          },
         }}
       >
         {children}

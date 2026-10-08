@@ -771,7 +771,7 @@ describe("library questions", () => {
       "Where did I read about generics?",
     );
     const prompt = m(commands.agentPrompt).mock.calls[0][1];
-    expect(prompt).toContain('- "Go generics": type parameters');
+    expect(prompt).toContain('- "Go generics" (id: b): type parameters');
     expect(prompt).not.toContain("Each value has one owner.");
     expect(useChatStore.getState().messages[0].scope).toBe("library");
   });

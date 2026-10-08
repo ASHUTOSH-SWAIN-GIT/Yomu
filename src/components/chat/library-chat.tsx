@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/chat/composer";
 import { AgentActivity } from "@/components/chat/agent-activity";
+import { SourceChips } from "@/components/chat/source-link";
+import { hasProgress } from "@/lib/agent-progress";
 import { CopyButton } from "@/components/chat/copy-button";
 import { Markdown } from "@/components/chat/markdown";
 import { useAgentStore } from "@/stores/agent-store";
@@ -111,14 +113,22 @@ export function LibraryChat() {
             ) : (
               // The agent's: plain text on the page, with a copy button.
               <li key={i} className="group text-[0.9375rem] leading-7">
+                {m.trace && <AgentActivity progress={m.trace} finished />}
                 <Markdown>{m.text}</Markdown>
                 {!(streaming && i === messages.length - 1) && (
-                  <CopyButton text={m.text} />
+                  <>
+                    <SourceChips text={m.text} />
+                    <CopyButton text={m.text} />
+                  </>
                 )}
               </li>
             ),
           )}
-          {streaming && <AgentActivity progress={progress} />}
+          {streaming && hasProgress(progress) && (
+            <li>
+              <AgentActivity progress={progress} />
+            </li>
+          )}
           {waiting && (
             <li
               aria-label="Thinking"

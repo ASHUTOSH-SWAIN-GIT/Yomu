@@ -454,3 +454,18 @@ html.dark {
     scroll-behavior: auto !important;
   }
 }
+
+/* A paragraph an answer's source link points at. */
+@keyframes yomu-source-flash {
+  0%,
+  35% {
+    background-color: color-mix(in oklab, var(--foreground) 14%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.source-flash {
+  animation: yomu-source-flash 2.2s ease-out;
+  border-radius: 6px;
+}

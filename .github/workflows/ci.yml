@@ -67,3 +67,35 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test
+
+      # The sandbox tests start real processes under the Linux rules. They
+      # skip on a kernel without Landlock, so here a skip is a failure: this
+      # step proves the sandbox really ran on the CI machine.
+      - name: Linux sandbox (Landlock) tests
+        working-directory: src-tauri
+        env:
+          YOMU_REQUIRE_LANDLOCK: "1"
+        run: cargo test agent::confine -- --nocapture
+
+  rust-macos:
+    name: Rust (macOS sandbox)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The mock agent (scripts/mock-acp-agent.mjs) runs on Node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Real processes under the real `sandbox-exec` profile (agent/sandbox.rs),
+      # plus the agent tests against the mock agent.
+      - name: cargo test (agent and sandbox)
+        working-directory: src-tauri
+        run: "cargo test --lib agent::"

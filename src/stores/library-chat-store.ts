@@ -3,6 +3,7 @@ import { agentCancel, agentNewSession, agentPrompt } from "@/lib/commands";
 import { onAgentEvent } from "@/lib/agent-events";
 import {
   applyProgress,
+  attachTrace,
   emptyProgress,
   type Progress,
 } from "@/lib/agent-progress";
@@ -28,6 +29,8 @@ import { useUiStore } from "@/stores/ui-store";
 export interface LibraryMessage {
   role: "user" | "assistant";
   text: string;
+  /** What the agent did to produce this answer (this run only). */
+  trace?: Progress;
 }
 
 export interface LibraryChatStore {
@@ -86,7 +89,11 @@ registerPart("libraryChat", (bundle) => {
           });
           break;
         case "done": {
-          set({ streaming: false, progress: emptyProgress });
+          set((s) => ({
+            streaming: false,
+            progress: emptyProgress,
+            messages: attachTrace(s.messages, s.progress),
+          }));
           const { chatId, messages } = get();
           const last = messages[messages.length - 1];
           if (chatId && last?.role === "assistant" && last.text) {
@@ -137,7 +144,7 @@ registerPart("libraryChat", (bundle) => {
         if (mine !== epoch) return;
         const inventory = useLibraryStore
           .getState()
-          .articles.map((a) => ({ title: a.title, site: a.site }));
+          .articles.map((a) => ({ id: a.id, title: a.title, site: a.site }));
         await agentPrompt(
           sessionId,
           buildInventoryPrompt(

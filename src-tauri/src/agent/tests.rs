@@ -618,7 +618,7 @@ async fn real_codex_uses_the_library_server() {
     harness
         .prompt(
             &session,
-            "Use your yomu tools: call list_articles, then reply with the titles of the blogs it returns, one per line. Nothing else.",
+            "Use your yomu tools: call search_library for 'storage and compute', then answer in one sentence what the best blog says. Cite the article as a Markdown link whose address is yomu:<id>, or yomu:<id>#<paragraph> when you know the paragraph number (¶), for example [Inside Neon](yomu:abc123#12), using only ids you were given.",
         )
         .await
         .unwrap();
@@ -631,6 +631,8 @@ async fn real_codex_uses_the_library_server() {
     println!("REPLY: {}", joined_tokens(&all));
     assert!(all.iter().any(|e| matches!(e,
         AgentEvent::Step { title: Some(t), .. } if t.contains("yomu"))));
+    // The answer points at a saved blog the way the chat can open.
+    assert!(joined_tokens(&all).contains("](yomu:"), "no source link");
     assert!(!all
         .iter()
         .any(|e| matches!(e, AgentEvent::PermissionRequest { .. })));

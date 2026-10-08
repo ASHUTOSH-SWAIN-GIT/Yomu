@@ -77,6 +77,19 @@ export function applyProgress(p: Progress, event: AgentEvent): Progress {
   }
 }
 
+/** Keeps what the agent did with the answer it led to, so it can still be
+ * looked at once the turn is over. */
+export function attachTrace<M extends { role: string; trace?: Progress }>(
+  messages: M[],
+  progress: Progress,
+): M[] {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "assistant" || !hasProgress(progress)) {
+    return messages;
+  }
+  return [...messages.slice(0, -1), { ...last, trace: progress }];
+}
+
 /** True when there is anything worth showing. */
 export function hasProgress(p: Progress): boolean {
   return p.thinking.length > 0 || p.steps.length > 0 || p.plan.length > 0;

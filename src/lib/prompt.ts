@@ -213,6 +213,12 @@ export function buildArticlePrompt(
 const WEB_LOOKUP =
   "You may look things up on the web when that makes your answer more accurate or current (documentation, release notes, recent changes); when you do, say so and name the source. Do not read local files or run commands.";
 
+/** How an answer points at a saved article: a link the chat turns into a
+ * button that opens the blog (at that paragraph, when given). Only ids the
+ * model was given work, which is why it is told to use no others. */
+const CITE_LINKS =
+  "Cite a saved article as a Markdown link whose address is yomu:<id>, or yomu:<id>#<paragraph> when you know the paragraph number (¶), for example [Inside Neon](yomu:abc123#12), using only ids you were given.";
+
 /** Tells the model about Yomu's own read-only library tools (an MCP server
  * named "yomu", see src-tauri/src/mcp.rs). Said in a way that costs nothing
  * for an agent that was not given them. */
@@ -225,7 +231,7 @@ const LIBRARY_TOOLS =
 export function buildInventoryPrompt(
   question: string,
   passages: RelatedArticle[],
-  inventory: { title: string; site: string }[],
+  inventory: { id: string; title: string; site: string }[],
   personalizationNotes: string[] = [],
   /** The conversation so far, for a session that has not seen it (a saved
    * chat reopened, or a session that had to be restarted). */
@@ -241,7 +247,7 @@ export function buildInventoryPrompt(
     .join("\n");
   const listed = inventory
     .slice(0, MAX_LISTED)
-    .map((a) => `- "${a.title}"${a.site ? ` (${a.site})` : ""}`)
+    .map((a) => `- "${a.title}" (id: ${a.id})${a.site ? ` (${a.site})` : ""}`)
     .join("\n");
   const more =
     inventory.length > MAX_LISTED
@@ -249,11 +255,15 @@ export function buildInventoryPrompt(
       : "";
   const found =
     passages.length > 0
-      ? passages.map((r) => `- "${r.title}": ${r.snippet}`).join("\n")
+      ? passages
+          .map((r) => `- "${r.title}" (id: ${r.articleId}): ${r.snippet}`)
+          .join("\n")
       : "(No saved article text matched this message.)";
   return [
-    "You are a knowledgeable assistant chatting with a developer who keeps a library of saved blogs. Answer their message fully and helpfully, from your own knowledge, whatever the topic: you are not limited to their blogs, and you must never refuse or hold back an explanation because their blogs do not cover it. Below are the titles of everything they have saved, and passages from the saved articles that best match their latest message. Use them as extra context when they are relevant, and then cite the article by its title in quotes (only titles that are listed). When the blogs are not relevant, ignore them and just answer. " +
+    "You are a knowledgeable assistant chatting with a developer who keeps a library of saved blogs. Answer their message fully and helpfully, from your own knowledge, whatever the topic: you are not limited to their blogs, and you must never refuse or hold back an explanation because their blogs do not cover it. Below are the titles of everything they have saved, and passages from the saved articles that best match their latest message. Use them as extra context when they are relevant, and then cite the article by its title in quotes (see below how to cite). When the blogs are not relevant, ignore them and just answer. " +
       LIBRARY_TOOLS +
+      " " +
+      CITE_LINKS +
       " " +
       WEB_LOOKUP +
       " Reply in Markdown.",
@@ -283,11 +293,15 @@ export function buildLibraryPrompt(
 ): string {
   const found =
     passages.length > 0
-      ? passages.map((r) => `- "${r.title}": ${r.snippet}`).join("\n")
+      ? passages
+          .map((r) => `- "${r.title}" (id: ${r.articleId}): ${r.snippet}`)
+          .join("\n")
       : "(No saved article matched this question.)";
   return [
-    "You are a knowledgeable assistant helping a developer who keeps a library of saved blogs. Answer the question fully and correctly. Use their saved articles where they help (the passages below, and anything you look up with the tools) and cite the article title in quotes when you do, but you are not limited to them: add your own knowledge wherever the articles are incomplete, out of date or silent, and never leave an answer thin or refuse because their blogs do not cover it. When it matters, make clear which parts come from their saved articles and which from general knowledge. Never cite a title you were not given. " +
+    "You are a knowledgeable assistant helping a developer who keeps a library of saved blogs. Answer the question fully and correctly. Use their saved articles where they help (the passages below, and anything you look up with the tools) and cite them (see below how) when you do, but you are not limited to them: add your own knowledge wherever the articles are incomplete, out of date or silent, and never leave an answer thin or refuse because their blogs do not cover it. When it matters, make clear which parts come from their saved articles and which from general knowledge. Never cite a title you were not given. " +
       LIBRARY_TOOLS +
+      " " +
+      CITE_LINKS +
       " " +
       WEB_LOOKUP +
       " Reply in Markdown.",

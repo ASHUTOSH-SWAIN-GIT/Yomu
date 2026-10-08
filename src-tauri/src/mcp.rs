@@ -304,7 +304,7 @@ fn tool_list() -> Value {
         },
         {
             "name": "read_article",
-            "description": "Read a saved blog by id. Long blogs come in parts: the reply says where the next part starts (use `offset`). Use `section` to jump to a heading.",
+            "description": "Read a saved blog by id. Every paragraph starts with its number (¶7), which you can cite. Long blogs come in parts: the reply says where the next part starts (use `offset`). Use `section` to jump to a heading.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -371,15 +371,44 @@ fn db_error(e: sqlx::Error) -> String {
 /// A safe FTS5 query from free words: each word quoted and prefix-matched,
 /// joined with OR (the same idea as `toRelatedQuery` in `src/lib/db.ts`).
 fn match_query(text: &str) -> Option<String> {
-    let mut seen = std::collections::HashSet::new();
-    let terms: Vec<String> = text
-        .split(|c: char| !(c.is_alphanumeric() || c == '_'))
-        .filter(|w| w.chars().count() >= 3)
-        .filter(|w| seen.insert(w.to_lowercase()))
-        .take(12)
+    let terms: Vec<String> = search_words(text)
+        .into_iter()
         .map(|w| format!("\"{w}\"*"))
         .collect();
     (!terms.is_empty()).then(|| terms.join(" OR "))
+}
+
+/// The words of a query worth searching for: at least three letters, each
+/// once, at most twelve. Original case is kept for the FTS query; callers
+/// that compare text lowercase them.
+fn search_words(text: &str) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    text.split(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .filter(|w| w.chars().count() >= 3)
+        .filter(|w| seen.insert(w.to_lowercase()))
+        .take(12)
+        .map(str::to_string)
+        .collect()
+}
+
+/// The paragraph (block number) of a blog that best matches the search
+/// words: the one holding the most of them. `None` when none does.
+fn best_paragraph(blocks: &[Value], words: &[String]) -> Option<usize> {
+    let words: Vec<String> = words.iter().map(|w| w.to_lowercase()).collect();
+    blocks
+        .iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let text = block_text(b).to_lowercase();
+            (
+                i,
+                words.iter().filter(|w| text.contains(w.as_str())).count(),
+            )
+        })
+        .filter(|(_, score)| *score > 0)
+        // The earliest of the best, so a tie points at where it starts.
+        .max_by_key(|(i, score)| (*score, std::cmp::Reverse(*i)))
+        .map(|(i, _)| i)
 }
 
 async fn search_library(db: &SqlitePool, args: &Value) -> Result<String, String> {
@@ -406,19 +435,36 @@ async fn search_library(db: &SqlitePool, args: &Value) -> Result<String, String>
     if rows.is_empty() {
         return Ok("No saved blog matches. Try other words.".to_string());
     }
-    let mut out = format!("{} matching passages:\n", rows.len());
+    let words = search_words(query);
+    let mut out = format!(
+        "{} matching passages (¶ is the paragraph number to cite):\n",
+        rows.len()
+    );
     for (i, row) in rows.iter().enumerate() {
         let id: String = row.get("article_id");
         let title: Option<String> = row.get("title");
         let snip: String = row.get("snip");
+        let paragraph = paragraph_in(db, &id, &words).await;
         out.push_str(&format!(
-            "\n{}. \"{}\" (id: {id})\n   {}\n",
+            "\n{}. \"{}\" (id: {id}{})\n   {}\n",
             i + 1,
             title.unwrap_or_else(|| "Untitled".into()),
+            paragraph.map(|p| format!(", ¶{p}")).unwrap_or_default(),
             snip.replace(['\u{1}', '\u{2}'], "").replace('\n', " ")
         ));
     }
     Ok(cap(out))
+}
+
+/// The paragraph of blog `id` that best matches `words`, if it can be told.
+async fn paragraph_in(db: &SqlitePool, id: &str, words: &[String]) -> Option<usize> {
+    let row = sqlx::query("SELECT blocks_json FROM articles WHERE id = ?1")
+        .bind(id)
+        .fetch_optional(db)
+        .await
+        .ok()??;
+    let blocks: Vec<Value> = serde_json::from_str(&row.get::<String, _>("blocks_json")).ok()?;
+    best_paragraph(&blocks, words)
 }
 
 async fn list_articles(db: &SqlitePool, args: &Value) -> Result<String, String> {
@@ -501,11 +547,13 @@ async fn read_article(db: &SqlitePool, args: &Value) -> Result<String, String> {
     // Text of each block, with where each heading starts.
     let mut text = String::new();
     let mut headings: Vec<(usize, String)> = Vec::new();
-    for block in &blocks {
+    for (number, block) in blocks.iter().enumerate() {
         let piece = block_text(block);
         if piece.is_empty() {
             continue;
         }
+        // Every paragraph is numbered, so an answer can point at one.
+        let piece = format!("¶{number} {piece}");
         if block.get("type").and_then(Value::as_str) == Some("heading") {
             headings.push((
                 text.chars().count(),
@@ -561,7 +609,7 @@ async fn read_article(db: &SqlitePool, args: &Value) -> Result<String, String> {
 async fn get_comments(db: &SqlitePool, args: &Value) -> Result<String, String> {
     let id = text_arg(args, "id").ok_or("`id` is needed")?;
     let rows = sqlx::query(
-        "SELECT quote, note FROM annotations
+        "SELECT block_index, quote, note FROM annotations
          WHERE article_id = ?1 AND note IS NOT NULL
          ORDER BY block_index, start_offset",
     )
@@ -576,8 +624,9 @@ async fn get_comments(db: &SqlitePool, args: &Value) -> Result<String, String> {
         .iter()
         .map(|r| {
             format!(
-                "- On \"{}\": {}",
+                "- On \"{}\" (¶{}): {}",
                 r.get::<String, _>("quote"),
+                r.get::<i64, _>("block_index"),
                 r.get::<String, _>("note")
             )
         })
@@ -694,6 +743,20 @@ mod tests {
         assert_eq!(match_query("a an of"), None);
         // Nothing the agent types can break out of the quotes.
         assert_eq!(match_query("x\" OR 1 --").as_deref(), None,);
+    }
+
+    #[test]
+    fn the_paragraph_with_most_of_the_words_is_the_one_to_cite() {
+        let blocks = vec![
+            json!({ "type": "heading", "level": 1, "text": "Storage" }),
+            json!({ "type": "paragraph", "spans": [{ "text": "Neon keeps storage apart." }] }),
+            json!({ "type": "paragraph", "spans": [{ "text": "Storage and compute scale alone." }] }),
+        ];
+        let words = |q: &str| search_words(q);
+        assert_eq!(best_paragraph(&blocks, &words("storage compute")), Some(2));
+        // A tie points at where it starts.
+        assert_eq!(best_paragraph(&blocks, &words("storage")), Some(0));
+        assert_eq!(best_paragraph(&blocks, &words("kubernetes")), None);
     }
 
     #[test]
@@ -881,7 +944,7 @@ mod tests {
         let (found, error) =
             tool(&f, "search_library", json!({ "query": "storage compute" })).await;
         assert!(!error);
-        assert!(found.contains("\"Inside Neon\" (id: a1)"), "{found}");
+        assert!(found.contains("\"Inside Neon\" (id: a1, ¶1)"), "{found}");
         assert!(!found.contains('\u{1}'));
 
         let (none, _) = tool(&f, "search_library", json!({ "query": "kubernetes" })).await;
@@ -897,7 +960,10 @@ mod tests {
         assert_eq!(collections, "- databases (1 blogs)");
 
         let (article, _) = tool(&f, "read_article", json!({ "id": "a1" })).await;
-        assert!(article.contains("# Inside Neon") && article.contains("Safekeepers"));
+        assert!(
+            article.contains("¶0 # Inside Neon") && article.contains("¶3 Safekeepers"),
+            "{article}"
+        );
         assert!(article.contains("[Headings: Inside Neon | Durability]"));
         let (section, _) = tool(
             &f,
@@ -908,7 +974,7 @@ mod tests {
         assert!(section.contains("Safekeepers") && !section.contains("separates storage"));
 
         let (comments, _) = tool(&f, "get_comments", json!({ "id": "a1" })).await;
-        assert_eq!(comments, "- On \"Neon separates\": Remember this");
+        assert_eq!(comments, "- On \"Neon separates\" (¶1): Remember this");
         let (no_comments, _) = tool(&f, "get_comments", json!({ "id": "a2" })).await;
         assert!(no_comments.contains("no comments"));
     }

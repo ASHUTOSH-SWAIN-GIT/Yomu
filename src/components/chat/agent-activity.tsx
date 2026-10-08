@@ -6,17 +6,30 @@ import { cn } from "@/lib/utils";
 /** What the agent is doing while it works: one quiet line ("Searching the
  * library…") that opens to its thinking and the steps it took. Shown only
  * while the turn runs, and only if the agent reports anything. */
-export function AgentActivity({ progress }: { progress: Progress }) {
+export function AgentActivity({
+  progress,
+  finished = false,
+}: {
+  progress: Progress;
+  /** The turn is over: say what was done, not what is being done. */
+  finished?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   if (!hasProgress(progress)) return null;
 
   const running = [...progress.steps]
     .reverse()
     .find((s) => s.status === "pending" || s.status === "in_progress");
-  const label = running ? `${running.title}…` : "Thinking…";
+  const label = finished
+    ? progress.steps.length > 0
+      ? `Used ${progress.steps.length} ${progress.steps.length === 1 ? "tool" : "tools"}`
+      : "Thought it through"
+    : running
+      ? `${running.title}…`
+      : "Thinking…";
 
   return (
-    <li className="text-muted-foreground py-1 text-[0.8125rem]">
+    <div className="text-muted-foreground py-1 text-[0.8125rem]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -28,7 +41,7 @@ export function AgentActivity({ progress }: { progress: Progress }) {
           aria-hidden
         />
         {label}
-        {progress.steps.length > 0 && (
+        {!finished && progress.steps.length > 0 && (
           <span className="text-muted-foreground/70">
             · {progress.steps.length}{" "}
             {progress.steps.length === 1 ? "step" : "steps"}
@@ -48,6 +61,8 @@ export function AgentActivity({ progress }: { progress: Progress }) {
                 <li key={step.id} className="flex items-center gap-2">
                   {step.status === "completed" ? (
                     <Check className="size-3.5 shrink-0" aria-hidden />
+                  ) : finished && step.status !== "failed" ? (
+                    <Check className="size-3.5 shrink-0" aria-hidden />
                   ) : step.status === "failed" ? (
                     <span className="text-destructive size-3.5 shrink-0 text-center leading-none">
                       ×
@@ -65,6 +80,6 @@ export function AgentActivity({ progress }: { progress: Progress }) {
           )}
         </div>
       )}
-    </li>
+    </div>
   );
 }
