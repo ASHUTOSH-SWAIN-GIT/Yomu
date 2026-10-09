@@ -53,6 +53,7 @@ fn default_command() -> Option<Command> {
 /// kernel has no Landlock; there the agent runs as it is, and says so in
 /// the log. `read` and `write` are a custom agent's own folders.
 #[cfg(not(target_os = "macos"))]
+#[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
 fn confined(
     mut command: Command,
     read: &[std::path::PathBuf],

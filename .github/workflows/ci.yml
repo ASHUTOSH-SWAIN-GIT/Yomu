@@ -99,3 +99,25 @@ jobs:
       - name: cargo test (agent and sandbox)
         working-directory: src-tauri
         run: "cargo test --lib agent::"
+
+  rust-windows:
+    name: Rust (Windows builds)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # The release builds Windows installers, so Windows must compile on every
+      # change, not only on release day.
+      - name: cargo check
+        working-directory: src-tauri
+        run: cargo check --all-targets
+
+      - name: Program lookup (agent/status.rs)
+        working-directory: src-tauri
+        run: "cargo test --lib agent::status"
