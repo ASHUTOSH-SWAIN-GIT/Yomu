@@ -1,8 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@tauri-apps/plugin-sql", () => ({ default: { load: vi.fn() } }));
+const fake = vi.hoisted(() => ({
+  execute: vi.fn<(sql: string, args?: unknown[]) => Promise<object>>(
+    async () => ({}),
+  ),
+}));
+vi.mock("@tauri-apps/plugin-sql", () => ({
+  default: { load: vi.fn(async () => fake) },
+}));
 
-import { normalizeTag, toMatchQuery, toRelatedQuery } from "@/lib/db";
+import {
+  addArticleTag,
+  normalizeTag,
+  toMatchQuery,
+  toRelatedQuery,
+} from "@/lib/db";
+
+describe("addArticleTag", () => {
+  it("takes the article out of the Inbox, as filing it in a collection does", async () => {
+    fake.execute.mockClear();
+    await addArticleTag("a1", "Databases");
+    const sql = fake.execute.mock.calls.map((c) => c[0] as string);
+    expect(sql[0]).toContain("INSERT OR IGNORE INTO article_tags");
+    expect(sql[1]).toBe("UPDATE articles SET inbox = 0 WHERE id = $1");
+    expect(fake.execute.mock.calls[1][1]).toEqual(["a1"]);
+  });
+
+  it("does nothing for a tag that is empty once cleaned", async () => {
+    fake.execute.mockClear();
+    await addArticleTag("a1", "   ");
+    expect(fake.execute).not.toHaveBeenCalled();
+  });
+});
 
 describe("toMatchQuery", () => {
   it("quotes each word as a prefix match, all required", () => {

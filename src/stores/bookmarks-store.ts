@@ -5,7 +5,6 @@ import {
   type BrowserStatus,
 } from "@/lib/bookmarks";
 import { canonicalizeUrl, scanBookmarks, scrapeUrl } from "@/lib/commands";
-import { saveToDefaultCollection } from "@/lib/default-collection";
 import {
   getArticleByCanonicalUrl,
   listBookmarkImports,
@@ -39,19 +38,16 @@ interface BookmarksStore {
   check: () => Promise<void>;
 }
 
-/** Saves one bookmarked page into the Inbox. A page already in the library is
- * left where it is: it is not new to the reader. Returns the saved article's
- * id. */
+/** Saves one bookmarked page into the Inbox, in no collection: the reader
+ * files it, and that is what takes it out of the Inbox. A page already in the
+ * library is left where it is: it is not new to the reader. Returns the saved
+ * article's id. */
 async function saveBookmarked(url: string): Promise<string> {
   const canonical = await canonicalizeUrl(url);
   const existing = await getArticleByCanonicalUrl(canonical);
   if (existing) return existing.id;
   const saved = await upsertArticle(await scrapeUrl(url));
   await setInbox(saved.id, true);
-  // A failure to file it must not lose the page that was just saved.
-  await saveToDefaultCollection(saved.id).catch((err) =>
-    logError("filing a bookmarked page failed", err),
-  );
   return saved.id;
 }
 

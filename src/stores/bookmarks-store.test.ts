@@ -47,9 +47,8 @@ vi.mock("@/lib/db", () => ({
     else h.inbox.delete(id);
   },
 }));
-vi.mock("@/lib/default-collection", () => ({
-  saveToDefaultCollection: vi.fn(async () => {}),
-}));
+const filed = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/lib/default-collection", () => ({ saveToDefaultCollection: filed }));
 vi.mock("@/stores/library-store", () => ({
   useLibraryStore: { getState: () => ({ refresh: vi.fn(async () => {}) }) },
 }));
@@ -81,6 +80,8 @@ describe("saving bookmarked pages", () => {
     expect(h.saved).toEqual(["https://a.dev/1"]);
     expect(h.inbox.has("new-https://a.dev/1")).toBe(true);
     expect(h.imports.get("https://a.dev/1")?.status).toBe("saved");
+    // It waits in the Inbox, in no collection, until the reader files it.
+    expect(filed).not.toHaveBeenCalled();
     expect(store().saved).toBe(1);
     expect(store().browsers[0].name).toBe("Brave");
   });

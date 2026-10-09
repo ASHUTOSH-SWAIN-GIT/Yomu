@@ -776,6 +776,9 @@ export async function addArticleTag(id: string, raw: string): Promise<void> {
     "INSERT OR IGNORE INTO article_tags (article_id, tag) VALUES ($1, $2)",
     [id, tag],
   );
+  // Filing a page in a collection takes it out of the Inbox: it has been
+  // dealt with.
+  await db.execute("UPDATE articles SET inbox = 0 WHERE id = $1", [id]);
 }
 
 export async function removeArticleTag(id: string, tag: string): Promise<void> {

@@ -32,7 +32,10 @@ export function Home() {
   const isHome = !showArchive && !showInbox;
   const list = showInbox
     ? articles.filter((a) => a.inbox && !a.archived)
-    : articles.filter((a) => a.archived === showArchive);
+    : articles.filter(
+        // A bookmarked page waits in the Inbox until it is in a collection.
+        (a) => a.archived === showArchive && (showArchive || !a.inbox),
+      );
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -58,7 +61,8 @@ export function Home() {
         </h1>
         {showInbox && (
           <p className="text-muted-foreground mt-2 text-[0.8125rem]">
-            Pages you bookmarked into a folder named Yomu.
+            Pages you bookmarked into a folder named Yomu. Add one to a
+            collection and it leaves the Inbox.
           </p>
         )}
         {showArchive && list.length > 0 && (

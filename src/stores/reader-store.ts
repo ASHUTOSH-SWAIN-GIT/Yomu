@@ -6,7 +6,6 @@ import {
   upsertArticle,
 } from "@/lib/db";
 import { saveToDefaultCollection } from "@/lib/default-collection";
-import { leaveInbox } from "@/lib/inbox";
 import { logError } from "@/lib/log";
 import { useLibraryStore } from "@/stores/library-store";
 import { registerPart, tabStore } from "@/stores/tabs";
@@ -43,7 +42,6 @@ registerPart("reader", () =>
         const cached = await getArticleByCanonicalUrl(canonicalUrl);
         if (cached) {
           set({ state: { status: "ready", article: cached } });
-          void leaveInbox(cached.id);
           return;
         }
 
@@ -92,7 +90,6 @@ registerPart("reader", () =>
       const article = await getArticleById(id);
       if (article) {
         set({ state: { status: "ready", article } });
-        void leaveInbox(article.id);
       }
     },
   })),

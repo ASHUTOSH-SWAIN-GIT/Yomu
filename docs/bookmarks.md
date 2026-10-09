@@ -20,8 +20,9 @@ BraveSoftware/Brave-Browser, net.imput.helium}`. Windows and Linux: Chrome and
 - **When.** At startup, every minute, and when the window is brought back to
   the front (`watchBookmarks` in `src/stores/bookmarks-store.ts`).
 - **Saving.** Each new page is fetched and cleaned like a pasted link, saved,
-  filed in the default collection, and marked as waiting in the Inbox. Opening
-  it takes it out of the Inbox. A page that is already in the library is not put
+  and put in the Inbox, in no collection. It stays there (and out of Home's
+  list) until the reader adds it to a collection, which takes it out of the
+  Inbox. Opening it does not. A page that is already in the library is not put
   in the Inbox. Up to 20 pages are saved per pass; a big folder is spread over
   the next passes.
 - **Remembering.** Table `bookmark_imports` (migration 11) records each page
