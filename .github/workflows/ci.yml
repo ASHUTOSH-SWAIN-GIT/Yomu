@@ -113,11 +113,10 @@ jobs:
           workspaces: src-tauri
 
       # The release builds Windows installers, so Windows must compile on every
-      # change, not only on release day.
+      # change, not only on release day. It only compiles: Tauri's unit-test
+      # programs cannot start on a Windows runner (STATUS_ENTRYPOINT_NOT_FOUND,
+      # the app manifest is only embedded in the real app), so running them
+      # there fails for a reason that has nothing to do with the code.
       - name: cargo check
         working-directory: src-tauri
         run: cargo check --all-targets
-
-      - name: Program lookup (agent/status.rs)
-        working-directory: src-tauri
-        run: "cargo test --lib agent::status"
