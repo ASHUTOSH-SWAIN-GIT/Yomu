@@ -4,6 +4,7 @@ import { AgentActivity } from "@/components/chat/agent-activity";
 import { ContextNote } from "@/components/chat/context-note";
 import { ErrorNote } from "@/components/chat/error-note";
 import { SourceChips } from "@/components/chat/source-link";
+import { LIBRARY_COMMANDS } from "@/lib/slash-commands";
 import { hasProgress } from "@/lib/agent-progress";
 import { CopyButton } from "@/components/chat/copy-button";
 import { Markdown } from "@/components/chat/markdown";
@@ -61,6 +62,7 @@ export function LibraryChat() {
       onSetup={() => setSetupOpen(true)}
       streaming={streaming}
       ready={ready}
+      commands={LIBRARY_COMMANDS}
       placeholder={
         ready ? "Ask anything about your blogs" : "Set up Explain to chat"
       }

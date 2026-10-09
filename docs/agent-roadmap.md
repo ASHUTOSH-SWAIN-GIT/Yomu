@@ -47,15 +47,15 @@ side.
 
 ## 3. UI: make answers easier to use
 
-| Item                             | What and why                                                                                                                                                              | Where                                                               | Effort |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------ |
-| **Thinking and steps**           | A collapsible "Thinking…" line and a step list ("Searched library: 3 results", "Read _Neon architecture_ §2"). People trust what they can see. Needs the richer events.   | `components/chat/chat-panel.tsx`, `library-chat.tsx`                | S–M    |
-| **Free question on a selection** | The selection "Ask" only explains. Add a small input so you can ask your own question about the passage. `askAbout()` already exists in the chat store.                   | `components/reader/comments.tsx` (selection popup), `chat-store.ts` | S      |
-| **Ask in place**                 | The answer appears as a margin card beside the words, like comments, with follow-ups threaded there and not only in the side chat. Reuse the `BlockComments` positioning. | `components/reader/comments.tsx`, new `answer-card.tsx`             | M      |
-| **Clickable sources**            | Citations jump to the exact paragraph (block index) in the source blog, possibly in a new tab.                                                                            | `src/lib/sources.ts`, `lib/navigate.ts`                             | S–M    |
-| **Message actions**              | Edit and resend; regenerate with another model; pin an answer; save an answer as a comment.                                                                               | `chat-panel.tsx`, `chat-store.ts`                                   | M      |
-| **Slash commands**               | `/summarize`, `/eli5`, `/quiz`, `/compare`, `/library` in the composer, with autocomplete. Built on `quick-actions.ts`.                                                   | `components/chat/composer.tsx`                                      | S–M    |
-| **Status pill**                  | Shows the agent, the model, and whether it is ready or working. Shows usage or quota when the agent reports it.                                                           | Top bar or chat header                                              | S      |
+| Item                             | What and why                                                                                                                                                         | Where | Effort |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
+| **Thinking and steps**           | **Built.** One quiet line while the agent works, opening to its thinking and steps; it stays with the answer afterwards ("Used 2 tools").                            |
+| **Free question on a selection** | **Built.** Select words, click Ask, type a question (or press Enter to explain). `components/reader/ask-box.tsx`.                                                    |
+| **Ask in place**                 | **Not built.** Answers still appear in the chat panel. Margin cards beside the words need layout work alongside comments and must be checked in the running app.     |
+| **Clickable sources**            | **Built.** `[Title](yomu:<id>#<paragraph>)` links open the blog at that paragraph; a Sources row lists blogs an answer mentions.                                     |
+| **Message actions**              | **Partly built.** Copy and "Answer again" (last reply). Not built: edit and resend, pin, save an answer as a comment.                                                |
+| **Slash commands**               | **Built.** `/summarize`, `/takeaways`, `/quiz` in the blog chat and `/recent`, `/topics`, `/disagree` in the global chat, with a pick-list. `lib/slash-commands.ts`. |
+| **Status pill**                  | **Built (agent and state).** "Codex · Ready / Working… / Needs setup" in the chat header. The model is in the message box; quota is not shown.                       |
 
 ## 4. Features: new things the agent does
 

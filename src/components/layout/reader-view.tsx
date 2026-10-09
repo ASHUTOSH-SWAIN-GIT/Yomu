@@ -9,9 +9,13 @@ import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
 import { GlossaryLayer } from "@/components/reader/glossary";
 import { Outline } from "@/components/reader/outline";
+import { AskBox } from "@/components/reader/ask-box";
 import { AddCommentButton, BlockComments } from "@/components/reader/comments";
 import { useCommentHighlights } from "@/hooks/use-comment-highlights";
-import { useCommentSelection } from "@/hooks/use-comment-selection";
+import {
+  useCommentSelection,
+  type CommentSelection,
+} from "@/hooks/use-comment-selection";
 import { useCommentsStore } from "@/stores/comments-store";
 import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -127,6 +131,9 @@ function Article({
   const loadedFor = useCommentsStore((s) => s.articleId);
   const load = useCommentsStore((s) => s.load);
   const { selection, clear } = useCommentSelection(articleRef, scrollRef);
+  // The words being asked about; kept apart from the live selection, which
+  // goes away when the question box takes the keyboard.
+  const [asking, setAsking] = useState<CommentSelection | null>(null);
   useCommentHighlights(articleRef);
 
   useEffect(() => {
@@ -227,9 +234,16 @@ function Article({
       />
       {selection && (
         <AddCommentButton
-          article={article}
           selection={selection}
+          onAsk={() => setAsking(selection)}
           onDone={clear}
+        />
+      )}
+      {asking && (
+        <AskBox
+          article={article}
+          selection={asking}
+          onDone={() => setAsking(null)}
         />
       )}
     </>

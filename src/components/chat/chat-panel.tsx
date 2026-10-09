@@ -3,9 +3,12 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { CopyButton } from "@/components/chat/copy-button";
 import { AgentActivity } from "@/components/chat/agent-activity";
+import { AgentPill } from "@/components/chat/agent-pill";
+import { RegenerateButton } from "@/components/chat/regenerate-button";
 import { ContextNote } from "@/components/chat/context-note";
 import { ErrorNote } from "@/components/chat/error-note";
 import { SourceChips } from "@/components/chat/source-link";
+import { ARTICLE_COMMANDS } from "@/lib/slash-commands";
 import { hasProgress } from "@/lib/agent-progress";
 import { Markdown } from "@/components/chat/markdown";
 import { chatArtFor } from "@/lib/chat-art";
@@ -31,6 +34,7 @@ export function ChatPanel() {
   const ask = useChatStore((s) => s.ask);
   const stop = useChatStore((s) => s.stop);
   const retry = useChatStore((s) => s.retry);
+  const regenerate = useChatStore((s) => s.regenerate);
   const chatOpen = useViewStore((s) => s.chatOpen);
   const setChatOpen = useViewStore((s) => s.setChatOpen);
   const full = useViewStore((s) => s.chatFull);
@@ -83,7 +87,10 @@ export function ChatPanel() {
     >
       <header className="flex h-16 shrink-0 items-center gap-1 pr-2 pl-5">
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <h2 className="text-[1.25rem] font-bold tracking-[-0.01em]">Chat</h2>
+          <h2 className="flex items-baseline gap-3 text-[1.25rem] font-bold tracking-[-0.01em]">
+            Chat
+            <AgentPill working={streaming} />
+          </h2>
           <span className="text-muted-foreground truncate text-[0.8125rem]">
             {article.title}
           </span>
@@ -157,7 +164,14 @@ export function ChatPanel() {
                     {!(streaming && i === messages.length - 1) && (
                       <>
                         <SourceChips text={m.text} />
-                        <CopyButton text={m.text} />
+                        <div className="flex items-center gap-0.5">
+                          <CopyButton text={m.text} />
+                          {i === messages.length - 1 && (
+                            <RegenerateButton
+                              onClick={() => void regenerate(article)}
+                            />
+                          )}
+                        </div>
                       </>
                     )}
                   </li>
@@ -209,6 +223,7 @@ export function ChatPanel() {
           onSetup={() => setSetupOpen(true)}
           streaming={streaming}
           ready={ready}
+          commands={ARTICLE_COMMANDS}
           placeholder={
             ready ? "Ask about this article" : "Set up Explain to chat"
           }

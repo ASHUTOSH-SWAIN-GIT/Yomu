@@ -12,12 +12,8 @@ import {
 import type { CommentSelection } from "@/hooks/use-comment-selection";
 import { rangeOfWords } from "@/hooks/use-comment-highlights";
 import { cn } from "@/lib/utils";
-import { useAgentStore } from "@/stores/agent-store";
-import { useChatStore } from "@/stores/chat-store";
 import { useCommentsStore } from "@/stores/comments-store";
-import { useUiStore } from "@/stores/ui-store";
-import { useViewStore } from "@/stores/view-store";
-import type { Comment, StoredArticle } from "@/types/library";
+import type { Comment } from "@/types/library";
 
 const buttonClass =
   "hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-[0.8125rem] outline-none focus-visible:ring-2 [&>svg]:size-3.5";
@@ -25,17 +21,16 @@ const buttonClass =
 /** What is offered over selected text: ask the agent about it, comment, or
  * copy it. */
 export function AddCommentButton({
-  article,
   selection,
+  onAsk,
   onDone,
 }: {
-  article: StoredArticle;
   selection: CommentSelection;
+  /** Opens the box for asking about these words (see `AskBox`). */
+  onAsk: () => void;
   onDone: () => void;
 }) {
   const startDraft = useCommentsStore((s) => s.startDraft);
-  const explain = useChatStore((s) => s.explain);
-  const setChatOpen = useViewStore((s) => s.setChatOpen);
   const { rect, anchor } = selection;
   // Above the selection, or under it when there is no room above.
   const above = rect.top > 56;
@@ -54,19 +49,7 @@ export function AddCommentButton({
       <button
         type="button"
         onClick={() => {
-          // Without a connected agent there is nothing to ask; show how to
-          // set one up instead.
-          if (useAgentStore.getState().status !== "ready")
-            useUiStore.getState().setSetupOpen(true);
-          else {
-            setChatOpen(true);
-            void explain(article, {
-              blockIndex: anchor.blockIndex,
-              startOffset: anchor.start,
-              endOffset: anchor.end,
-              text: anchor.quote,
-            });
-          }
+          onAsk();
           window.getSelection()?.removeAllRanges();
           onDone();
         }}
