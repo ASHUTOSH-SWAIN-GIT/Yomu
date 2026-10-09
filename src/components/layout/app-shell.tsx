@@ -12,6 +12,7 @@ import { useThemeEffect } from "@/hooks/use-theme";
 import { goHome } from "@/lib/navigate";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { shortcutFor } from "@/lib/shortcuts";
+import { watchBookmarks } from "@/stores/bookmarks-store";
 import { applyZoom, savedZoom, stepZoom } from "@/lib/zoom";
 import { useAgentStore } from "@/stores/agent-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
@@ -99,6 +100,10 @@ export function AppShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // Pages bookmarked into a browser folder named Yomu are saved on their own,
+  // including ones bookmarked while the app was closed.
+  useEffect(() => watchBookmarks(), []);
 
   // Zoom the whole app: Cmd/Ctrl + and - step it, Cmd/Ctrl 0 resets it. The
   // level is saved, so the app opens at the same size next time.

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Maximize2, Minimize2, Pencil, X } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { CopyButton } from "@/components/chat/copy-button";
 import { AgentActivity } from "@/components/chat/agent-activity";
 import { AgentPill } from "@/components/chat/agent-pill";
+import { SaveAnswerButton } from "@/components/chat/save-answer-button";
+import { saveAnswerAsComment } from "@/lib/save-answer";
 import { RegenerateButton } from "@/components/chat/regenerate-button";
 import { ContextNote } from "@/components/chat/context-note";
 import { ErrorNote } from "@/components/chat/error-note";
@@ -45,6 +47,20 @@ export function ChatPanel() {
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // The last question that can be edited (a free question to the article).
+  const lastQuestion = messages.map((m) => m.role).lastIndexOf("user");
+  const [editing, setEditing] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const editLast = useChatStore((s) => s.editLast);
+  const highlights = useChatStore((s) => s.highlights);
+  // The passage a reply is about: the one its question was asked on.
+  const passageOf = (i: number) => {
+    const question = messages
+      .slice(0, i)
+      .reverse()
+      .find((m) => m.role === "user");
+    return highlights.find((h) => h.id === question?.highlightId) ?? null;
+  };
   const waiting =
     streaming && messages[messages.length - 1]?.role !== "assistant";
 
@@ -146,15 +162,75 @@ export function ChatPanel() {
               {messages.map((m, i) =>
                 m.role === "user" ? (
                   // Yours: a bubble on the right, as wide as the message.
-                  <li key={i} className="flex flex-col items-end gap-1.5">
+                  <li
+                    key={i}
+                    className="group/question flex flex-col items-end gap-1.5"
+                  >
                     {m.quote && (
                       <p className="text-muted-foreground border-border line-clamp-2 max-w-[85%] border-l-2 pl-2 text-[0.75rem] italic">
                         {m.quote}
                       </p>
                     )}
-                    <p className="bg-muted max-w-[85%] rounded-3xl px-4 py-2.5 text-[0.875rem] leading-6 whitespace-pre-wrap">
-                      {m.text}
-                    </p>
+                    {editing === i ? (
+                      <form
+                        className="flex w-full max-w-[85%] flex-col gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void editLast(article, editText);
+                          setEditing(null);
+                        }}
+                      >
+                        <textarea
+                          autoFocus
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setEditing(null);
+                          }}
+                          rows={2}
+                          aria-label="Edit your question"
+                          className="bg-muted field-sizing-content max-h-52 w-full resize-none rounded-2xl px-4 py-2.5 text-[0.875rem] leading-6 outline-none"
+                        />
+                        <span className="flex justify-end gap-2 text-[0.75rem]">
+                          <button
+                            type="button"
+                            onClick={() => setEditing(null)}
+                            className="text-muted-foreground hover:text-foreground rounded-md px-2 py-1"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={!editText.trim()}
+                            className="bg-primary text-primary-foreground disabled:bg-secondary disabled:text-muted-foreground rounded-md px-2.5 py-1 font-medium"
+                          >
+                            Ask again
+                          </button>
+                        </span>
+                      </form>
+                    ) : (
+                      <>
+                        <p className="bg-muted max-w-[85%] rounded-3xl px-4 py-2.5 text-[0.875rem] leading-6 whitespace-pre-wrap">
+                          {m.text}
+                        </p>
+                        {i === lastQuestion &&
+                          m.scope === "article" &&
+                          !streaming && (
+                            <button
+                              type="button"
+                              aria-label="Edit this question"
+                              title="Edit and ask again"
+                              onClick={() => {
+                                setEditText(m.text);
+                                setEditing(i);
+                              }}
+                              className="text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 grid size-7 place-items-center rounded-md opacity-0 outline-none group-hover/question:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
+                            >
+                              <Pencil className="size-3.5" aria-hidden />
+                            </button>
+                          )}
+                      </>
+                    )}
                   </li>
                 ) : (
                   // The agent's: plain text on the page, with a copy button.
@@ -166,6 +242,15 @@ export function ChatPanel() {
                         <SourceChips text={m.text} />
                         <div className="flex items-center gap-0.5">
                           <CopyButton text={m.text} />
+                          {passageOf(i) && (
+                            <SaveAnswerButton
+                              onClick={() => {
+                                const passage = passageOf(i);
+                                if (passage)
+                                  void saveAnswerAsComment(passage, m.text);
+                              }}
+                            />
+                          )}
                           {i === messages.length - 1 && (
                             <RegenerateButton
                               onClick={() => void regenerate(article)}

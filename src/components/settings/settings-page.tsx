@@ -1,5 +1,6 @@
 import { AgentSection } from "@/components/settings/agent-section";
 import { AnswersSection } from "@/components/settings/answers-section";
+import { BookmarksSection } from "@/components/settings/bookmarks-section";
 import { DataSection } from "@/components/settings/data-section";
 import { ReadingSection } from "@/components/settings/reading-section";
 import { Section } from "@/components/settings/controls";
@@ -8,6 +9,7 @@ const SECTIONS = [
   { id: "reading", label: "Appearance and reading" },
   { id: "answers", label: "AI answers" },
   { id: "agent", label: "Agent" },
+  { id: "bookmarks", label: "Bookmarks" },
   { id: "data", label: "Data" },
 ];
 
@@ -44,6 +46,8 @@ export function SettingsPage() {
       <Section id="agent" title="Agent">
         <AgentSection />
       </Section>
+      <div className="border-border mt-10 border-t" />
+      <BookmarksSection />
       <div className="border-border mt-10 border-t" />
       <DataSection />
     </div>

@@ -29,6 +29,7 @@ vi.mock("@/lib/db", () => ({
   addMessage: vi.fn(),
   createChat: vi.fn(),
   deleteLastAssistantMessage: vi.fn(),
+  deleteLastUserMessage: vi.fn(),
   getChatForArticle: vi.fn(),
   listHighlights: vi.fn(),
   listMessages: vi.fn(),
@@ -473,6 +474,40 @@ describe("what the agent reports while it works", () => {
       { id: "t1", title: "Search the library", status: "pending" },
     ]);
     expect(useChatStore.getState().progress.steps).toEqual([]);
+  });
+});
+
+describe("editing the last question", () => {
+  it("replaces it, forgets the old exchange, and asks again in a new session", async () => {
+    agentReplies("first answer");
+    await useChatStore.getState().ask(article, "What is it?");
+    m(commands.agentNewSession).mockResolvedValue("s2");
+    agentReplies("better answer");
+
+    await useChatStore.getState().editLast(article, "What is ownership?");
+
+    const s = useChatStore.getState();
+    expect(s.messages.map((x) => x.text)).toEqual([
+      "What is ownership?",
+      "better answer",
+    ]);
+    expect(db.deleteLastAssistantMessage).toHaveBeenCalledTimes(1);
+    expect(db.deleteLastUserMessage).toHaveBeenCalledTimes(1);
+    // The old session remembers the old question, so a new one is used and
+    // is given the article again.
+    expect(commands.agentNewSession).toHaveBeenCalledTimes(2);
+    expect(m(commands.agentPrompt).mock.calls[1][0]).toBe("s2");
+    expect(m(commands.agentPrompt).mock.calls[1][1]).toContain(
+      "Ownership in Rust",
+    );
+  });
+
+  it("leaves a question about a passage alone", async () => {
+    agentReplies("It means one owner.");
+    await useChatStore.getState().explain(article, selection);
+    await useChatStore.getState().editLast(article, "Something else");
+    expect(useChatStore.getState().messages).toHaveLength(2);
+    expect(db.deleteLastUserMessage).not.toHaveBeenCalled();
   });
 });
 

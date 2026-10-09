@@ -14,6 +14,8 @@ const SCOPES: MessageScope[] = ["passage", "followup", "article", "library"];
  * stored label so rows written before scopes existed still read as article
  * questions. */
 export const SUMMARY_LABEL = "Summarize this article";
+/** The question shown for a passage that was explained without a question. */
+export const EXPLAIN_LABEL = "Explain this";
 
 export function parseScope(raw: unknown): MessageScope | null {
   return SCOPES.includes(raw as MessageScope) ? (raw as MessageScope) : null;

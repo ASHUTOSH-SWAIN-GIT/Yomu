@@ -1,5 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { normText, rangeInBlock } from "@/lib/text-ranges";
+import { parseImageQuote } from "@/lib/images";
+import { useChatStore } from "@/stores/chat-store";
 import { useCommentsStore } from "@/stores/comments-store";
 import { useIsActiveTab } from "@/stores/tabs";
 
@@ -10,6 +12,8 @@ export function rangeOfWords(
   article: HTMLElement,
   w: { blockIndex: number; start: number; end: number; quote: string },
 ): Range | null {
+  // A note on a whole picture has no words to find.
+  if (!w.quote) return null;
   const block = article.querySelector<HTMLElement>(
     `[data-block-index="${w.blockIndex}"]`,
   );
@@ -72,6 +76,35 @@ export function useCommentHighlights(
       CSS.highlights.delete("yomu-comment-active");
     };
   }, [articleRef, items, draft, activeId, tabActive]);
+
+  // Words that were asked about get a thin underline, so the answer card
+  // beside them is easy to tie to its words.
+  const asked = useChatStore((s) => s.highlights);
+  useEffect(() => {
+    const article = articleRef.current;
+    if (
+      !tabActive ||
+      !article ||
+      typeof CSS === "undefined" ||
+      !("highlights" in CSS)
+    ) {
+      return;
+    }
+    const ranges = asked.flatMap((h) => {
+      if (parseImageQuote(h.text)) return [];
+      const range = rangeOfWords(article, {
+        blockIndex: h.blockIndex,
+        start: h.startOffset,
+        end: h.endOffset,
+        quote: h.text,
+      });
+      return range ? [range] : [];
+    });
+    CSS.highlights.set("yomu-asked", new Highlight(...ranges));
+    return () => {
+      CSS.highlights.delete("yomu-asked");
+    };
+  }, [articleRef, asked, tabActive]);
 
   // Pointing at commented words makes them (and their comment) react.
   useEffect(() => {

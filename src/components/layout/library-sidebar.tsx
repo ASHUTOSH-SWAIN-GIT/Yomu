@@ -5,6 +5,7 @@ import {
   Folder,
   FolderOpen,
   Home,
+  Inbox,
   MoreHorizontal,
   MessageCircle,
   SquarePen,
@@ -44,6 +45,8 @@ export function LibrarySidebar() {
   const slots = useSpacesStore((s) => s.slots);
   const setActive = useSpacesStore((s) => s.setActive);
   const showArchive = useViewStore((s) => s.showArchive);
+  const showInbox = useViewStore((s) => s.showInbox);
+  const setShowInbox = useViewStore((s) => s.setShowInbox);
   const setShowArchive = useViewStore((s) => s.setShowArchive);
   const libraryChat = useViewStore((s) => s.libraryChat);
   const setLibraryChat = useViewStore((s) => s.setLibraryChat);
@@ -103,6 +106,7 @@ export function LibrarySidebar() {
     [articles, extra, slots],
   );
   const archived = articles.filter((a) => a.archived).length;
+  const inboxCount = articles.filter((a) => a.inbox && !a.archived).length;
   const named = spaces.filter((s) => s.id !== INBOX);
 
   return (
@@ -135,7 +139,13 @@ export function LibrarySidebar() {
         )}
       >
         <Item
-          on={!reading && !showArchive && !libraryChat && !settingsPage}
+          on={
+            !reading &&
+            !showArchive &&
+            !showInbox &&
+            !libraryChat &&
+            !settingsPage
+          }
           onClick={() => {
             setActive(INBOX);
             setSelected(null);
@@ -145,6 +155,20 @@ export function LibrarySidebar() {
         >
           Home
         </Item>
+        {(inboxCount > 0 || showInbox) && (
+          <Item
+            on={!reading && showInbox}
+            onClick={() => {
+              setShowInbox(true);
+              setSelected(null);
+              leave();
+            }}
+            icon={<Inbox />}
+            count={inboxCount}
+          >
+            Inbox
+          </Item>
+        )}
 
         <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
           Chat

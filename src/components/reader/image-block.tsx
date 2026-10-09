@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { ImageOff, Sparkles } from "lucide-react";
+import { ImageOff, MessageSquareText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageLightbox } from "@/components/reader/image-lightbox";
 import { isRemoteImage, isSvgUrl, resolveImageUrl } from "@/lib/images";
 import { useChatStore } from "@/stores/chat-store";
+import { useCommentsStore } from "@/stores/comments-store";
 import { useImageStore } from "@/stores/image-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -32,6 +33,7 @@ export function ImageBlock({
   );
   const streaming = useChatStore((s) => s.streaming);
   const explainImage = useChatStore((s) => s.explainImage);
+  const startDraft = useCommentsStore((s) => s.startDraft);
   const [allowed, setAllowed] = useState(false);
   // If the cached copy won't load, fall back to the remote URL; if that
   // fails too, show a placeholder.
@@ -120,21 +122,37 @@ export function ImageBlock({
           onClosed={() => setNatural(null)}
         />
       )}
-      {article && !isSvgUrl(remote) && (
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={streaming}
-          // Sends this image to the agent, which counts against plan quota.
-          title="Send this image to your Codex agent"
-          className="absolute top-2 right-2 opacity-0 shadow-md group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
-          onClick={() =>
-            void explainImage(article, { blockIndex, src: remote, alt })
-          }
-        >
-          <Sparkles className="size-3.5" />
-          Ask about image
-        </Button>
+      {article && (
+        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="shadow-md"
+            // A note on the whole picture; it sits beside it like any comment.
+            onClick={() =>
+              startDraft({ blockIndex, start: 0, end: 0, quote: "" })
+            }
+          >
+            <MessageSquareText className="size-3.5" />
+            Comment
+          </Button>
+          {!isSvgUrl(remote) && (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={streaming}
+              className="shadow-md"
+              // Sends this image to the agent, which counts against plan quota.
+              title="Send this image to your agent"
+              onClick={() =>
+                void explainImage(article, { blockIndex, src: remote, alt })
+              }
+            >
+              <Sparkles className="size-3.5" />
+              Ask about image
+            </Button>
+          )}
+        </div>
       )}
       {alt && (
         <figcaption className="text-muted-foreground mt-2 text-center font-sans text-[0.8125rem]">

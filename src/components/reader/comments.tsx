@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
 import {
@@ -9,8 +9,12 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { AnswerCard } from "@/components/reader/answer-card";
+import { passageAnswers } from "@/lib/exchanges";
+import { useChatStore } from "@/stores/chat-store";
 import type { CommentSelection } from "@/hooks/use-comment-selection";
 import { rangeOfWords } from "@/hooks/use-comment-highlights";
+import { RESTACK } from "@/hooks/use-margin-stack";
 import { cn } from "@/lib/utils";
 import { useCommentsStore } from "@/stores/comments-store";
 import type { Comment } from "@/types/library";
@@ -102,42 +106,70 @@ export function BlockComments({
 }) {
   const items = useCommentsStore((s) => s.items);
   const draft = useCommentsStore((s) => s.draft);
+  const asked = useChatStore((s) => s.highlights);
+  const messages = useChatStore((s) => s.messages);
   const mine = items.filter((c) => c.blockIndex === blockIndex);
   const writing = draft?.blockIndex === blockIndex ? draft : null;
+  // Questions asked about words in this paragraph, with their answers.
+  const answers = useMemo(
+    () =>
+      passageAnswers(asked, messages).filter(
+        (a) => a.highlight.blockIndex === blockIndex,
+      ),
+    [asked, messages, blockIndex],
+  );
   const box = useRef<HTMLDivElement>(null);
-  const [top, setTop] = useState(0);
 
   // Level with the first words commented on in this paragraph. Measured
   // after each change; the same number sets nothing, so it cannot loop.
-  const first = writing ?? mine[0];
+  const firstAnswer = answers[0]?.highlight;
+  const first =
+    writing ??
+    mine[0] ??
+    (firstAnswer && {
+      blockIndex,
+      start: firstAnswer.startOffset,
+      end: firstAnswer.endOffset,
+      quote: firstAnswer.text,
+    });
   const firstKey = first ? `${first.start}-${first.end}` : "";
   useLayoutEffect(() => {
     const article = articleRef.current;
     const holder = box.current?.parentElement;
-    if (!beside || !first || !article || !holder) return setTop(0);
+    const el = box.current;
+    if (!el) return;
+    if (!beside || !first || !article || !holder) {
+      el.style.top = "";
+      return;
+    }
     const rect = rangeOfWords(article, first)?.getClientRects()[0];
-    setTop(
+    el.style.top = `${
       rect
         ? Math.max(0, Math.round(rect.top - holder.getBoundingClientRect().top))
-        : 0,
-    );
+        : 0
+    }px`;
+    // Moved by itself: the notes may now need nudging apart.
+    article.dispatchEvent(new Event(RESTACK));
     // `first` is described by firstKey; the paragraph's width by `beside`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beside, firstKey, mine.length, articleRef]);
+  }, [beside, firstKey, mine.length, answers.length, articleRef]);
 
-  if (mine.length === 0 && !writing) return null;
+  if (mine.length === 0 && !writing && answers.length === 0) return null;
   return (
     <div
       ref={box}
+      data-margin-stack
       className={
         beside
           ? "absolute left-full ml-8 flex w-64 flex-col gap-2 font-sans"
           : "my-3 flex flex-col gap-2 font-sans"
       }
-      style={beside ? { top } : undefined}
     >
       {mine.map((c) => (
         <CommentCard key={c.id} comment={c} />
+      ))}
+      {answers.map((a) => (
+        <AnswerCard key={a.highlight.id} item={a} />
       ))}
       {writing && <DraftBox />}
     </div>

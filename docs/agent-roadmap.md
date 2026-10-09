@@ -47,15 +47,15 @@ side.
 
 ## 3. UI: make answers easier to use
 
-| Item                             | What and why                                                                                                                                                         | Where | Effort |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
-| **Thinking and steps**           | **Built.** One quiet line while the agent works, opening to its thinking and steps; it stays with the answer afterwards ("Used 2 tools").                            |
-| **Free question on a selection** | **Built.** Select words, click Ask, type a question (or press Enter to explain). `components/reader/ask-box.tsx`.                                                    |
-| **Ask in place**                 | **Not built.** Answers still appear in the chat panel. Margin cards beside the words need layout work alongside comments and must be checked in the running app.     |
-| **Clickable sources**            | **Built.** `[Title](yomu:<id>#<paragraph>)` links open the blog at that paragraph; a Sources row lists blogs an answer mentions.                                     |
-| **Message actions**              | **Partly built.** Copy and "Answer again" (last reply). Not built: edit and resend, pin, save an answer as a comment.                                                |
-| **Slash commands**               | **Built.** `/summarize`, `/takeaways`, `/quiz` in the blog chat and `/recent`, `/topics`, `/disagree` in the global chat, with a pick-list. `lib/slash-commands.ts`. |
-| **Status pill**                  | **Built (agent and state).** "Codex · Ready / Working… / Needs setup" in the chat header. The model is in the message box; quota is not shown.                       |
+| Item                             | What and why                                                                                                                                                                                                                        | Where | Effort |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
+| **Thinking and steps**           | **Built.** One quiet line while the agent works, opening to its thinking and steps; it stays with the answer afterwards ("Used 2 tools").                                                                                           |
+| **Free question on a selection** | **Built.** Select words, click Ask, type a question (or press Enter to explain). `components/reader/ask-box.tsx`.                                                                                                                   |
+| **Ask in place**                 | **Built.** An answer about some words also shows as a card beside them (cut short, with "Open in chat"), and those words get a thin underline. The cards share the margin with comments and are nudged apart so they never overlap. |
+| **Clickable sources**            | **Built.** `[Title](yomu:<id>#<paragraph>)` links open the blog at that paragraph; a Sources row lists blogs an answer mentions.                                                                                                    |
+| **Message actions**              | **Built:** Copy, "Answer again" (last reply), edit and resend (last free question to the article), and "Save as a comment" on an answer about some words. Not built: pin.                                                           |
+| **Slash commands**               | **Built.** `/summarize`, `/takeaways`, `/quiz` in the blog chat and `/recent`, `/topics`, `/disagree` in the global chat, with a pick-list. `lib/slash-commands.ts`.                                                                |
+| **Status pill**                  | **Built (agent and state).** "Codex · Ready / Working… / Needs setup" in the chat header. The model is in the message box; quota is not shown.                                                                                      |
 
 ## 4. Features: new things the agent does
 

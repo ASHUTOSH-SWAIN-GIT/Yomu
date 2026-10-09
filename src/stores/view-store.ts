@@ -13,6 +13,9 @@ export interface ViewStore {
   /** Home shows archived blogs instead of the active collection. */
   showArchive: boolean;
   setShowArchive: (on: boolean) => void;
+  /** Home shows what was saved from a bookmark and not opened yet. */
+  showInbox: boolean;
+  setShowInbox: (on: boolean) => void;
   /** Back to plain Home. */
   showHome: () => void;
   /** The chat panel on the right of a blog. */
@@ -35,9 +38,27 @@ registerPart("view", () =>
       set({ settingsPage, libraryChat: false }),
     showArchive: false,
     setShowArchive: (showArchive) =>
-      set({ showArchive, libraryChat: false, settingsPage: false }),
+      set({
+        showArchive,
+        showInbox: false,
+        libraryChat: false,
+        settingsPage: false,
+      }),
+    showInbox: false,
+    setShowInbox: (showInbox) =>
+      set({
+        showInbox,
+        showArchive: false,
+        libraryChat: false,
+        settingsPage: false,
+      }),
     showHome: () =>
-      set({ showArchive: false, libraryChat: false, settingsPage: false }),
+      set({
+        showArchive: false,
+        showInbox: false,
+        libraryChat: false,
+        settingsPage: false,
+      }),
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
     chatFull: false,

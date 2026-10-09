@@ -357,6 +357,19 @@ html.dark {
   text-underline-offset: 0.22em;
 }
 
+/* Words that were asked about: a thin line, tying them to the answer beside
+   them. */
+::highlight(yomu-asked) {
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--muted-foreground) 70%,
+    transparent
+  );
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+
 /* Words with a comment on them (and the words a new comment is being
    written about): a soft wash and an underline. */
 ::highlight(yomu-comment) {

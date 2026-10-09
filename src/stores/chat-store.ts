@@ -13,6 +13,7 @@ import {
   addMessage,
   createChat,
   deleteLastAssistantMessage,
+  deleteLastUserMessage,
   getChatForArticle,
   listHighlights,
   listMessages,
@@ -33,7 +34,7 @@ import { explainPrefInstructions } from "@/lib/explain-prefs";
 import { logError } from "@/lib/log";
 import { imageQuote, parseImageQuote } from "@/lib/images";
 import { articleInstruction } from "@/lib/quick-actions";
-import type { MessageScope } from "@/lib/scope";
+import { EXPLAIN_LABEL, type MessageScope } from "@/lib/scope";
 import {
   buildPrompt,
   buildArticlePrompt,
@@ -58,8 +59,6 @@ export interface ChatMessage {
   /** What the agent did to produce this answer (this run only). */
   trace?: Progress;
 }
-
-const EXPLAIN_LABEL = "Explain this";
 
 export type Selection = Omit<Highlight, "id" | "articleId">;
 
@@ -96,6 +95,10 @@ export interface ChatStore {
   ) => Promise<void>;
   /** A message in the chat panel: a question about the open article. */
   ask: (article: StoredArticle, text: string) => Promise<void>;
+  /** Replaces the last question to the article chat with an edited one and
+   * asks it afresh (a new session, so the agent does not remember the old
+   * question). */
+  editLast: (article: StoredArticle, text: string) => Promise<void>;
   /** Asks about the whole article (a quick action's message or free text). */
   askArticle: (article: StoredArticle, text: string) => Promise<void>;
   /** Asks a question answered from the developer's other saved articles. */
@@ -622,6 +625,25 @@ registerPart(
                     notes(),
                   ),
           }));
+        },
+
+        async editLast(article, text) {
+          const question = text.trim();
+          const { chat, messages, streaming } = get();
+          if (!chat || streaming || !question) return;
+          // The last exchange: the last question, and the answers after it.
+          const at = messages.map((m) => m.role).lastIndexOf("user");
+          if (at < 0 || messages[at].scope !== "article") return;
+          for (let i = at + 1; i < messages.length; i++) {
+            await deleteLastAssistantMessage(chat.id);
+          }
+          await deleteLastUserMessage(chat.id);
+          set({
+            messages: messages.slice(0, at),
+            sessionId: null,
+            chat: { ...chat, acpSessionId: null },
+          });
+          await get().ask(article, question);
         },
 
         async askArticle(article, text) {

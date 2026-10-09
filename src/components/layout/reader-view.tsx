@@ -11,11 +11,13 @@ import { GlossaryLayer } from "@/components/reader/glossary";
 import { Outline } from "@/components/reader/outline";
 import { AskBox } from "@/components/reader/ask-box";
 import { AddCommentButton, BlockComments } from "@/components/reader/comments";
+import { useMarginStack } from "@/hooks/use-margin-stack";
 import { useCommentHighlights } from "@/hooks/use-comment-highlights";
 import {
   useCommentSelection,
   type CommentSelection,
 } from "@/hooks/use-comment-selection";
+import { useChatStore } from "@/stores/chat-store";
 import { useCommentsStore } from "@/stores/comments-store";
 import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -146,9 +148,10 @@ function Article({
   // margin); when there is no room even then, comments go under their
   // paragraph. Only these two small values are kept, so a resize never
   // re-renders more than it must.
-  const hasComments = useCommentsStore(
-    (s) => s.items.length > 0 || s.draft !== null,
-  );
+  const hasAnswers = useChatStore((s) => s.highlights.length > 0);
+  const hasComments =
+    useCommentsStore((s) => s.items.length > 0 || s.draft !== null) ||
+    hasAnswers;
   const [layout, setLayout] = useState<{
     beside: boolean;
     left: number | null;
@@ -169,6 +172,12 @@ function Article({
     return () => observer.disconnect();
   }, [scrollRef]);
   const { beside } = layout;
+  const comments = useCommentsStore((s) => s.items);
+  const draft = useCommentsStore((s) => s.draft);
+  const editingId = useCommentsStore((s) => s.editingId);
+  // Notes in the margin must not run into each other.
+  const highlights = useChatStore((s) => s.highlights);
+  useMarginStack(articleRef, beside, [comments, draft, editingId, highlights]);
   const shiftLeft = hasComments && layout.left !== null ? layout.left : null;
 
   const minutes = readingMinutes(article.blocks);

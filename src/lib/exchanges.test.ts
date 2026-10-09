@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   groupExchanges,
+  passageAnswers,
   pickExchange,
   priorExplanations,
 } from "@/lib/exchanges";
@@ -132,5 +133,49 @@ describe("priorExplanations", () => {
     expect(priorExplanations(messages, undefined)).toEqual([
       { quote: "quote", summary: "better answer." },
     ]);
+  });
+});
+
+describe("passageAnswers", () => {
+  const highlight = (id: string, blockIndex = 0) => ({
+    id,
+    articleId: "a1",
+    blockIndex,
+    startOffset: 0,
+    endOffset: 4,
+    text: "word",
+  });
+
+  it("pairs each asked passage with what was answered", () => {
+    const out = passageAnswers(
+      [highlight("h1"), highlight("h2", 3)],
+      [
+        asked("h1", "word"),
+        a("It means one owner."),
+        asked("h2", "word", "Why?"),
+        a("Because."),
+      ],
+    );
+    expect(out.map((x) => [x.highlight.id, x.question, x.answer])).toEqual([
+      ["h1", null, "It means one owner."],
+      ["h2", "Why?", "Because."],
+    ]);
+  });
+
+  it("joins an answer that came in several messages", () => {
+    const out = passageAnswers(
+      [highlight("h1")],
+      [asked("h1", "word"), a("One."), a("Two.")],
+    );
+    expect(out[0].answer).toBe("One.\n\nTwo.");
+  });
+
+  it("leaves out a passage with no answer yet, and whole-article questions", () => {
+    expect(passageAnswers([highlight("h1")], [asked("h1", "word")])).toEqual(
+      [],
+    );
+    expect(
+      passageAnswers([highlight("h1")], [u("Summarize"), a("Here.")]),
+    ).toEqual([]);
   });
 });

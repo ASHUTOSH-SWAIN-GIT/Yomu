@@ -110,6 +110,12 @@ pub fn migrations() -> Vec<Migration> {
             kind: MigrationKind::Up,
             sql: MIGRATION_10,
         },
+        Migration {
+            version: 11,
+            description: "pages found in the browsers' bookmark folder",
+            kind: MigrationKind::Up,
+            sql: MIGRATION_11,
+        },
     ]
 }
 
@@ -268,5 +274,19 @@ pub const MIGRATION_10: &str = r#"
         found_at INTEGER NOT NULL,
         dismissed INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (feed_id, url)
+    );
+"#;
+
+/// Pages found in a browser's "Yomu" bookmarks folder, so each is saved once:
+/// `saved` once it is in the library, `failed` (with how many tries) when the
+/// page could not be fetched. Never edit or remove a migration that has been
+/// released: databases that ran it check it.
+pub const MIGRATION_11: &str = r#"
+    CREATE TABLE bookmark_imports (
+        url TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        article_id TEXT,
+        found_at INTEGER NOT NULL,
+        tries INTEGER NOT NULL DEFAULT 0
     );
 "#;

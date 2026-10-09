@@ -77,10 +77,10 @@ export async function listArticles(): Promise<ArticleSummary[]> {
       | "progress"
       | "archived"
       | "icon_url"
-    > & { tags: string | null })[]
+    > & { inbox: number; tags: string | null })[]
   >(
     `SELECT a.id, a.url, a.canonical_url, a.title, a.author, a.site, a.scraped_at,
-            a.published_at, a.progress, a.archived, a.icon_url,
+            a.published_at, a.progress, a.archived, a.inbox, a.icon_url,
             (SELECT group_concat(tag, char(31)) FROM article_tags t WHERE t.article_id = a.id) AS tags
      FROM articles a ORDER BY a.scraped_at DESC`,
   );
@@ -94,6 +94,7 @@ export async function listArticles(): Promise<ArticleSummary[]> {
     publishedAt: row.published_at,
     progress: row.progress,
     archived: row.archived === 1,
+    inbox: row.inbox === 1,
     tags: row.tags ? row.tags.split("\u001f").sort() : [],
     icon: row.icon_url,
   }));
@@ -537,6 +538,17 @@ export async function deleteLastAssistantMessage(
   );
 }
 
+/** Removes the newest question in a chat (to replace it with an edited one). */
+export async function deleteLastUserMessage(chatId: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `DELETE FROM messages WHERE id = (
+       SELECT id FROM messages WHERE chat_id = $1 AND role = 'user'
+       ORDER BY created_at DESC, rowid DESC LIMIT 1)`,
+    [chatId],
+  );
+}
+
 // ---- Library: search, progress, archive, tags (migration 2) ----
 
 /** Fills `text_content` for articles saved before search existed. The
@@ -808,4 +820,54 @@ export async function listUsedImageFiles(): Promise<string[]> {
     "SELECT DISTINCT file FROM article_images",
   );
   return rows.map((r) => r.file);
+}
+
+// ---- Pages from the browsers' bookmark folder (migration 11) ----
+
+export interface BookmarkImport {
+  status: "saved" | "failed";
+  tries: number;
+}
+
+/** Every page that has been tried, by address. */
+export async function listBookmarkImports(): Promise<
+  Map<string, BookmarkImport>
+> {
+  const db = await getDb();
+  const rows = await db.select<
+    { url: string; status: BookmarkImport["status"]; tries: number }[]
+  >("SELECT url, status, tries FROM bookmark_imports");
+  return new Map(
+    rows.map((r) => [r.url, { status: r.status, tries: r.tries }]),
+  );
+}
+
+/** Notes how a bookmarked page went; a failure counts a try. */
+export async function recordBookmarkImport(
+  url: string,
+  status: BookmarkImport["status"],
+  articleId: string | null,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO bookmark_imports (url, status, article_id, found_at, tries)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT(url) DO UPDATE SET
+       status = excluded.status,
+       article_id = excluded.article_id,
+       tries = bookmark_imports.tries + $5`,
+    [url, status, articleId, Date.now(), status === "failed" ? 1 : 0],
+  );
+}
+
+/** Puts an article in the Inbox, or takes it out (once it has been opened). */
+export async function setInbox(
+  articleId: string,
+  inbox: boolean,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE articles SET inbox = $2 WHERE id = $1", [
+    articleId,
+    inbox ? 1 : 0,
+  ]);
 }

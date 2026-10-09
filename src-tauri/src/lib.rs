@@ -1,4 +1,5 @@
 mod agent;
+mod bookmarks;
 mod db;
 mod env;
 mod imgcache;
@@ -94,6 +95,14 @@ async fn prune_images(app: tauri::AppHandle, keep: Vec<String>) -> Result<usize,
 
 /// Normalizes a URL without a network round trip, so the frontend can
 /// check the local cache before deciding whether to call `scrape_url`.
+/// Pages bookmarked into the browsers' "Yomu" folder (see bookmarks.rs).
+#[tauri::command]
+async fn scan_bookmarks(folder: String) -> Result<bookmarks::Scan, String> {
+    tokio::task::spawn_blocking(move || bookmarks::scan(&folder))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn canonicalize_url(url: String) -> Result<String, String> {
     scraper::canonical_url(&url).map_err(|e| e.to_string())
@@ -323,6 +332,7 @@ pub fn run() {
             agent_resume_session,
             agent_warm,
             agent_sandboxed,
+            scan_bookmarks,
             agent_use,
             agent_find_command,
             agent_list_models,

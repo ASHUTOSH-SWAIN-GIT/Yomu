@@ -21,6 +21,7 @@ const art = (id: string, tags: string[], archived = false): ArticleSummary => ({
   publishedAt: null,
   progress: 0,
   archived,
+  inbox: false,
   tags,
 });
 

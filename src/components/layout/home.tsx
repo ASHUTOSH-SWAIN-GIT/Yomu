@@ -21,6 +21,7 @@ export function Home() {
   const articles = useLibraryStore((s) => s.articles);
   const slots = useSpacesStore((s) => s.slots);
   const showArchive = useViewStore((s) => s.showArchive);
+  const showInbox = useViewStore((s) => s.showInbox);
   const libraryChat = useViewStore((s) => s.libraryChat);
   const settingsPage = useViewStore((s) => s.settingsPage);
 
@@ -28,8 +29,10 @@ export function Home() {
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const [input, setInput] = useState("");
   const loading = state.status === "loading";
-  const isHome = !showArchive;
-  const list = articles.filter((a) => a.archived === showArchive);
+  const isHome = !showArchive && !showInbox;
+  const list = showInbox
+    ? articles.filter((a) => a.inbox && !a.archived)
+    : articles.filter((a) => a.archived === showArchive);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -37,7 +40,11 @@ export function Home() {
     if (url && !loading) void openUrl(url);
   }
 
-  const title = showArchive ? "Archive" : "Read anything. Ask about any line.";
+  const title = showInbox
+    ? "Inbox"
+    : showArchive
+      ? "Archive"
+      : "Read anything. Ask about any line.";
 
   if (settingsPage) return <SettingsPage />;
   if (libraryChat) return <LibraryChat />;
@@ -49,6 +56,11 @@ export function Home() {
         <h1 className="font-display mt-1.5 text-[2.25rem] leading-[1.12] font-semibold tracking-[-0.025em] text-balance">
           {title}
         </h1>
+        {showInbox && (
+          <p className="text-muted-foreground mt-2 text-[0.8125rem]">
+            Pages you bookmarked into a folder named Yomu.
+          </p>
+        )}
         {showArchive && list.length > 0 && (
           <p className="text-muted-foreground mt-2 text-[0.8125rem]">
             {list.length} archived
@@ -118,7 +130,11 @@ export function Home() {
         !loading && <Welcome />
       ) : list.length === 0 ? (
         <p className="text-muted-foreground mt-14 text-center text-[0.8125rem]">
-          {showArchive ? "Nothing archived." : "Nothing here yet."}
+          {showInbox
+            ? "Nothing waiting."
+            : showArchive
+              ? "Nothing archived."
+              : "Nothing here yet."}
         </p>
       ) : (
         <LibraryList list={list} archive={showArchive} slots={slots} />

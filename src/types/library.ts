@@ -31,6 +31,8 @@ export interface ArticleSummary {
   publishedAt: number | null;
   progress: number;
   archived: boolean;
+  /** Saved from a bookmark and not opened yet. */
+  inbox: boolean;
   tags: string[];
   /** The site's logo address, when the page declared one. */
   icon?: string | null;

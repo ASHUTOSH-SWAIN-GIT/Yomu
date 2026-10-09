@@ -36,6 +36,7 @@ vi.mock("@/lib/db", () => ({
   addMessage: vi.fn(),
   createChat: vi.fn(),
   deleteLastAssistantMessage: vi.fn(),
+  deleteLastUserMessage: vi.fn(),
   getChatForArticle: vi.fn(),
   listHighlights: vi.fn(),
   listMessages: vi.fn(),

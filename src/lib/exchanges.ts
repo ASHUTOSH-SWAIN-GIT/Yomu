@@ -1,6 +1,8 @@
 import { parseImageQuote } from "@/lib/images";
+import { EXPLAIN_LABEL } from "@/lib/scope";
 import { firstSentence } from "@/lib/text";
 import type { ChatMessage } from "@/stores/chat-store";
+import type { Highlight } from "@/types/library";
 
 /** One question and the answer(s) that followed it. */
 export interface Exchange {
@@ -36,6 +38,41 @@ export function pickExchange(
     if (found) return found;
   }
   return exchanges[exchanges.length - 1] ?? null;
+}
+
+/** A passage that was asked about, with what was answered: shown beside
+ * the words. */
+export interface PassageAnswer {
+  highlight: Highlight;
+  /** The reader's own question; null when the passage was just explained. */
+  question: string | null;
+  answer: string;
+}
+
+/** The answers to questions about passages, in the order they were asked.
+ * A passage with no answer yet (or none that arrived) is left out. */
+export function passageAnswers(
+  highlights: Highlight[],
+  messages: ChatMessage[],
+): PassageAnswer[] {
+  const asked = new Map(
+    groupExchanges(messages)
+      .filter((e) => e.question.highlightId !== undefined)
+      .map((e) => [e.question.highlightId as string, e]),
+  );
+  return highlights.flatMap((highlight) => {
+    const exchange = asked.get(highlight.id);
+    const answer = exchange?.answers.map((a) => a.text).join("\n\n") ?? "";
+    if (!exchange || !answer.trim()) return [];
+    const question = exchange.question.text;
+    return [
+      {
+        highlight,
+        question: question === EXPLAIN_LABEL ? null : question,
+        answer,
+      },
+    ];
+  });
 }
 
 /** A passage explained earlier in the article, condensed for the prompt

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { BookmarkScan } from "@/lib/bookmarks";
 import type { ScrapedArticle } from "@/types/article";
 import type {
   AgentConfig,
@@ -120,4 +121,10 @@ export async function agentPrompt(
     text,
     imageUrl: imageUrl ?? null,
   });
+}
+
+/** The pages in the browsers' bookmarks folder, and which browsers were found
+ * (see src-tauri/src/bookmarks.rs). */
+export async function scanBookmarks(folder: string): Promise<BookmarkScan> {
+  return invoke<BookmarkScan>("scan_bookmarks", { folder });
 }
