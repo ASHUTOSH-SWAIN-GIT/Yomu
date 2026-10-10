@@ -3,7 +3,7 @@ import { Check, Loader2 } from "lucide-react";
 import type { AgentConfig } from "@/types/agent";
 import { Button } from "@/components/ui/button";
 import { agentFindCommand, agentSandboxed } from "@/lib/commands";
-import { CUSTOM_ID, PRESETS, agentId, presetOf } from "@/lib/agents";
+import { PRESETS, agentId, presetOf } from "@/lib/agents";
 import { joinWords, splitWords } from "@/lib/shell-words";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
@@ -80,9 +80,10 @@ export function AgentSection() {
   }
 
   async function applyCustom() {
-    if (!enabled.includes(CUSTOM_ID)) return ask(customConfig());
+    const next = customConfig();
+    if (!enabled.includes(agentId(next))) return ask(next);
     setTesting(true);
-    await setConfig(customConfig());
+    await setConfig(next);
     setTesting(false);
   }
 

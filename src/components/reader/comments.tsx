@@ -1,14 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
-import {
-  ArrowUp,
-  Copy,
-  MessageSquareText,
-  Pencil,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { ArrowUp, Copy, MessageSquareText, Pencil, Trash2 } from "lucide-react";
 import { AnswerCard } from "@/components/reader/answer-card";
 import { passageAnswers } from "@/lib/exchanges";
 import { useChatStore } from "@/stores/chat-store";
@@ -22,16 +15,12 @@ import type { Comment } from "@/types/library";
 const buttonClass =
   "hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-[0.8125rem] outline-none focus-visible:ring-2 [&>svg]:size-3.5";
 
-/** What is offered over selected text: ask the agent about it, comment, or
- * copy it. */
+/** What is offered over selected text: comment on it, or copy it. */
 export function AddCommentButton({
   selection,
-  onAsk,
   onDone,
 }: {
   selection: CommentSelection;
-  /** Opens the box for asking about these words (see `AskBox`). */
-  onAsk: () => void;
   onDone: () => void;
 }) {
   const startDraft = useCommentsStore((s) => s.startDraft);
@@ -50,18 +39,6 @@ export function AddCommentButton({
         transform: `translate(-50%, ${above ? "-100%" : "0"})`,
       }}
     >
-      <button
-        type="button"
-        onClick={() => {
-          onAsk();
-          window.getSelection()?.removeAllRanges();
-          onDone();
-        }}
-        className={buttonClass}
-      >
-        <Sparkles aria-hidden />
-        Ask
-      </button>
       <button
         type="button"
         onClick={() => {

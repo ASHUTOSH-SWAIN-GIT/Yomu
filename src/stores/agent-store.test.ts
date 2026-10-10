@@ -10,9 +10,10 @@ vi.mock("@/lib/commands", () => ({
   agentLogin: async () => {},
   agentDiagnose: async () => ({ node: "v24", codex: "0.1", loggedIn: true }),
 }));
+const disk = vi.hoisted(() => new Map<string, string>());
 vi.mock("@/lib/storage", () => ({
-  readStorage: () => null,
-  writeStorage: () => {},
+  readStorage: (k: string) => disk.get(k) ?? null,
+  writeStorage: (k: string, v: string) => void disk.set(k, v),
 }));
 
 import { useAgentStore } from "@/stores/agent-store";
@@ -28,7 +29,19 @@ const OPENCODE: AgentConfig = {
 
 beforeEach(() => {
   h.used = [];
+  disk.clear();
   useAgentStore.setState({ enabled: [], status: "off", asking: null });
+});
+
+describe("after an agent was turned on", () => {
+  it("is still on after the app is opened again, Codex included", async () => {
+    await useAgentStore.getState().enable({ kind: "codex" });
+    await useAgentStore.getState().enable(OPENCODE);
+    vi.resetModules();
+    const reopened = (await import("@/stores/agent-store")).useAgentStore;
+    expect(reopened.getState().enabled.sort()).toEqual(["codex", "opencode"]);
+    expect(reopened.getState().status).toBe("checking");
+  });
 });
 
 describe("before an agent is turned on", () => {
