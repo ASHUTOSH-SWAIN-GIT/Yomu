@@ -1,3 +1,4 @@
+import { readStorage, writeStorage } from "@/lib/storage";
 import type { AgentConfig } from "@/types/agent";
 
 type CustomAgent = Extract<AgentConfig, { kind: "custom" }>;
@@ -66,23 +67,7 @@ export const CLAUDE_CODE: AgentPreset = {
   },
 };
 
-/** Gemini CLI, started as `gemini --acp`. */
-export const GEMINI: AgentPreset = {
-  id: "gemini",
-  label: "Gemini CLI",
-  detect: "gemini",
-  note: "Your local Gemini CLI. Needs a Gemini API key or a Google Workspace account; Google no longer supports personal sign-in there.",
-  missing:
-    "Not found on this computer. Install the Gemini CLI, then run `gemini` once to set it up.",
-  config: {
-    kind: "custom",
-    command: "gemini",
-    args: ["--acp"],
-    dataDirs: ["~/.gemini"],
-  },
-};
-
-export const PRESETS: AgentPreset[] = [CLAUDE_CODE, GEMINI, OPENCODE];
+export const PRESETS: AgentPreset[] = [CLAUDE_CODE, OPENCODE];
 
 /** A saved choice made before a preset changed, brought up to date: Claude
  * Code was first saved without its own npm cache. Anything else is returned
@@ -104,4 +89,49 @@ export function presetOf(config: AgentConfig): AgentPreset | undefined {
       config.command === p.config.command &&
       config.args.join(" ") === p.config.args.join(" "),
   );
+}
+
+const ENABLED_KEY = "yomu-agents-enabled";
+
+/** The ids used for Codex and for a hand-made agent in the enabled list;
+ * a preset uses its own id. */
+export const CODEX_ID = "codex";
+export const CUSTOM_ID = "custom";
+
+/** The name an agent goes by in the enabled list. */
+export function agentId(config: AgentConfig): string {
+  return config.kind === "codex"
+    ? CODEX_ID
+    : (presetOf(config)?.id ?? CUSTOM_ID);
+}
+
+/** What to call an agent in the interface. */
+export function agentLabel(config: AgentConfig): string {
+  if (config.kind === "codex") return "Codex";
+  return presetOf(config)?.label ?? config.command.split("/").pop() ?? "Agent";
+}
+
+/** Agents the user has turned on (after reading the notice). Nothing runs
+ * until it is here, Codex included. A preset or custom agent already in use
+ * counts as on, because it was picked by hand before this existed; Codex
+ * does not, because it was only ever the default. */
+export function readEnabled(inUse: AgentConfig): string[] {
+  let ids: string[] = [];
+  try {
+    const data = JSON.parse(readStorage(ENABLED_KEY) ?? "[]") as unknown;
+    if (Array.isArray(data)) {
+      ids = data.filter((d): d is string => typeof d === "string");
+    }
+  } catch {
+    // Corrupt value: nothing is enabled.
+  }
+  if (inUse.kind === "custom") {
+    const id = agentId(inUse);
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+export function writeEnabled(ids: string[]) {
+  writeStorage(ENABLED_KEY, JSON.stringify(ids));
 }

@@ -28,10 +28,35 @@ const OPENCODE: AgentConfig = {
 
 beforeEach(() => {
   h.used = [];
+  useAgentStore.setState({ enabled: [], status: "off", asking: null });
+});
+
+describe("before an agent is turned on", () => {
+  it("starts and checks nothing, Codex included", async () => {
+    await useAgentStore.getState().refreshStatus();
+    expect(useAgentStore.getState().status).toBe("off");
+    expect(h.used).toEqual([]);
+  });
+
+  it("starts nothing when a switch is made to an agent that is off", async () => {
+    await useAgentStore.getState().setConfig(OPENCODE);
+    expect(useAgentStore.getState().status).toBe("off");
+    expect(h.used).toEqual([]);
+  });
+
+  it("starts the agent once the user turns it on", async () => {
+    useAgentStore.getState().ask(OPENCODE);
+    await useAgentStore.getState().enable(OPENCODE);
+    expect(useAgentStore.getState().asking).toBeNull();
+    expect(useAgentStore.getState().enabled).toEqual(["opencode"]);
+    expect(h.used).toEqual([OPENCODE]);
+    expect(useAgentStore.getState().status).toBe("ready");
+  });
 });
 
 describe("switching agents", () => {
   it("starts the custom agent, and tells the app to go back to Codex", async () => {
+    useAgentStore.setState({ enabled: ["opencode", "codex"] });
     await useAgentStore.getState().setConfig(OPENCODE);
     expect(h.used).toEqual([OPENCODE]);
     expect(useAgentStore.getState().status).toBe("ready");

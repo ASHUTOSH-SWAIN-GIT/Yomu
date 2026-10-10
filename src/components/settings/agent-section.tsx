@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
+import type { AgentConfig } from "@/types/agent";
 import { Button } from "@/components/ui/button";
 import { agentFindCommand, agentSandboxed } from "@/lib/commands";
-import { PRESETS, presetOf } from "@/lib/agents";
+import { CUSTOM_ID, PRESETS, agentId, presetOf } from "@/lib/agents";
 import { joinWords, splitWords } from "@/lib/shell-words";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
 import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
 
-/** Which agent Yomu talks to: Codex, one of the presets (Claude Code, Gemini
- * CLI, OpenCode), or any program that speaks ACP over stdio. */
+/** Which agent Yomu talks to: Codex, one of the presets (Claude Code,
+ * OpenCode), or any program that speaks ACP over stdio. */
 export function AgentSection() {
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const setSettingsPage = useViewStore((s) => s.setSettingsPage);
@@ -19,6 +20,8 @@ export function AgentSection() {
   const customError = useAgentStore((s) => s.customError);
   const setConfig = useAgentStore((s) => s.setConfig);
   const refresh = useAgentStore((s) => s.refreshStatus);
+  const enabled = useAgentStore((s) => s.enabled);
+  const ask = useAgentStore((s) => s.ask);
 
   const custom = config.kind === "custom" ? config : null;
   const [command, setCommand] = useState(custom?.command ?? "");
@@ -60,23 +63,34 @@ export function AgentSection() {
     }
   }, [refresh]);
 
+  const customConfig = (): AgentConfig => ({
+    kind: "custom",
+    command: command.trim(),
+    args: splitWords(args),
+    dataDirs: dataDirs
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean),
+  });
+
+  /** Uses the agent if it is turned on; otherwise asks the user first. */
+  function choose(next: AgentConfig) {
+    if (enabled.includes(agentId(next))) void setConfig(next);
+    else ask(next);
+  }
+
   async function applyCustom() {
+    if (!enabled.includes(CUSTOM_ID)) return ask(customConfig());
     setTesting(true);
-    await setConfig({
-      kind: "custom",
-      command: command.trim(),
-      args: splitWords(args),
-      dataDirs: dataDirs
-        .split(",")
-        .map((d) => d.trim())
-        .filter(Boolean),
-    });
+    await setConfig(customConfig());
     setTesting(false);
   }
 
-  const usingCodex = config.kind === "codex";
-  const usingPreset = presetOf(config);
-  const usingCustom = !usingCodex && !usingPreset;
+  // Only an agent the user turned on counts as the one in use.
+  const turnedOn = enabled.includes(agentId(config));
+  const usingCodex = turnedOn && config.kind === "codex";
+  const usingPreset = turnedOn ? presetOf(config) : undefined;
+  const usingCustom = turnedOn && config.kind === "custom" && !usingPreset;
   const agentBadge =
     status === "ready"
       ? "Ready"
@@ -99,7 +113,7 @@ export function AgentSection() {
                   : "Needs setup"
               : undefined
           }
-          onSelect={() => void setConfig({ kind: "codex" })}
+          onSelect={() => choose({ kind: "codex" })}
         >
           {usingCodex && status === "setup" && (
             <Button
@@ -127,7 +141,7 @@ export function AgentSection() {
               note={found ? undefined : preset.missing}
               badge={on ? agentBadge : found ? "Installed" : undefined}
               onSelect={() => {
-                if (found) void setConfig(preset.config);
+                if (found) choose(preset.config);
               }}
             >
               {on && customError && (

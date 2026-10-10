@@ -205,7 +205,7 @@ async fn real_codex_streams_and_resumes() {
 
 /// Opt-in: starts any ACP agent through the real harness (sandbox included)
 /// and asks it one short question. For trying a preset before shipping it:
-/// `YOMU_AGENT="gemini --acp" YOMU_AGENT_DIRS="~/.gemini" cargo test real_custom_agent -- --ignored --nocapture`
+/// `YOMU_AGENT="opencode acp" YOMU_AGENT_DIRS="~/.local/share/opencode" cargo test real_custom_agent -- --ignored --nocapture`
 #[tokio::test]
 #[ignore]
 async fn real_custom_agent() {

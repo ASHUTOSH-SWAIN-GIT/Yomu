@@ -75,7 +75,7 @@ Ranked by how much they make Yomu feel different from "a reader with a chatbot".
 10. **Glossary on hover.** Terms the agent explained before get a dotted underline everywhere; hovering shows your earlier answer. **M**
 11. **Reading stats.** Minutes read, streak, and topics this month as a small, pretty Home card. **S**
 12. **Share a page.** Export an article with your comments and answers as a clean HTML page or image card for Twitter/LinkedIn. **S–M**
-13. **More agents.** Claude Code and Gemini CLI over ACP (the harness already supports custom commands; add presets). **S**
+13. **More agents.** Claude Code and OpenCode over ACP (the harness already supports custom commands; add presets). **S**
 14. **Sync (optional).** Encrypted sync through iCloud Drive or a folder, keeping the local-first promise (ADR 0004). **L**
 
 ---

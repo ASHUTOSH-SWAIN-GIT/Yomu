@@ -34,7 +34,7 @@ Not done: resizing large images before sending, image search, storing images ins
 | 3   | **Library**              | Only pays off once there is more content and more highlights to find again.                                                              | M    |
 | 4   | **Onboarding and trust** | Least important for you as the daily driver, essential before strangers use it. Tests (4b) can move earlier if regressions start biting. | M    |
 
-Parked: agent picker (Claude/Gemini via ACP), sync, browser extension.
+Parked: agent picker (Claude/OpenCode via ACP), sync, browser extension.
 
 ### Theme 2: Reader fidelity
 

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { agentDiagnose, agentLogin, agentUse, agentWarm } from "@/lib/commands";
 import { logError } from "@/lib/log";
-import { upgradeSaved } from "@/lib/agents";
+import { agentId, readEnabled, upgradeSaved, writeEnabled } from "@/lib/agents";
 import { isReady } from "@/lib/setup";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { useModelsStore } from "@/stores/models-store";
@@ -41,12 +41,23 @@ export function parseAgentConfig(raw: string | null): AgentConfig {
 }
 
 interface AgentStore {
-  /** "setup" means something is missing: for Codex, a step of the checklist
-   * (see lib/setup.ts); for a custom agent, that it would not start. */
-  status: "checking" | "setup" | "ready";
+  /** "off" means the user has not turned the agent in use on, so nothing
+   * has been started or checked. "setup" means something is missing: for
+   * Codex, a step of the checklist (see lib/setup.ts); for a custom agent,
+   * that it would not start. */
+  status: "off" | "checking" | "setup" | "ready";
   diagnosis: Diagnosis | null;
   /** The agent in use. */
   config: AgentConfig;
+  /** Ids (see `agentId`) of the agents the user has turned on. */
+  enabled: string[];
+  /** The agent whose notice is showing, waiting for the user to turn it
+   * on. */
+  asking: AgentConfig | null;
+  ask: (config: AgentConfig) => void;
+  cancelAsk: () => void;
+  /** Turns the agent on, after the user agreed, and switches to it. */
+  enable: (config: AgentConfig) => Promise<void>;
   /** Why the custom agent would not start, when it did not. */
   customError: string | null;
   refreshStatus: () => Promise<void>;
@@ -59,14 +70,33 @@ interface AgentStore {
 // restart an agent that is already fine.
 let started: string | null = null;
 
+const initialConfig = upgradeSaved(parseAgentConfig(readStorage(CONFIG_KEY)));
+const initialEnabled = readEnabled(initialConfig);
+
 export const useAgentStore = create<AgentStore>((set, get) => ({
-  status: "checking",
+  status: initialEnabled.includes(agentId(initialConfig)) ? "checking" : "off",
   diagnosis: null,
-  config: upgradeSaved(parseAgentConfig(readStorage(CONFIG_KEY))),
+  config: initialConfig,
+  enabled: initialEnabled,
+  asking: null,
   customError: null,
 
+  ask: (asking) => set({ asking }),
+  cancelAsk: () => set({ asking: null }),
+  async enable(config) {
+    const enabled = [...new Set([...get().enabled, agentId(config)])];
+    writeEnabled(enabled);
+    set({ enabled, asking: null });
+    await get().setConfig(config);
+  },
+
   async refreshStatus() {
-    const { config } = get();
+    const { config, enabled } = get();
+    // Nothing is started, or even looked for, until the user turns it on.
+    if (!enabled.includes(agentId(config))) {
+      set({ status: "off", customError: null });
+      return;
+    }
     if (config.kind === "custom") {
       const key = JSON.stringify(config);
       if (started === key && get().status === "ready") return;

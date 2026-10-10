@@ -15,7 +15,7 @@ use crate::mcp::McpInfo;
 
 /// Real Codex ACP adapter, pinned (ROADMAP.md risk: "pin versions").
 /// This constant plus the notification mapping below is the "swappable
-/// agent layer": another ACP adapter (Claude, Gemini) only needs a
+/// agent layer": another ACP adapter (Claude, OpenCode) only needs a
 /// different command here.
 const AGENT_LABEL: &str = "@agentclientprotocol/codex-acp";
 

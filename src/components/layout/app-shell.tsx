@@ -5,6 +5,7 @@ import { CommandPalette } from "@/components/layout/command-palette";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { TabPages } from "@/components/layout/tab-pages";
 import { ShortcutsDialog } from "@/components/layout/shortcuts-dialog";
+import { AgentConsentDialog } from "@/components/layout/agent-consent-dialog";
 import { SetupDialog } from "@/components/layout/setup-dialog";
 import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
@@ -146,6 +147,7 @@ export function AppShell() {
       <CommandPalette />
       <AllChatsDialog />
       <SetupDialog />
+      <AgentConsentDialog />
       <ShortcutsDialog />
 
       {focusMode && (

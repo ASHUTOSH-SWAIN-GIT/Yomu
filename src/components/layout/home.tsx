@@ -108,15 +108,17 @@ export function Home() {
           </Button>
         </form>
       )}
-      {isHome && agentStatus === "setup" && (
+      {isHome && (agentStatus === "setup" || agentStatus === "off") && (
         <p className="text-muted-foreground mt-3 text-[0.8125rem]">
-          Connect an AI agent to ask about what you read.{" "}
+          {agentStatus === "off"
+            ? "Turn on an AI agent to ask about what you read."
+            : "Connect an AI agent to ask about what you read."}{" "}
           <button
             type="button"
             onClick={() => setSetupOpen(true)}
             className="text-foreground underline underline-offset-2 outline-none hover:opacity-80"
           >
-            Set up
+            {agentStatus === "off" ? "Turn on" : "Set up"}
           </button>
         </p>
       )}

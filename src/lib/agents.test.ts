@@ -1,9 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const saved = vi.hoisted(() => ({ value: null as string | null }));
+vi.mock("@/lib/storage", () => ({
+  readStorage: () => saved.value,
+  writeStorage: (_: string, v: string) => void (saved.value = v),
+}));
+
 import {
   CLAUDE_CODE,
-  GEMINI,
   OPENCODE,
+  CUSTOM_ID,
+  agentId,
+  agentLabel,
   PRESETS,
+  readEnabled,
+  writeEnabled,
   presetOf,
   upgradeSaved,
 } from "@/lib/agents";
@@ -20,7 +31,6 @@ describe("agent presets", () => {
   it("recognises a preset from the configuration saved for it", () => {
     expect(presetOf(OPENCODE.config)).toBe(OPENCODE);
     expect(presetOf(CLAUDE_CODE.config)).toBe(CLAUDE_CODE);
-    expect(presetOf(GEMINI.config)).toBe(GEMINI);
   });
 
   it("treats Codex and a hand-made agent as no preset", () => {
@@ -57,6 +67,50 @@ describe("upgradeSaved", () => {
     };
     expect(upgradeSaved(mine)).toBe(mine);
     expect(upgradeSaved({ kind: "codex" })).toEqual({ kind: "codex" });
-    expect(upgradeSaved(GEMINI.config)).toBe(GEMINI.config);
+  });
+});
+
+describe("turning agents on", () => {
+  it("starts with nothing on, Codex included", () => {
+    saved.value = null;
+    expect(readEnabled({ kind: "codex" })).toEqual([]);
+  });
+
+  it("remembers what was turned on", () => {
+    writeEnabled([OPENCODE.id]);
+    expect(readEnabled({ kind: "codex" })).toEqual([OPENCODE.id]);
+  });
+
+  it("counts the agent already in use, so existing users are not asked", () => {
+    saved.value = null;
+    expect(readEnabled(CLAUDE_CODE.config)).toEqual([CLAUDE_CODE.id]);
+    expect(
+      readEnabled({ kind: "custom", command: "x", args: [], dataDirs: [] }),
+    ).toEqual([CUSTOM_ID]);
+  });
+
+  it("ignores a corrupt saved value", () => {
+    saved.value = "{nope";
+    expect(readEnabled({ kind: "codex" })).toEqual([]);
+  });
+});
+
+describe("agent names", () => {
+  it("tells Codex, presets and hand-made agents apart", () => {
+    expect(agentId({ kind: "codex" })).toBe("codex");
+    expect(agentId(OPENCODE.config)).toBe("opencode");
+    expect(
+      agentId({ kind: "custom", command: "x", args: [], dataDirs: [] }),
+    ).toBe("custom");
+    expect(agentLabel({ kind: "codex" })).toBe("Codex");
+    expect(agentLabel(CLAUDE_CODE.config)).toBe("Claude Code");
+    expect(
+      agentLabel({
+        kind: "custom",
+        command: "/bin/my-agent",
+        args: [],
+        dataDirs: [],
+      }),
+    ).toBe("my-agent");
   });
 });

@@ -16,10 +16,19 @@ export function SetupDialog() {
   const setOpen = useUiStore((s) => s.setSetupOpen);
   const status = useAgentStore((s) => s.status);
   const refresh = useAgentStore((s) => s.refreshStatus);
+  const config = useAgentStore((s) => s.config);
+  const ask = useAgentStore((s) => s.ask);
 
+  // Nothing is set up for an agent that is not turned on: ask first.
   useEffect(() => {
-    if (open) void refresh();
-  }, [open, refresh]);
+    if (open && status === "off") {
+      setOpen(false);
+      ask(config);
+    }
+  }, [open, status, config, ask, setOpen]);
+  useEffect(() => {
+    if (open && status !== "off") void refresh();
+  }, [open, status, refresh]);
   useEffect(() => {
     if (open && status === "ready") setOpen(false);
   }, [open, status, setOpen]);
