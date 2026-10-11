@@ -1,16 +1,26 @@
 import { useState } from "react";
-import { Archive, ArchiveRestore, FolderPlus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  Archive,
+  ArchiveRestore,
+  FolderPlus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { Confirm } from "@/components/ui/confirm";
+import { IconButton } from "@/components/ui/icon-button";
+import { ReadState } from "@/components/layout/reading-card";
+import { finished, savedOn } from "@/lib/reading";
 import { CollectionPicker } from "@/components/layout/collection-picker";
 import { SiteLogoTile, SiteMark } from "@/components/layout/article-cover";
 import { articleColor } from "@/lib/spaces";
 import { deleteArticle, openSavedArticle } from "@/lib/navigate";
+import { toggleArchived } from "@/lib/article-actions";
 import { moveFocus } from "@/lib/list-focus";
+import { matchesQuery } from "@/lib/palette";
 import { cn } from "@/lib/utils";
-import { useLibraryStore } from "@/stores/library-store";
 import type { ArticleSummary } from "@/types/library";
 
-/** The saved blogs on Home (a list) and on the Archive page (rows), with
+/** The saved articles on Home (a list) and on the Archive page (rows), with
  * archive, delete and add-to-collection on each. */
 export function LibraryList({
   list,
@@ -21,15 +31,18 @@ export function LibraryList({
   archive: boolean;
   slots: Record<string, number>;
 }) {
-  const setArchived = useLibraryStore((s) => s.setArchived);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const shown = query.trim()
+    ? list.filter((a) => matchesQuery(`${a.title} ${a.site}`, query))
+    : list;
 
   const props = (a: ArticleSummary) => ({
     article: a,
     color: articleColor(a, slots),
     confirming: confirmingId === a.id,
     onOpen: () => void openSavedArticle(a.id),
-    onArchive: () => void setArchived(a.id, !a.archived),
+    onArchive: () => void toggleArchived(a),
     onDelete: () => setConfirmingId(a.id),
     onConfirm: (yes: boolean) => {
       setConfirmingId(null);
@@ -50,14 +63,33 @@ export function LibraryList({
   return (
     // Arrow keys (or j/k) move between items, like a list in Linear.
     <div onKeyDown={moveFocus}>
-      <div className="mt-14 flex items-baseline gap-2">
-        <h2 className="text-[0.9375rem] font-semibold">All blogs</h2>
-        <span className="text-muted-foreground text-[0.8125rem] tabular-nums">
+      <div className="mt-12 flex items-center gap-2">
+        <h2 className="text-lead font-semibold">All articles</h2>
+        <span className="text-muted-foreground text-ui tabular-nums">
           {list.length}
         </span>
+        {/* A long list gets a way to find one article in it. */}
+        {list.length > 5 && (
+          <label className="bg-muted text-muted-foreground focus-within:ring-ring/60 ml-auto flex h-8 w-56 items-center gap-2 rounded-lg px-2.5 focus-within:ring-2">
+            <Search className="size-3.5 shrink-0" aria-hidden />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+              placeholder="Find an article"
+              aria-label="Find an article"
+              className="placeholder:text-muted-foreground text-foreground text-ui min-w-0 flex-1 bg-transparent outline-none"
+            />
+          </label>
+        )}
       </div>
+      {shown.length === 0 && (
+        <p className="text-muted-foreground text-ui mt-6">
+          No article matches “{query.trim()}”.
+        </p>
+      )}
       <ul className="divide-border mt-3 flex flex-col divide-y">
-        {list.map((a) => (
+        {shown.map((a) => (
           <HomeRow key={a.id} {...props(a)} />
         ))}
       </ul>
@@ -75,8 +107,8 @@ interface ItemProps {
   onConfirm: (yes: boolean) => void;
 }
 
-/** One blog in Home's list: its site's logo, the title with the site under
- * it, how far you are, and when it was saved. */
+/** One article in Home's list: its site's logo, the title with the site and
+ * the day it was saved under it, and how far you are. */
 function HomeRow({
   article,
   confirming,
@@ -89,14 +121,13 @@ function HomeRow({
     return (
       <li className="bg-muted flex h-[3.75rem] items-center px-2">
         <Confirm
-          title={article.title}
+          question={`Delete “${article.title}”?`}
           onConfirm={onConfirm}
           className="w-full"
         />
       </li>
     );
   }
-  const finished = article.progress >= 0.95;
   return (
     <li className="group hover:bg-muted/60 relative transition-colors duration-[var(--dur-fast)]">
       <button
@@ -114,16 +145,17 @@ function HomeRow({
         <span className="flex min-w-0 flex-1 flex-col">
           <span
             className={cn(
-              "truncate text-[0.9375rem] font-medium",
-              finished && "text-muted-foreground",
+              "text-lead truncate font-medium",
+              finished(article) && "text-muted-foreground",
             )}
           >
             {article.title}
           </span>
-          <span className="text-muted-foreground truncate text-[0.75rem]">
-            {article.site}
+          <span className="text-muted-foreground text-meta truncate">
+            {article.site} · Saved {savedOn(article)}
           </span>
         </span>
+        <ReadState article={article} />
       </button>
       <Actions
         article={article}
@@ -144,7 +176,7 @@ function Rows({
 }) {
   return (
     <section className="mt-10">
-      {label && <h2 className="mb-2 text-[0.8125rem] font-medium">{label}</h2>}
+      {label && <h2 className="text-ui mb-2 font-medium">{label}</h2>}
       <ul className="flex flex-col">{children}</ul>
     </section>
   );
@@ -163,14 +195,13 @@ function Row({
     return (
       <li className="bg-muted flex h-14 items-center rounded-lg px-3">
         <Confirm
-          title={article.title}
+          question={`Delete “${article.title}”?`}
           onConfirm={onConfirm}
           className="w-full"
         />
       </li>
     );
   }
-  const finished = article.progress >= 0.95;
   return (
     <li className="group hover:bg-muted relative -mx-3 rounded-lg transition-colors duration-[var(--dur-fast)]">
       <button
@@ -184,13 +215,13 @@ function Row({
         <span className="flex min-w-0 flex-1 flex-col">
           <span
             className={cn(
-              "truncate font-serif text-[0.9375rem] font-medium",
-              finished && "text-muted-foreground",
+              "text-lead truncate font-serif font-medium",
+              finished(article) && "text-muted-foreground",
             )}
           >
             {article.title}
           </span>
-          <span className="text-muted-foreground truncate text-[0.75rem]">
+          <span className="text-muted-foreground text-meta truncate">
             {article.site}
           </span>
         </span>
@@ -232,94 +263,25 @@ export function Actions({
         open={picking}
         onOpenChange={setPicking}
         trigger={
-          <button
-            type="button"
-            aria-label="Save to a collection"
-            title="Save to a collection"
-            className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 grid size-7 place-items-center rounded-md outline-none focus-visible:ring-2 [&>svg]:size-3.5"
-          >
-            <FolderPlus />
-          </button>
+          <IconButton label="Add to a collection" size="md">
+            <FolderPlus aria-hidden />
+          </IconButton>
         }
       />
       <IconButton
-        label={article.archived ? "Move out of archive" : "Archive"}
+        label={article.archived ? "Move out of the archive" : "Archive"}
+        size="md"
         onClick={onArchive}
       >
-        {article.archived ? <ArchiveRestore /> : <Archive />}
+        {article.archived ? (
+          <ArchiveRestore aria-hidden />
+        ) : (
+          <Archive aria-hidden />
+        )}
       </IconButton>
-      <IconButton label="Delete" onClick={onDelete} danger>
-        <Trash2 />
+      <IconButton label="Delete" size="md" onClick={onDelete} danger>
+        <Trash2 aria-hidden />
       </IconButton>
     </span>
-  );
-}
-
-export function Confirm({
-  title,
-  keepLabel = "Keep",
-  note,
-  onConfirm,
-  className,
-}: {
-  title: string;
-  keepLabel?: string;
-  /** A short reassurance shown with the question. */
-  note?: string;
-  onConfirm: (yes: boolean) => void;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex items-center gap-3 text-[0.8125rem]", className)}>
-      <span className="line-clamp-2 min-w-0">
-        Delete “{title}”?
-        {note && <span className="text-muted-foreground"> {note}</span>}
-      </span>
-      <span className="ml-auto flex shrink-0 gap-1.5">
-        <Button
-          size="sm"
-          variant="destructive"
-          className="h-7 px-2.5 text-[0.75rem]"
-          onClick={() => onConfirm(true)}
-        >
-          Delete
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2.5 text-[0.75rem]"
-          onClick={() => onConfirm(false)}
-        >
-          {keepLabel}
-        </Button>
-      </span>
-    </div>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  danger,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className={cn(
-        "text-muted-foreground hover:bg-accent focus-visible:ring-ring/60 grid size-7 place-items-center rounded-md outline-none focus-visible:ring-2 [&>svg]:size-3.5",
-        danger ? "hover:text-destructive" : "hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }

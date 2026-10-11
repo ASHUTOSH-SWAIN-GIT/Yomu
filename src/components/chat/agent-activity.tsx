@@ -29,7 +29,7 @@ export function AgentActivity({
       : "Thinking…";
 
   return (
-    <div className="text-muted-foreground py-1 text-[0.8125rem]">
+    <div className="text-muted-foreground text-ui py-1">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

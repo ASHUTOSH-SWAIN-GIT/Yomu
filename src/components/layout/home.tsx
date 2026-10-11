@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { CornerDownLeft, Link as LinkIcon, Loader2 } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { LibraryChat } from "@/components/chat/library-chat";
 import { SettingsPage } from "@/components/settings/settings-page";
 import { LibraryList } from "@/components/layout/home-library";
 import { Fetching } from "@/components/layout/fetching";
 import { Welcome } from "@/components/layout/home-welcome";
+import { ReadingCard } from "@/components/layout/reading-card";
+import { inProgress } from "@/lib/reading";
 import { PapersPage } from "@/components/layout/papers-page";
 import { isPdfUrl } from "@/lib/pdf/identity";
 import { useAgentStore } from "@/stores/agent-store";
@@ -16,8 +19,9 @@ import { useReaderStore } from "@/stores/reader-store";
 import { useSpacesStore } from "@/stores/spaces-store";
 
 /** Home: the box where you paste a link (with a loader while the page is
- * fetched) and the list of every saved blog. The Archive page reuses it.
- * Collections live in the sidebar, with their blogs under them. */
+ * fetched), what you are partway through, and the list of every saved
+ * article. The Inbox and Archive pages reuse it. Collections live in the
+ * sidebar, with their articles under them. */
 export function Home() {
   const state = useReaderStore((s) => s.state);
   const openUrl = useReaderStore((s) => s.openUrl);
@@ -50,11 +54,16 @@ export function Home() {
     if (url && !loading) void openUrl(url);
   }
 
+  // A new reader is told what Yomu is; after that, Home just says hello.
+  const fresh = articles.length === 0;
   const title = showInbox
     ? "Inbox"
     : showArchive
       ? "Archive"
-      : "Read anything. Ask about any line.";
+      : fresh
+        ? "Read anything, with your agent beside you."
+        : greeting();
+  const continuing = isHome ? list.filter(inProgress).slice(0, 3) : [];
 
   if (settingsPage) return <SettingsPage />;
   if (papersPage) return <PapersPage />;
@@ -63,18 +72,25 @@ export function Home() {
   return (
     <div className="mx-auto w-full max-w-[62rem] px-10 pt-14 pb-32">
       <header>
-        <p className="text-muted-foreground text-[0.8125rem]">{greeting()}</p>
-        <h1 className="font-display mt-1.5 text-[2.25rem] leading-[1.12] font-semibold tracking-[-0.025em] text-balance">
+        {isHome && fresh && (
+          <p className="text-muted-foreground text-ui mb-1.5">{greeting()}</p>
+        )}
+        <h1
+          className={
+            "font-display leading-[1.12] font-semibold tracking-[-0.025em] text-balance " +
+            (isHome && !fresh ? "text-headline" : "text-display")
+          }
+        >
           {title}
         </h1>
         {showInbox && (
-          <p className="text-muted-foreground mt-2 text-[0.8125rem]">
+          <p className="text-muted-foreground text-ui mt-2">
             Pages you bookmarked into a folder named Yomu. Add one to a
             collection and it leaves the Inbox.
           </p>
         )}
         {showArchive && list.length > 0 && (
-          <p className="text-muted-foreground mt-2 text-[0.8125rem]">
+          <p className="text-muted-foreground text-ui mt-2">
             {list.length} archived
           </p>
         )}
@@ -97,13 +113,13 @@ export function Home() {
             disabled={loading}
             placeholder="Paste a link to read it here"
             aria-label="Article URL"
-            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.9375rem] outline-none"
+            className="placeholder:text-muted-foreground text-lead min-w-0 flex-1 bg-transparent outline-none"
           />
           <Button
             type="submit"
             size="sm"
             disabled={loading || !input.trim()}
-            className="h-10 gap-2 rounded-lg px-4 text-[0.8125rem]"
+            className="text-ui h-10 gap-2 rounded-lg px-4"
           >
             {loading ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -117,7 +133,7 @@ export function Home() {
         </form>
       )}
       {isHome && (agentStatus === "setup" || agentStatus === "off") && (
-        <p className="text-muted-foreground mt-3 text-[0.8125rem]">
+        <p className="text-muted-foreground text-ui mt-3">
           {agentStatus === "off"
             ? "Turn on an AI agent to ask about what you read."
             : "Connect an AI agent to ask about what you read."}{" "}
@@ -134,23 +150,39 @@ export function Home() {
         <Fetching url={state.url} detail={state.detail} />
       )}
       {state.status === "error" && (
-        <p
-          role="alert"
-          className="bg-destructive/8 text-destructive mt-3 rounded-lg px-3.5 py-2.5 text-[0.8125rem] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--destructive)_30%,transparent)]"
+        <Alert
+          className="mt-3 max-w-[38rem]"
+          action={
+            // A failed PDF says so on the Papers page, with its own retry.
+            /^https?:/i.test(state.url)
+              ? { label: "Try again", onClick: () => void openUrl(state.url) }
+              : undefined
+          }
         >
           {state.message}
-        </p>
+        </Alert>
       )}
 
-      {articles.length === 0 && isHome ? (
+      {continuing.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-lead font-semibold">Continue reading</h2>
+          <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
+            {continuing.map((a) => (
+              <ReadingCard key={a.id} article={a} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {fresh && isHome ? (
         !loading && <Welcome />
       ) : list.length === 0 ? (
-        <p className="text-muted-foreground mt-14 text-center text-[0.8125rem]">
+        <p className="text-muted-foreground text-ui mt-14 text-center">
           {showInbox
             ? "Nothing waiting."
             : showArchive
               ? "Nothing archived."
-              : "Nothing here yet."}
+              : "Nothing here yet. Paste a link above to save your first article."}
         </p>
       ) : (
         <LibraryList list={list} archive={showArchive} slots={slots} />

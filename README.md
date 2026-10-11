@@ -64,7 +64,7 @@ cargo test real_codex -- --ignored --nocapture  # optional: real Codex, uses pla
 | ← →              | Previous and next page in a paper |
 | Cmd/Ctrl+/       | All shortcuts                     |
 
-The **Aa** menu sets typeface, size, width and theme.
+**Settings** sets the theme and typeface; `Cmd/Ctrl +` and `-` zoom the whole app. The **…** menu while reading opens the original, fetches it again, exports it as Markdown or archives it.
 
 ## Releasing
 

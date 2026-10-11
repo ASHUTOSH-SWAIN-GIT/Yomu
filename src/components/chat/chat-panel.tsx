@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2, Pencil, X } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
+import { Thinking } from "@/components/chat/thinking";
+import { IconButton } from "@/components/ui/icon-button";
 import { CopyButton } from "@/components/chat/copy-button";
 import { AgentActivity } from "@/components/chat/agent-activity";
 import { AgentPill } from "@/components/chat/agent-pill";
@@ -10,7 +12,8 @@ import { RegenerateButton } from "@/components/chat/regenerate-button";
 import { ContextNote } from "@/components/chat/context-note";
 import { ErrorNote } from "@/components/chat/error-note";
 import { SourceChips } from "@/components/chat/source-link";
-import { ARTICLE_COMMANDS } from "@/lib/slash-commands";
+import { ARTICLE_COMMANDS, PAPER_COMMANDS } from "@/lib/slash-commands";
+import { isPdfUrl } from "@/lib/pdf/identity";
 import { hasProgress } from "@/lib/agent-progress";
 import { Markdown } from "@/components/chat/markdown";
 import { chatArtFor } from "@/lib/chat-art";
@@ -20,6 +23,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
+import { toast } from "@/stores/toast-store";
 
 /** The chat beside the article: ask anything about what you are reading. The
  * agent is given the article's text, and the conversation is kept per
@@ -93,47 +97,33 @@ export function ChatPanel() {
     setText("");
   }
 
-  const iconButton =
-    "text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 grid size-8 shrink-0 place-items-center rounded-lg outline-none focus-visible:ring-2";
-
   return (
     <aside
       aria-label="Chat about this article"
       className="bg-background border-border flex h-full w-full min-w-[20rem] flex-col border-l"
     >
-      <header className="flex h-16 shrink-0 items-center gap-1 pr-2 pl-5">
-        <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <h2 className="flex items-baseline gap-3 text-[1.25rem] font-bold tracking-[-0.01em]">
-            Chat
-            <AgentPill working={streaming} />
-          </h2>
-          <span className="text-muted-foreground truncate text-[0.8125rem]">
-            {article.title}
-          </span>
+      <header className="flex h-12 shrink-0 items-center gap-1 pr-2 pl-5">
+        <div className="flex min-w-0 flex-1 items-baseline gap-3">
+          <h2 className="text-lead font-semibold">Chat</h2>
+          <AgentPill working={streaming} />
+          {/* Beside the article its title is in view already. */}
+          {full && (
+            <span className="text-muted-foreground text-ui min-w-0 truncate">
+              {article.title}
+            </span>
+          )}
         </div>
-        <button
-          type="button"
+        <IconButton
+          label={full ? "Exit full screen (Esc)" : "Open the chat full screen"}
           onClick={() =>
             full ? setFull(false) : void openChatFullInNewTab(article.id)
           }
-          aria-label={full ? "Exit full screen" : "Full screen"}
-          title={full ? "Exit full screen (Esc)" : "Full screen"}
-          className={iconButton}
         >
-          {full ? (
-            <Minimize2 className="size-4" aria-hidden />
-          ) : (
-            <Maximize2 className="size-4" aria-hidden />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setChatOpen(false)}
-          aria-label="Close chat"
-          className={iconButton}
-        >
-          <X className="size-4" aria-hidden />
-        </button>
+          {full ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
+        </IconButton>
+        <IconButton label="Close the chat" onClick={() => setChatOpen(false)}>
+          <X aria-hidden />
+        </IconButton>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4">
@@ -146,15 +136,28 @@ export function ChatPanel() {
                 alt=""
                 aria-hidden
                 draggable={false}
-                className="size-24 rounded-full shadow-[0_12px_40px_-8px_rgb(124_92_255/0.5)]"
+                className="size-20 rounded-full shadow-[var(--shadow-card)]"
               />
               <div>
-                <p className="text-[1.375rem] leading-tight font-bold tracking-[-0.02em]">
+                <p className="text-title leading-tight font-semibold tracking-[-0.015em]">
                   Ask about this article
                 </p>
-                <p className="text-muted-foreground mt-1.5 text-[0.875rem]">
-                  I have read it, so ask me anything.
+                <p className="text-muted-foreground text-prose mt-1.5">
+                  The agent has the whole text, so ask it anything.
                 </p>
+              </div>
+              {/* A first question to start from. */}
+              <div className="mt-2 flex flex-wrap justify-center gap-2">
+                {ARTICLE_COMMANDS.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => send(c.text)}
+                    className="bg-muted text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 text-ui h-8 rounded-full px-3.5 outline-none focus-visible:ring-2"
+                  >
+                    {c.hint}
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
@@ -167,7 +170,7 @@ export function ChatPanel() {
                     className="group/question flex flex-col items-end gap-1.5"
                   >
                     {m.quote && (
-                      <p className="text-muted-foreground border-border line-clamp-2 max-w-[85%] border-l-2 pl-2 text-[0.75rem] italic">
+                      <p className="text-muted-foreground border-border text-meta line-clamp-2 max-w-[85%] border-l-2 pl-2 italic">
                         {m.quote}
                       </p>
                     )}
@@ -189,9 +192,9 @@ export function ChatPanel() {
                           }}
                           rows={2}
                           aria-label="Edit your question"
-                          className="bg-muted field-sizing-content max-h-52 w-full resize-none rounded-2xl px-4 py-2.5 text-[0.875rem] leading-6 outline-none"
+                          className="bg-muted text-prose field-sizing-content max-h-52 w-full resize-none rounded-2xl px-4 py-2.5 leading-6 outline-none"
                         />
-                        <span className="flex justify-end gap-2 text-[0.75rem]">
+                        <span className="text-meta flex justify-end gap-2">
                           <button
                             type="button"
                             onClick={() => setEditing(null)}
@@ -210,31 +213,30 @@ export function ChatPanel() {
                       </form>
                     ) : (
                       <>
-                        <p className="bg-muted max-w-[85%] rounded-3xl px-4 py-2.5 text-[0.875rem] leading-6 whitespace-pre-wrap">
+                        <p className="bg-muted text-prose max-w-[85%] rounded-3xl px-4 py-2.5 leading-6 whitespace-pre-wrap">
                           {m.text}
                         </p>
                         {i === lastQuestion &&
                           m.scope === "article" &&
                           !streaming && (
-                            <button
-                              type="button"
-                              aria-label="Edit this question"
-                              title="Edit and ask again"
+                            <IconButton
+                              label="Edit and ask again"
+                              size="md"
                               onClick={() => {
                                 setEditText(m.text);
                                 setEditing(i);
                               }}
-                              className="text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 grid size-7 place-items-center rounded-md opacity-0 outline-none group-hover/question:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
+                              className="opacity-0 group-hover/question:opacity-100 focus-visible:opacity-100"
                             >
-                              <Pencil className="size-3.5" aria-hidden />
-                            </button>
+                              <Pencil aria-hidden />
+                            </IconButton>
                           )}
                       </>
                     )}
                   </li>
                 ) : (
                   // The agent's: plain text on the page, with a copy button.
-                  <li key={i} className="group text-[0.875rem] leading-7">
+                  <li key={i} className="group text-prose leading-7">
                     {m.trace && <AgentActivity progress={m.trace} finished />}
                     <Markdown>{m.text}</Markdown>
                     {!(streaming && i === messages.length - 1) && (
@@ -247,7 +249,14 @@ export function ChatPanel() {
                               onClick={() => {
                                 const passage = passageOf(i);
                                 if (passage)
-                                  void saveAnswerAsComment(passage, m.text);
+                                  void saveAnswerAsComment(
+                                    passage,
+                                    m.text,
+                                  ).then(() =>
+                                    toast(
+                                      "Saved as a comment beside the words",
+                                    ),
+                                  );
                               }}
                             />
                           )}
@@ -267,29 +276,7 @@ export function ChatPanel() {
                   <AgentActivity progress={progress} />
                 </li>
               )}
-              {waiting && (
-                <li
-                  aria-label="Thinking"
-                  className="text-muted-foreground flex items-center gap-3 py-1"
-                >
-                  <img
-                    src={chatArtFor(article.id)}
-                    alt=""
-                    aria-hidden
-                    draggable={false}
-                    className="size-8 shrink-0 animate-[spin_6s_linear_infinite] rounded-full shadow-[var(--shadow-card)]"
-                  />
-                  <span className="flex gap-1">
-                    {[0, 150, 300].map((delay) => (
-                      <i
-                        key={delay}
-                        className="bg-muted-foreground size-1.5 animate-bounce rounded-full"
-                        style={{ animationDelay: `${delay}ms` }}
-                      />
-                    ))}
-                  </span>
-                </li>
-              )}
+              {waiting && <Thinking />}
             </ul>
           )}
           {error && <ErrorNote error={error} onRetry={retry} />}
@@ -308,9 +295,15 @@ export function ChatPanel() {
           onSetup={() => setSetupOpen(true)}
           streaming={streaming}
           ready={ready}
-          commands={ARTICLE_COMMANDS}
+          commands={
+            isPdfUrl(article.canonicalUrl)
+              ? [...ARTICLE_COMMANDS, ...PAPER_COMMANDS]
+              : ARTICLE_COMMANDS
+          }
           placeholder={
-            ready ? "Ask about this article" : "Set up Explain to chat"
+            ready
+              ? "Ask about this article, or type / for shortcuts"
+              : "Set up an agent to chat"
           }
         />
         <ContextNote usage={contextUsage} />

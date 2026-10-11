@@ -9,7 +9,7 @@ export function TableBlock({
 }) {
   return (
     <div className="bg-card my-[1.1em] overflow-x-auto rounded-lg font-sans shadow-[var(--shadow-card)]">
-      <table className="w-full border-collapse text-left text-[0.8125rem] leading-snug">
+      <table className="text-ui w-full border-collapse text-left leading-snug">
         {header.length > 0 && (
           <thead className="bg-muted">
             <tr>
@@ -17,7 +17,7 @@ export function TableBlock({
                 <th
                   key={i}
                   scope="col"
-                  className="border-border text-muted-foreground border-b px-3.5 py-2.5 text-[0.75rem] font-semibold"
+                  className="border-border text-muted-foreground text-meta border-b px-3.5 py-2.5 font-semibold"
                 >
                   {cell}
                 </th>

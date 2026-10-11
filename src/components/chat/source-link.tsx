@@ -53,7 +53,7 @@ export function SourceChips({ text }: { text: string }) {
   );
   if (cited.length === 0) return null;
   return (
-    <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-1.5 text-[0.75rem]">
+    <div className="text-muted-foreground text-meta mt-3 flex flex-wrap items-center gap-1.5">
       <span>Sources</span>
       {cited.map((a) => (
         <button

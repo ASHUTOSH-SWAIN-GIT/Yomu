@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ARTICLE_COMMANDS,
   LIBRARY_COMMANDS,
+  PAPER_COMMANDS,
   matchCommands,
 } from "@/lib/slash-commands";
 import { articleInstruction } from "@/lib/quick-actions";
@@ -30,7 +31,11 @@ describe("matchCommands", () => {
 
 describe("the commands themselves", () => {
   it("have unique names", () => {
-    for (const list of [ARTICLE_COMMANDS, LIBRARY_COMMANDS]) {
+    for (const list of [
+      ARTICLE_COMMANDS,
+      LIBRARY_COMMANDS,
+      [...ARTICLE_COMMANDS, ...PAPER_COMMANDS],
+    ]) {
       const names = list.map((c) => c.name);
       expect(new Set(names).size).toBe(names.length);
       expect(names.every((n) => /^[\w-]+$/.test(n))).toBe(true);

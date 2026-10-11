@@ -17,12 +17,14 @@ import {
   type ExplainPrefs,
 } from "@/lib/explain-prefs";
 import { readStorage as read, writeStorage as write } from "@/lib/storage";
+import { applyZoom, savedZoom } from "@/lib/zoom";
 
 export type { Theme } from "@/lib/appearance";
 
 const SIDEBAR_KEY = "yomu-sidebar";
 const CHAT_MODEL_KEY = "yomu-chat-model";
 const CHAT_WIDTH_KEY = "yomu-chat-width";
+const WELCOMED_KEY = "yomu-welcomed";
 /** Width of the chat panel beside an article, before the user drags it. */
 export const CHAT_WIDTH_DEFAULT = 416;
 export const CHAT_WIDTH_MIN = 320;
@@ -34,6 +36,9 @@ interface UiState {
   /** Typeface, size and column width of the article. */
   reader: ReaderPrefs;
   setReader: (patch: Partial<ReaderPrefs>) => void;
+  /** How large the whole app is drawn (Cmd/Ctrl +/-, or Settings). */
+  zoom: number;
+  setZoom: (level: number) => void;
   /** Hides everything except the article (Cmd/Ctrl+.). */
   focusMode: boolean;
   setFocusMode: (on: boolean) => void;
@@ -64,6 +69,10 @@ interface UiState {
   /** The keyboard shortcuts sheet (Cmd/Ctrl+/). */
   shortcutsOpen: boolean;
   setShortcutsOpen: (open: boolean) => void;
+  /** The welcome tour: open on the very first launch, and from Cmd+K. */
+  welcomeOpen: boolean;
+  /** Closing it remembers that the tour was seen. */
+  setWelcomeOpen: (open: boolean) => void;
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
   /** Skill level and code-example preference, applied to every explain
@@ -89,6 +98,11 @@ export const useUiStore = create<UiState>((set, get) => ({
     const reader = { ...DEFAULT_READER, ...get().reader, ...patch };
     write(READER_KEY, JSON.stringify(reader));
     set({ reader });
+  },
+  zoom: savedZoom(),
+  setZoom: (zoom) => {
+    void applyZoom(zoom);
+    set({ zoom });
   },
   focusMode: false,
   setFocusMode: (focusMode) => set({ focusMode }),
@@ -129,6 +143,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAllChatsOpen: (allChatsOpen) => set({ allChatsOpen }),
   shortcutsOpen: false,
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  welcomeOpen: read(WELCOMED_KEY) !== "1",
+  setWelcomeOpen: (welcomeOpen) => {
+    if (!welcomeOpen) write(WELCOMED_KEY, "1");
+    set({ welcomeOpen });
+  },
   setupOpen: false,
   setSetupOpen: (setupOpen) => set({ setupOpen }),
   explainPrefs: parseExplainPrefs(read(EXPLAIN_PREFS_KEY)),

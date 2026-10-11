@@ -1,3 +1,4 @@
+import { graphicsOf, type DrawOps } from "@/lib/pdf/graphics";
 import type { PdfInfo, PdfPage, PdfText } from "@/lib/pdf/types";
 
 /** "D:20170612143000+02'00'" to ms; null when it is not a date. */
@@ -27,11 +28,15 @@ interface PdfjsPage {
       fontName?: string;
     }[];
   }>;
-  getOperatorList(): Promise<unknown>;
+  getOperatorList(): Promise<{ fnArray: number[]; argsArray: unknown[] }>;
+  getAnnotations(): Promise<
+    { subtype?: string; url?: string; rect?: number[] }[]
+  >;
   commonObjs: { has(id: string): boolean; get(id: string): { name?: string } };
   cleanup(): void;
 }
 export interface PdfjsLib {
+  OPS: DrawOps;
   getDocument(src: { data: Uint8Array } & Record<string, unknown>): {
     promise: Promise<PdfjsDocument>;
     destroy(): Promise<void>;
@@ -103,8 +108,11 @@ export async function readPdf(
       const page = await doc.getPage(n);
       const view = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
-      // Loads the page's fonts, so their real names can be read.
-      await page.getOperatorList().catch(() => null);
+      // Loads the page's fonts, so their real names can be read, and says
+      // where pictures and drawings are.
+      const ops = await page.getOperatorList().catch(() => null);
+      const graphics = ops ? graphicsOf(ops, pdfjs.OPS, view.height) : [];
+      const links = await webLinks(page, view.height);
 
       const names = new Map<string, string>();
       const nameOf = (id: string) => {
@@ -125,16 +133,25 @@ export async function readPdf(
       for (const item of content.items) {
         if (typeof item.str !== "string" || !item.transform) continue;
         const [a, b, , , e, f] = item.transform;
-        items.push({
+        const text: PdfText = {
           str: item.str,
           x: e,
           y: view.height - f,
           width: item.width ?? 0,
           size: Math.hypot(a, b) || 10,
           font: item.fontName ? nameOf(item.fontName) : "",
-        });
+        };
+        const href = linkAt(links, text);
+        if (href) text.href = href;
+        items.push(text);
       }
-      pages.push({ number: n, width: view.width, height: view.height, items });
+      pages.push({
+        number: n,
+        width: view.width,
+        height: view.height,
+        items,
+        graphics,
+      });
       page.cleanup();
       onPage(n, doc.numPages);
     }
@@ -142,4 +159,48 @@ export async function readPdf(
   } finally {
     void task.destroy();
   }
+}
+
+interface WebLink {
+  url: string;
+  x: number;
+  x2: number;
+  /** Top and bottom, measured from the top of the page. */
+  y: number;
+  y2: number;
+}
+
+/** The page's links to web addresses (links within the PDF, such as a
+ * citation jumping to its reference, are left out). */
+async function webLinks(page: PdfjsPage, height: number): Promise<WebLink[]> {
+  const annotations = await page.getAnnotations().catch(() => []);
+  return annotations.flatMap((a) =>
+    a.subtype === "Link" &&
+    typeof a.url === "string" &&
+    /^https?:\/\//i.test(a.url) &&
+    a.rect?.length === 4
+      ? [
+          {
+            url: a.url,
+            x: Math.min(a.rect[0], a.rect[2]),
+            x2: Math.max(a.rect[0], a.rect[2]),
+            y: height - Math.max(a.rect[1], a.rect[3]),
+            y2: height - Math.min(a.rect[1], a.rect[3]),
+          },
+        ]
+      : [],
+  );
+}
+
+/** The link a piece of text sits under: its baseline inside the link's
+ * box, and most of its width too. */
+export function linkAt(links: WebLink[], t: PdfText): string | undefined {
+  if (t.str.trim() === "") return undefined;
+  const width = Math.max(t.width, 1);
+  return links.find((l) => {
+    const overlap = Math.min(l.x2, t.x + width) - Math.max(l.x, t.x);
+    return (
+      t.y >= l.y - 1 && t.y <= l.y2 + t.size * 0.3 && overlap >= width * 0.5
+    );
+  })?.url;
 }

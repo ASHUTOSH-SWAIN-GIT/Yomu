@@ -18,6 +18,26 @@ export const ARTICLE_COMMANDS: SlashCommand[] = ARTICLE_ACTIONS.map((a) => ({
   text: a.message,
 }));
 
+/** For a paper, after the article ones: how it was done, what it leaves
+ * out, and what its figures and tables show. */
+export const PAPER_COMMANDS: SlashCommand[] = [
+  {
+    name: "methods",
+    hint: "How the work was done",
+    text: "Explain the paper's methods: what the authors built or did, and how, step by step.",
+  },
+  {
+    name: "limitations",
+    hint: "What the paper leaves out",
+    text: "What are this paper's limitations, both the ones it states and the ones it does not?",
+  },
+  {
+    name: "figures",
+    hint: "What the figures and tables show",
+    text: "Walk me through the paper's figures and tables: what each one shows and why it matters to the argument.",
+  },
+];
+
 /** For the chat about everything you have saved. */
 export const LIBRARY_COMMANDS: SlashCommand[] = [
   {
@@ -27,12 +47,12 @@ export const LIBRARY_COMMANDS: SlashCommand[] = [
   },
   {
     name: "topics",
-    hint: "What my saved blogs cover",
+    hint: "What my saved articles cover",
     text: "What topics do my saved blogs cover, and which have I read most about?",
   },
   {
     name: "disagree",
-    hint: "Where my blogs disagree",
+    hint: "Where my articles disagree",
     text: "Which of my articles disagree with each other?",
   },
 ];

@@ -35,7 +35,7 @@ export function AgentPill({ working }: { working: boolean }) {
             ? "Set up the agent"
             : `${name}: ${state}`
       }
-      className="text-muted-foreground enabled:hover:text-foreground focus-visible:ring-ring/60 flex shrink-0 items-center gap-1.5 rounded-full text-[0.6875rem] font-normal outline-none focus-visible:ring-2"
+      className="text-muted-foreground enabled:hover:text-foreground focus-visible:ring-ring/60 text-caption flex shrink-0 items-center gap-1.5 rounded-full font-normal outline-none focus-visible:ring-2"
     >
       <i
         aria-hidden

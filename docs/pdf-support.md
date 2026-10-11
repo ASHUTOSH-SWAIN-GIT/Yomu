@@ -1,6 +1,6 @@
 # PDF support: reading research papers in Yomu
 
-Written 2026-10-11. **Status:** phase 1 built (import, parsing, reader, entry points). Phases 2 and 3 are planned. Effort: **S** = an afternoon,
+Written 2026-10-11. **Status:** phases 1, 2 and 3 built (2026-10-12; see sections 6 and 6b). Effort: **S** = an afternoon,
 **M** = a few days, **L** = a week or more.
 
 ## 1. Goal and decisions
@@ -75,6 +75,19 @@ Pure functions in `src/lib/pdf/`, each tested on synthetic input.
 - **Not yet right:** display equations, tables and figure text come out as loose text or as headings (phase 2 turns them into images). Authors are only taken when they are plain lines of names.
 - **Differences from the plan:** no bundled font or cmap files yet (not needed for text); page markers wait for phase 2; "Open original" opens Yomu's saved copy in the system PDF viewer.
 - **To check in the real app:** the pdf.js worker loads under the CSP (the `.mjs` file is served as JavaScript, so it should), and the file dialog, drag and drop and `⌘O`. Image decoders need `'wasm-unsafe-eval'` in the CSP; add it with phase 2 when pages are drawn.
+
+## 6b. Built in phases 2 and 3
+
+- **Figures, tables, equations (`regions.ts`, `graphics.ts`, `render.ts`):** each page's operator list gives boxes for images and drawn paths. A "Figure N:" / "Table N." caption claims the drawings and loose lines on one side of it (figures above; tables on whichever side has the table), up to the nearest prose or section heading. Captionless pictures larger than 60×40 pt count too, and so do centred lines in math fonts (or with some math and a relation sign: derivations). Their lines leave the text and an `image` block stands in: `src` is `pdf-figure://<sha>/<id>.png`, `alt` the caption (an equation's text for search and the agent, not shown), `width` its size in em of the body text. Pages are drawn at 3× and cropped after the text is read; `save_pdf_figure` writes `pdf-<hash>.png` into the image cache, recorded in `article_images`. Figures are never evicted and survive "Clear images"; deleting the paper prunes them.
+- **Sub- and superscripts** join their line (they used to come out as small stray lines, read as footnotes). A footnote now also needs no body text below it in its column, and nothing after "References" is one.
+- **Ask about a figure:** `load_for_agent` reads a `pdf-figure://` picture from disk.
+- **Citations:** in a paper, "[12]", "[1, 3]" and "[2–4]" show the reference on hover (`citations.ts`, `CitationLayer`, CSS highlight, text unchanged).
+- **Links:** web link annotations become links on the words under them.
+- **Long papers:** over 30k characters, the whole-paper prompt sends the outline, the opening, the abstract, introduction and conclusion instead of the first pages (`paperDigest`).
+- **Commands:** `/methods`, `/limitations`, `/figures` in a paper's chat.
+- **Page markers:** not needed; the paged reader already shows "Page N of M".
+- **Checked on** the Spanner paper (14 pages): all 6 figures and 6 tables found with their captions, 4 derivations as equations, 42 references. Old papers need "Read the PDF again" (… menu) to get figures.
+- **CSP:** `'wasm-unsafe-eval'` added for pdf.js image decoders.
 
 ## 7. Phases
 

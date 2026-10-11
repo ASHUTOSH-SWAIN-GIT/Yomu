@@ -1,4 +1,5 @@
 import type { Line, Run } from "@/lib/pdf/lines";
+import { CAPTION, type Region } from "@/lib/pdf/regions";
 import type { Block, ListItem, Span } from "@/types/article";
 
 export interface PlacedBlock {
@@ -26,7 +27,6 @@ export function bodySize(lines: Line[]): number {
 }
 
 const SENTENCE_END = /[.?!:;]["”')\]]?$/;
-const CAPTION = /^(figure|fig\.|table|algorithm)\s*[\dA-Z]+[.:]/i;
 const NUMBERED = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?\s+\S/;
 const APPENDIX = /^([A-Z])(\.\d{1,2})*\.?\s+[A-Z]/;
 const SECTION_NAME =
@@ -68,13 +68,15 @@ function spansOf(runs: Run[]): Span[] {
       last &&
       !!last.bold === r.bold &&
       !!last.italic === r.italic &&
-      !!last.code === r.mono;
+      !!last.code === r.mono &&
+      last.href === r.href;
     if (same) last.text += r.text;
     else {
       const span: Span = { text: r.text };
       if (r.bold) span.bold = true;
       if (r.italic) span.italic = true;
       if (r.mono) span.code = true;
+      if (r.href) span.href = r.href;
       spans.push(span);
     }
   }
@@ -99,8 +101,13 @@ function appendRuns(into: Run[], runs: Run[]) {
   for (const r of runs) into.push({ ...r });
 }
 
-/** Lines, in reading order, to the blocks of an article. */
-export function toBlocks(lines: Line[], body: number): PlacedBlock[] {
+/** Lines, in reading order, to the blocks of an article. A stand-in line
+ * for a figure (see regions.ts) becomes the block `regionBlock` makes. */
+export function toBlocks(
+  lines: Line[],
+  body: number,
+  regionBlock?: (region: Region) => Block,
+): PlacedBlock[] {
   const out: PlacedBlock[] = [];
   let para: { runs: Run[]; page: number } | null = null;
   let list: { items: ListItem[]; page: number } | null = null;
@@ -169,6 +176,14 @@ export function toBlocks(lines: Line[], body: number): PlacedBlock[] {
   };
 
   for (const line of lines) {
+    if (line.region) {
+      endAll();
+      if (regionBlock) {
+        out.push({ block: regionBlock(line.region), page: line.page });
+      }
+      prev = null;
+      continue;
+    }
     const level = headingLevel(line, body);
 
     if (level !== null) {
@@ -244,6 +259,7 @@ export function toBlocks(lines: Line[], body: number): PlacedBlock[] {
         bold: !!s.bold,
         italic: !!s.italic,
         mono: !!s.code,
+        ...(s.href ? { href: s.href } : {}),
       }));
       appendRuns(runs, line.runs);
       item.spans = spansOf(runs);
@@ -320,7 +336,9 @@ export function notesToBlocks(notes: Line[]): PlacedBlock[] {
 }
 
 /** The small print at the foot of a page: from the first small line low
- * on the page to the end of it (captions are left where they are). */
+ * on the page to the end of it (captions are left where they are). Small
+ * lines with body text still under them in their column are not notes
+ * (a display formula, a code sample), and nothing in the references is. */
 export function splitFootnotes(
   lines: Line[],
   body: number,
@@ -328,16 +346,28 @@ export function splitFootnotes(
   const notes: Line[] = [];
   const rest: Line[] = [];
   const startOf = new Map<number, number>();
+  const referencesAt = lines.findIndex((l) => REFERENCES.test(l.text.trim()));
+  const isSmall = (l: Line) => !l.region && l.size <= body * 0.93;
+  const sameColumn = (a: Line, b: Line) =>
+    a.col === 0 || b.col === 0 || a.col === b.col;
   lines.forEach((l, i) => {
-    const small = l.size <= body * 0.93 && l.rel > 0.65;
-    if (small && !CAPTION.test(l.text) && !startOf.has(l.page)) {
-      startOf.set(l.page, i);
-    }
+    if (referencesAt >= 0 && i >= referencesAt) return;
+    if (!isSmall(l) || l.rel <= 0.65 || CAPTION.test(l.text)) return;
+    if (startOf.has(l.page)) return;
+    const textBelow = lines.some(
+      (m) =>
+        m.page === l.page &&
+        !m.region &&
+        !isSmall(m) &&
+        m.y > l.y + 1 &&
+        sameColumn(l, m),
+    );
+    if (!textBelow) startOf.set(l.page, i);
   });
   lines.forEach((l, i) => {
     const from = startOf.get(l.page);
     // Only the very end of the page's lines, small ones, count.
-    const inNotes = from !== undefined && i >= from && l.size <= body * 0.93;
+    const inNotes = from !== undefined && i >= from && isSmall(l);
     if (inNotes) notes.push(l);
     else rest.push(l);
   });

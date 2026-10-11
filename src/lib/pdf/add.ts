@@ -1,5 +1,9 @@
 import { importPdf } from "@/lib/commands";
-import { getArticleByCanonicalUrl, upsertArticle } from "@/lib/db";
+import {
+  getArticleByCanonicalUrl,
+  saveArticleImages,
+  upsertArticle,
+} from "@/lib/db";
 import { saveToDefaultCollection } from "@/lib/default-collection";
 import { logError } from "@/lib/log";
 import { fileUrl, pdfCanonicalUrl } from "@/lib/pdf/identity";
@@ -25,6 +29,7 @@ export async function addPaper(
     onProgress,
   );
   const saved = await upsertArticle(scraped);
+  await saveArticleImages(saved.id, scraped.figures);
   // A failure to file it must not lose the paper that was just saved.
   await saveToDefaultCollection(saved.id).catch((err) =>
     logError("saving to the default collection failed", err),

@@ -82,6 +82,29 @@ describe("comments", () => {
     expect(h.rows).toEqual([]);
   });
 
+  it("puts a deleted comment back on the same words (Undo)", async () => {
+    store().startDraft(draft);
+    await store().saveDraft("Keep me");
+    const [comment] = store().items;
+    await store().remove(comment.id);
+    await store().restore(comment);
+    expect(store().items).toMatchObject([
+      { ...draft, articleId: "a1", note: "Keep me" },
+    ]);
+    expect(h.rows).toHaveLength(1);
+  });
+
+  it("restoring after moving to another article does not show it there", async () => {
+    store().startDraft(draft);
+    await store().saveDraft("Old page");
+    const [comment] = store().items;
+    await store().remove(comment.id);
+    await store().load("a2");
+    await store().restore(comment);
+    expect(store().items).toEqual([]);
+    expect(h.rows).toMatchObject([{ articleId: "a1", note: "Old page" }]);
+  });
+
   it("tracks the comment being pointed at, and forgets it when it is deleted", async () => {
     store().startDraft(draft);
     await store().saveDraft("x");

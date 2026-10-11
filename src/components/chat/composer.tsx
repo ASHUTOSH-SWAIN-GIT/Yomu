@@ -69,7 +69,7 @@ export function Composer({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(c)}
                 className={cn(
-                  "flex w-full items-baseline gap-3 rounded-xl px-3 py-2 text-left text-[0.8125rem] outline-none",
+                  "text-ui flex w-full items-baseline gap-3 rounded-xl px-3 py-2 text-left outline-none",
                   i === at ? "bg-accent" : "hover:bg-accent/70",
                 )}
               >
@@ -119,7 +119,7 @@ export function Composer({
           placeholder={placeholder}
           aria-label="Message"
           className={cn(
-            "placeholder:text-muted-foreground field-sizing-content max-h-52 min-h-8 w-full resize-none bg-transparent text-[0.9375rem] leading-6 outline-none disabled:opacity-60",
+            "placeholder:text-muted-foreground text-lead field-sizing-content max-h-52 min-h-8 w-full resize-none bg-transparent leading-6 outline-none disabled:opacity-60",
             tall && "min-h-16",
           )}
         />
@@ -150,7 +150,7 @@ export function Composer({
             <button
               type="button"
               onClick={onSetup}
-              className="bg-primary text-primary-foreground focus-visible:ring-ring/60 mb-0.5 h-8 shrink-0 rounded-full px-3.5 text-[0.75rem] font-medium outline-none focus-visible:ring-2"
+              className="bg-primary text-primary-foreground focus-visible:ring-ring/60 text-meta mb-0.5 h-8 shrink-0 rounded-full px-3.5 font-medium outline-none focus-visible:ring-2"
             >
               Set up
             </button>

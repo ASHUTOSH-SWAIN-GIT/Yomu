@@ -8,6 +8,18 @@ export interface PdfText {
   size: number;
   /** The font's own name (`ABCDEF+CMBX10`), when known. */
   font: string;
+  /** A web link the text sits under (a PDF link annotation). */
+  href?: string;
+}
+
+/** A rectangle on a page, measured from the top like the text. `image` is
+ * true for a picture, false for drawn lines and shapes. */
+export interface Box {
+  x: number;
+  y: number;
+  x2: number;
+  y2: number;
+  image: boolean;
 }
 
 export interface PdfPage {
@@ -15,6 +27,8 @@ export interface PdfPage {
   width: number;
   height: number;
   items: PdfText[];
+  /** Where pictures and drawings are (see graphics.ts). */
+  graphics?: Box[];
 }
 
 /** What the PDF says about itself. */

@@ -205,6 +205,52 @@ export function buildPrompt(
 // Long articles are cut to keep the request a sensible size.
 const ARTICLE_MAX_CHARS = 30000;
 
+const KEY_SECTIONS = [
+  /abstract/i,
+  /introduction|overview/i,
+  /conclusions?|discussion|summary/i,
+];
+
+/** A long paper in brief: its outline, then what comes before the first
+ * heading and its abstract, introduction and conclusion, each cut to a
+ * share of `max`. These say what a paper is about far better than its
+ * first pages do. Null when it has none of those sections. */
+export function paperDigest(
+  blocks: Block[],
+  max = ARTICLE_MAX_CHARS,
+): string | null {
+  const all = headings(blocks);
+  const sections = all.map((h, i) => ({
+    title: h.block.text,
+    from: h.index + 1,
+    to: all[i + 1]?.index ?? blocks.length,
+  }));
+  const picked = KEY_SECTIONS.flatMap((pattern) => {
+    const found = sections.find((s) => pattern.test(s.title));
+    return found ? [found] : [];
+  });
+  if (picked.length === 0) return null;
+
+  const share = Math.floor(max / (picked.length + 2));
+  const cut = (text: string) =>
+    text.length > share ? `${text.slice(0, share)} […]` : text;
+  const textOf = (from: number, to: number) =>
+    fullArticleText(blocks.slice(from, to));
+  const outline = all
+    .map(
+      (h) => `${"  ".repeat(Math.max(0, h.block.level - 2))}- ${h.block.text}`,
+    )
+    .join("\n");
+  const opening = textOf(0, all[0]?.index ?? 0);
+  return [
+    `Outline:\n${outline}`,
+    ...(opening ? [cut(opening)] : []),
+    ...picked.map((s) => `## ${s.title}\n\n${cut(textOf(s.from, s.to))}`),
+  ]
+    .join("\n\n")
+    .slice(0, max);
+}
+
 /** Prompt for a question about the whole article (summary, takeaways, quiz
  * or a free-form question): the article text, then the instruction. */
 export function buildArticlePrompt(
@@ -216,6 +262,11 @@ export function buildArticlePrompt(
 ): string {
   const body = fullArticleText(article.blocks);
   const truncated = body.length > ARTICLE_MAX_CHARS;
+  // A long paper goes as its outline and key sections, not its first pages.
+  const digest =
+    truncated && isPdfUrl(article.canonicalUrl)
+      ? paperDigest(article.blocks)
+      : null;
   const where = spot
     ? `The reader is on page ${spot.page} (${spot.index + 1} of ${spot.count}).` +
       // A paper cut short may not include that page: give it here.
@@ -230,10 +281,12 @@ export function buildArticlePrompt(
     "",
     ...aboutArticle(article),
     "",
-    body.slice(0, ARTICLE_MAX_CHARS) +
-      (truncated
-        ? `\n\n[This is the first ${ARTICLE_MAX_CHARS} of ${body.length} characters; the rest is not shown here. Read it with read_article (id above) when the question needs it, rather than guessing.]`
-        : ""),
+    digest
+      ? `${digest}\n\n[This long paper (${body.length} characters) is shown as its outline and key sections. Read any other section with read_article (id above, \`section\` or \`page\`) when the question needs it, rather than guessing.]`
+      : body.slice(0, ARTICLE_MAX_CHARS) +
+        (truncated
+          ? `\n\n[This is the first ${ARTICLE_MAX_CHARS} of ${body.length} characters; the rest is not shown here. Read it with read_article (id above) when the question needs it, rather than guessing.]`
+          : ""),
     "",
     ...(where ? [where, ""] : []),
     [instruction, ...personalizationNotes].join("\n"),

@@ -145,7 +145,9 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       // to go back to it, whatever was running. If Codex cannot start, the
       // diagnosis below says what it is missing.
       started = null;
-      await agentUse(CODEX).catch(() => {});
+      await agentUse(CODEX).catch((err) =>
+        logError("switching back to Codex failed", err),
+      );
       started = "codex";
     } else {
       started = null;

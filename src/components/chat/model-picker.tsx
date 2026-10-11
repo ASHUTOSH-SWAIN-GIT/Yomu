@@ -100,7 +100,7 @@ export function ModelPicker() {
           type="button"
           aria-label="Choose the model"
           title="Choose the model"
-          className="text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 flex h-8 max-w-48 items-center gap-1 rounded-full px-2.5 text-[0.75rem] outline-none focus-visible:ring-2"
+          className="text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/60 text-meta flex h-8 max-w-48 items-center gap-1 rounded-full px-2.5 outline-none focus-visible:ring-2"
         >
           <span className="truncate">{label}</span>
           <ChevronDown className="size-3.5 shrink-0" aria-hidden />
@@ -118,7 +118,7 @@ export function ModelPicker() {
             placeholder={`Search ${total} models`}
             aria-label="Search models"
             autoFocus
-            className="bg-muted placeholder:text-muted-foreground mb-1 h-8 shrink-0 rounded-lg px-2.5 text-[0.8125rem] outline-none"
+            className="bg-muted placeholder:text-muted-foreground text-ui mb-1 h-8 shrink-0 rounded-lg px-2.5 outline-none"
           />
         )}
         <Row
@@ -128,12 +128,12 @@ export function ModelPicker() {
           onClick={() => pick(null)}
         />
         {!models && !failed && (
-          <p className="text-muted-foreground px-2.5 py-2 text-[0.8125rem]">
+          <p className="text-muted-foreground text-ui px-2.5 py-2">
             Loading models…
           </p>
         )}
         {failed && (
-          <p className="text-destructive px-2.5 py-2 text-[0.8125rem]">
+          <p className="text-destructive text-ui px-2.5 py-2">
             Could not load the models. Is the agent set up?
           </p>
         )}
@@ -161,7 +161,7 @@ export function ModelPicker() {
                     })
                   }
                   aria-expanded={!folded}
-                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mt-1.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-[0.6875rem] font-semibold tracking-wide uppercase outline-none focus-visible:ring-2"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 text-caption mt-1.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-left font-semibold tracking-wide uppercase outline-none focus-visible:ring-2"
                 >
                   <ChevronRight
                     className={cn(
@@ -206,7 +206,7 @@ export function ModelPicker() {
                                 }
                               }}
                               className={cn(
-                                "focus-visible:ring-ring/60 rounded-full px-2 py-0.5 text-[0.6875rem] outline-none focus-visible:ring-2",
+                                "focus-visible:ring-ring/60 text-caption rounded-full px-2 py-0.5 outline-none focus-visible:ring-2",
                                 current?.id === v.id
                                   ? "bg-foreground text-background"
                                   : "bg-muted text-muted-foreground hover:text-foreground",
@@ -228,7 +228,7 @@ export function ModelPicker() {
           sections.every(
             (s) => !s.entries.some((e) => matches(e, s.title)),
           ) && (
-            <p className="text-muted-foreground px-2.5 py-2 text-[0.8125rem]">
+            <p className="text-muted-foreground text-ui px-2.5 py-2">
               No model matches.
             </p>
           )}
@@ -269,9 +269,9 @@ function Row({
       )}
     >
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[0.8125rem] font-medium">{title}</span>
+        <span className="text-ui truncate font-medium">{title}</span>
         {description && (
-          <span className="text-muted-foreground line-clamp-2 text-[0.6875rem] leading-snug">
+          <span className="text-muted-foreground text-caption line-clamp-2 leading-snug">
             {description}
           </span>
         )}

@@ -1,3 +1,4 @@
+import { Alert } from "@/components/ui/alert";
 import type { ChatError } from "@/lib/chat-errors";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -27,18 +28,8 @@ export function ErrorNote({
         : { label: "Try again", run: () => void onRetry() };
 
   return (
-    <div
-      role="alert"
-      className="text-destructive border-destructive/40 mt-4 flex flex-col gap-2 rounded-2xl border px-4 py-3 text-[0.8125rem]"
-    >
+    <Alert className="mt-4" action={{ label: fix.label, onClick: fix.run }}>
       {error.message}
-      <button
-        type="button"
-        onClick={fix.run}
-        className="self-start font-medium underline underline-offset-2"
-      >
-        {fix.label}
-      </button>
-    </div>
+    </Alert>
   );
 }

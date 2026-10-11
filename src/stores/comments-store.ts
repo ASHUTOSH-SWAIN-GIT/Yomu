@@ -32,6 +32,9 @@ export interface CommentsStore {
   setEditing: (id: string | null) => void;
   update: (id: string, note: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  /** Puts a deleted comment back (Undo), as a new comment on the same
+   * words. */
+  restore: (comment: Comment) => Promise<void>;
 }
 
 registerPart("comments", () =>
@@ -99,6 +102,24 @@ registerPart("comments", () =>
         }));
       } catch (err) {
         logError("saving the comment failed", err);
+      }
+    },
+
+    async restore(comment) {
+      try {
+        const { blockIndex, start, end, quote, note, articleId } = comment;
+        const back = await addComment({
+          blockIndex,
+          start,
+          end,
+          quote,
+          note,
+          articleId,
+        });
+        if (get().articleId === articleId)
+          set((s) => ({ items: [...s.items, back] }));
+      } catch (err) {
+        logError("restoring the comment failed", err);
       }
     },
 

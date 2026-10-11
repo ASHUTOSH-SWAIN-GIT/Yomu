@@ -45,11 +45,11 @@ export function CollectionPicker({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent align={align ?? "end"} className="flex w-56 flex-col p-1">
-        <p className="text-muted-foreground px-2.5 pt-1.5 pb-1 text-[0.75rem]">
+        <p className="text-muted-foreground text-meta px-2.5 pt-1.5 pb-1">
           Save to a collection
         </p>
         {collections.length === 0 && (
-          <p className="text-muted-foreground px-2.5 py-2 text-[0.8125rem]">
+          <p className="text-muted-foreground text-ui px-2.5 py-2">
             No collections yet.
           </p>
         )}
@@ -64,7 +64,7 @@ export function CollectionPicker({
               onClick={() =>
                 void (on ? removeTag(articleId, c.id) : addTag(articleId, c.id))
               }
-              className="hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-2.5 rounded-md px-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2"
+              className="hover:bg-accent focus-visible:ring-ring/60 text-ui flex h-8 items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:ring-2"
             >
               <i
                 aria-hidden
@@ -103,7 +103,7 @@ export function CollectionPicker({
             maxLength={32}
             placeholder="New collection"
             aria-label="New collection name"
-            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
+            className="placeholder:text-muted-foreground text-ui min-w-0 flex-1 bg-transparent outline-none"
           />
         </form>
       </PopoverContent>

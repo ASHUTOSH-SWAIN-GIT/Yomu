@@ -3,6 +3,7 @@ import { canonicalizeUrl, scrapeUrl } from "@/lib/commands";
 import {
   getArticleByCanonicalUrl,
   getArticleById,
+  saveArticleImages,
   upsertArticle,
 } from "@/lib/db";
 import { saveToDefaultCollection } from "@/lib/default-collection";
@@ -87,7 +88,10 @@ registerPart("reader", () =>
             state: {
               status: "loading",
               url: name,
-              detail: `Reading page ${p.page} of ${p.pages}…`,
+              detail:
+                p.stage === "figures"
+                  ? `Drawing figures, page ${p.page} of ${p.pages}…`
+                  : `Reading page ${p.page} of ${p.pages}…`,
               fraction: p.page / p.pages,
             },
           }),
@@ -107,10 +111,13 @@ registerPart("reader", () =>
 
     async rescrape(article) {
       try {
-        const fresh = isPdfUrl(article.canonicalUrl)
+        const paper = isPdfUrl(article.canonicalUrl)
           ? await reimportPdf(article)
-          : await scrapeUrl(article.url);
+          : null;
+        const fresh = paper ?? (await scrapeUrl(article.url));
         const saved = await upsertArticle(fresh);
+        // A paper read again has its figures drawn again too.
+        if (paper) await saveArticleImages(saved.id, paper.figures);
         set({ state: { status: "ready", article: saved } });
         await useLibraryStore.getState().refresh();
       } catch (err) {

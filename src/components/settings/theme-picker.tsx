@@ -34,7 +34,7 @@ export function ThemePicker() {
         <button
           type="button"
           aria-label="Theme"
-          className="bg-muted hover:bg-accent focus-visible:ring-ring/60 flex h-9 w-60 items-center gap-2.5 rounded-lg px-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2"
+          className="bg-muted hover:bg-accent focus-visible:ring-ring/60 text-ui flex h-9 w-60 items-center gap-2.5 rounded-lg px-2.5 text-left outline-none focus-visible:ring-2"
         >
           {current ? <Swatch theme={current} /> : <AutoSwatch />}
           <span className="min-w-0 flex-1 truncate">

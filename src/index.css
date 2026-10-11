@@ -282,6 +282,20 @@ html.dark {
   --font-display: var(--font-sans);
   --font-mono:
     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* The interface's type scale. Sizes only: line height is inherited, as it
+     was with the one-off sizes these replace. Keep in step with the list in
+     lib/utils.ts. */
+  --text-micro: 0.625rem;
+  --text-caption: 0.6875rem;
+  --text-meta: 0.75rem;
+  --text-ui: 0.8125rem;
+  --text-prose: 0.875rem;
+  --text-lead: 0.9375rem;
+  --text-heading: 1.0625rem;
+  --text-title: 1.25rem;
+  --text-headline: 1.75rem;
+  --text-display: 2.25rem;
 }
 
 @layer base {
@@ -386,6 +400,19 @@ html.dark {
   text-decoration: underline dotted;
   text-decoration-color: var(--muted-foreground);
   text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.22em;
+}
+
+/* A paper's numbered citations ("[12]"): pointing at one shows the
+   reference, so they get a faint underline that says so. */
+::highlight(yomu-cite) {
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--muted-foreground) 55%,
+    transparent
+  );
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.22em;
 }
 

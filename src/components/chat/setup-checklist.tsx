@@ -40,10 +40,10 @@ export function SetupChecklist() {
   return (
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto">
       <div>
-        <h2 className="font-display text-[1.25rem] font-medium tracking-[-0.01em]">
-          Set up Explain
+        <h2 className="font-display text-title font-medium tracking-[-0.01em]">
+          Set up an agent
         </h2>
-        <p className="text-muted-foreground mt-1 text-[0.75rem] leading-relaxed">
+        <p className="text-muted-foreground text-meta mt-1 leading-relaxed">
           Answers come from Codex on your own computer, using your ChatGPT plan.
           Reading works without it.
         </p>
@@ -71,8 +71,8 @@ export function SetupChecklist() {
               <p
                 className={
                   step.done || step.id === current
-                    ? "text-[0.8125rem] font-medium"
-                    : "text-muted-foreground text-[0.8125rem] font-medium"
+                    ? "text-ui font-medium"
+                    : "text-muted-foreground text-ui font-medium"
                 }
               >
                 {step.title}
@@ -80,7 +80,7 @@ export function SetupChecklist() {
                   {step.done ? " (done)" : " (to do)"}
                 </span>
               </p>
-              <p className="text-muted-foreground mt-0.5 text-[0.75rem]">
+              <p className="text-muted-foreground text-meta mt-0.5">
                 {step.detail}
               </p>
               {!step.done && step.command && (
@@ -89,7 +89,7 @@ export function SetupChecklist() {
               {!step.done && step.id === "login" && step.actionable && (
                 <Button
                   size="sm"
-                  className="mt-2.5 h-8 text-[0.75rem]"
+                  className="text-meta mt-2.5 h-8"
                   onClick={() => void login()}
                 >
                   Sign in with ChatGPT
@@ -103,7 +103,7 @@ export function SetupChecklist() {
       <Button
         size="sm"
         variant="outline"
-        className="border-border h-8 self-start text-[0.75rem]"
+        className="border-border text-meta h-8 self-start"
         disabled={checking}
         onClick={() => void recheck()}
       >
@@ -129,7 +129,7 @@ function StepMark({
     <span
       aria-hidden
       className={
-        "grid size-[19px] shrink-0 place-items-center rounded-full text-[0.6875rem] font-semibold tabular-nums " +
+        "text-caption grid size-[19px] shrink-0 place-items-center rounded-full font-semibold tabular-nums " +
         (done
           ? "bg-foreground text-background"
           : current
@@ -157,9 +157,7 @@ function CommandLine({ command }: { command: SetupStep["command"] & string }) {
 
   return (
     <div className="border-border mt-2 flex items-center justify-between gap-2 rounded-md border py-1 pr-1 pl-2.5">
-      <code className="min-w-0 truncate font-mono text-[0.72rem]">
-        {command}
-      </code>
+      <code className="text-caption min-w-0 truncate font-mono">{command}</code>
       <Button
         variant="ghost"
         size="icon"

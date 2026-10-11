@@ -33,7 +33,7 @@ export function AgentConsentDialog() {
         <DialogDescription className="sr-only">
           What happens when Yomu uses {name}.
         </DialogDescription>
-        <ul className="text-muted-foreground list-disc space-y-2 pl-4 text-[0.8125rem]">
+        <ul className="text-muted-foreground text-ui list-disc space-y-2 pl-4">
           <li>
             Yomu starts it on this computer and sends it your questions, the
             words you select and the blog text it needs to answer.

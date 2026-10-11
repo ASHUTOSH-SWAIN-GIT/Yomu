@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { openSampleArticle } from "@/lib/sample-article";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
+import { useUiStore } from "@/stores/ui-store";
 import { useViewStore } from "@/stores/view-store";
 
 /** What a new reader sees before saving anything: four illustrated cards,
@@ -10,31 +11,31 @@ const STEPS = [
     art: "/welcome/link.svg",
     title: "Paste any link",
     text: "Blogs, docs, papers. Each opens as a clean page and is saved for later.",
-    action: "Try the tour",
+    action: "Open a sample page",
   },
   {
     art: "/welcome/ask.svg",
-    title: "Ask about any line",
-    text: "Select a passage and ask. The answer appears right beside the words.",
-    action: "Open the tour",
+    title: "Notes on any line",
+    text: "Select a passage to leave a note in the margin, right beside the words.",
+    action: "Select a line to try",
   },
   {
     art: "/welcome/chat.svg",
     title: "Chat with your agent",
-    text: "Talk with Codex or OpenCode about what you read, or about anything.",
+    text: "Talk with Codex, Claude Code or OpenCode about what you read, or anything.",
     action: "Start a chat",
   },
   {
     art: "/welcome/collect.svg",
-    title: "Comment and collect",
-    text: "Leave notes on lines you like and sort blogs into collections.",
-    action: "Open settings",
+    title: "Collections and tabs",
+    text: "Sort what you read into collections, and keep several pages open in tabs.",
+    action: "Open the sidebar",
   },
 ] as const;
 
 export function Welcome() {
   const setLibraryChat = useViewStore((s) => s.setLibraryChat);
-  const setSettingsPage = useViewStore((s) => s.setSettingsPage);
+  const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const resetChat = useLibraryChatStore((s) => s.reset);
   const actions = [
     () => void openSampleArticle(),
@@ -43,12 +44,12 @@ export function Welcome() {
       void resetChat();
       setLibraryChat(true);
     },
-    () => setSettingsPage(true),
+    () => setSidebarOpen(true),
   ];
 
   return (
     <section className="mt-12">
-      <h2 className="text-muted-foreground text-[0.8125rem] font-medium">
+      <h2 className="text-muted-foreground text-ui font-medium">
         Getting started
       </h2>
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -68,13 +69,13 @@ export function Welcome() {
               />
             </span>
             <span className="flex flex-col gap-1 px-3.5 pt-3 pb-3.5">
-              <span className="text-[0.8125rem] font-semibold tracking-[-0.01em]">
+              <span className="text-ui font-semibold tracking-[-0.01em]">
                 {step.title}
               </span>
-              <span className="text-muted-foreground text-[0.75rem] leading-snug">
+              <span className="text-muted-foreground text-meta leading-snug">
                 {step.text}
               </span>
-              <span className="text-foreground/80 mt-1 flex items-center gap-1.5 text-[0.6875rem] font-medium">
+              <span className="text-foreground/80 text-caption mt-1 flex items-center gap-1.5 font-medium">
                 {step.action}
                 <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
               </span>

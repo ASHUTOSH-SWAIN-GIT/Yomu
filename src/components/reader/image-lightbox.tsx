@@ -108,7 +108,7 @@ export function ImageLightbox({
       />
       {alt && (
         <p
-          className="absolute inset-x-0 mx-auto max-w-[80ch] px-6 text-center text-[0.875rem] text-white/80"
+          className="text-prose absolute inset-x-0 mx-auto max-w-[80ch] px-6 text-center text-white/80"
           style={{
             top: target.top + target.height + 14,
             opacity: open ? 1 : 0,

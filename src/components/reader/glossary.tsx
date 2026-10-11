@@ -139,7 +139,7 @@ function TermCard({ entry, rect }: { entry: GlossaryTerm; rect: DOMRect }) {
   return (
     <div
       role="tooltip"
-      className="pop-in bg-popover text-popover-foreground pointer-events-none fixed z-50 w-[22rem] max-w-[calc(100vw-2rem)] rounded-xl p-3.5 font-sans text-[0.8125rem] shadow-[var(--shadow-float)]"
+      className="pop-in bg-popover text-popover-foreground text-ui pointer-events-none fixed z-50 w-[22rem] max-w-[calc(100vw-2rem)] rounded-xl p-3.5 font-sans shadow-[var(--shadow-float)]"
       style={{
         left,
         top: above ? rect.top - 8 : rect.bottom + 8,
@@ -151,7 +151,7 @@ function TermCard({ entry, rect }: { entry: GlossaryTerm; rect: DOMRect }) {
         <Markdown>{gist(entry.answer)}</Markdown>
       </div>
       {entry.articleTitle && (
-        <p className="text-muted-foreground mt-2 truncate text-[0.75rem]">
+        <p className="text-muted-foreground text-meta mt-2 truncate">
           Explained in “{entry.articleTitle}”
         </p>
       )}

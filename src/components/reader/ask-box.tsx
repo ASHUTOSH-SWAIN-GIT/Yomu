@@ -84,7 +84,7 @@ export function AskBox({
         transform: `translate(-50%, ${above ? "-100%" : "0"})`,
       }}
     >
-      <p className="text-muted-foreground border-border line-clamp-2 border-l-2 pl-2 text-[0.75rem] italic">
+      <p className="text-muted-foreground border-border text-meta line-clamp-2 border-l-2 pl-2 italic">
         {anchor.quote}
       </p>
       <div className="bg-muted flex items-center gap-2 rounded-xl py-1 pr-1 pl-3">
@@ -94,7 +94,7 @@ export function AskBox({
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask about this, or press Enter to explain"
           aria-label="Ask about the selected words"
-          className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent py-1.5 text-[0.8125rem] outline-none"
+          className="placeholder:text-muted-foreground text-ui min-w-0 flex-1 bg-transparent py-1.5 outline-none"
         />
         <button
           type="submit"

@@ -65,7 +65,7 @@ export function SiteMark({ site, color }: { site: string; color: string }) {
   return (
     <span
       aria-hidden
-      className="font-display grid size-7 shrink-0 place-items-center rounded-md text-[0.8125rem] font-semibold"
+      className="font-display text-ui grid size-7 shrink-0 place-items-center rounded-md font-semibold"
       style={{
         background: `color-mix(in oklab, ${color} 16%, var(--card))`,
         color,
@@ -172,7 +172,7 @@ export function SiteFavicon({
       <span
         aria-hidden
         className={cn(
-          "bg-muted text-muted-foreground grid size-4 shrink-0 place-items-center rounded-[4px] text-[0.5625rem] font-semibold",
+          "bg-muted text-muted-foreground text-micro grid size-4 shrink-0 place-items-center rounded-[4px] font-semibold",
           className,
         )}
       >

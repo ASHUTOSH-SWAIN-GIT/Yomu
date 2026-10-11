@@ -83,7 +83,9 @@ export const useBookmarksStore = create<BookmarksStore>((set, get) => ({
           saved += 1;
         } catch (err) {
           logError(`saving the bookmarked page ${link.url} failed`, err);
-          await recordBookmarkImport(link.url, "failed", null).catch(() => {});
+          await recordBookmarkImport(link.url, "failed", null).catch((e) =>
+            logError(`recording the failed import of ${link.url} failed`, e),
+          );
         }
       }
       if (saved > 0) await useLibraryStore.getState().refresh();

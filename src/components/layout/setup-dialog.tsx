@@ -36,7 +36,7 @@ export function SetupDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
-        <DialogTitle className="sr-only">Set up Explain</DialogTitle>
+        <DialogTitle className="sr-only">Set up an agent</DialogTitle>
         <DialogDescription className="sr-only">
           Install Codex and sign in to ask questions about what you read.
         </DialogDescription>

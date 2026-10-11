@@ -1,5 +1,7 @@
 import { Plus, X } from "lucide-react";
 import { useStore } from "zustand";
+import { IconButton } from "@/components/ui/icon-button";
+import { MOD } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
   activateTab,
@@ -17,6 +19,7 @@ export function TabStrip() {
   const activeId = useTabsStore((s) => s.activeId);
   return (
     <div
+      data-tauri-drag-region
       role="tablist"
       aria-label="Tabs"
       className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
@@ -24,15 +27,14 @@ export function TabStrip() {
       {ids.map((id) => (
         <Tab key={id} id={id} active={id === activeId} />
       ))}
-      <button
-        type="button"
+      <IconButton
+        label={`New tab (${MOD}T)`}
+        size="md"
         onClick={() => openTab()}
-        aria-label="New tab"
-        title="New tab"
-        className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 grid size-7 shrink-0 place-items-center rounded-md outline-none focus-visible:ring-2"
+        className="[&_svg]:size-4"
       >
-        <Plus className="size-4" aria-hidden />
-      </button>
+        <Plus aria-hidden />
+      </IconButton>
     </div>
   );
 }
@@ -42,7 +44,7 @@ function Tab({ id, active }: { id: string; active: boolean }) {
   return (
     <div
       className={cn(
-        "group flex h-7 w-44 shrink-0 items-center rounded-md text-[0.8125rem]",
+        "group text-ui flex h-7 w-44 shrink-0 items-center rounded-md",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
@@ -59,14 +61,17 @@ function Tab({ id, active }: { id: string; active: boolean }) {
       >
         {title}
       </button>
-      <button
-        type="button"
+      <IconButton
+        label={`Close ${title}`}
+        size="sm"
         onClick={() => closeTab(id)}
-        aria-label={`Close ${title}`}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mr-1 grid size-5 shrink-0 place-items-center rounded-sm opacity-0 outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
+        className={cn(
+          "mr-1 size-5 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-transparent focus-visible:opacity-100",
+          active && "opacity-100",
+        )}
       >
-        <X className="size-3.5" aria-hidden />
-      </button>
+        <X aria-hidden />
+      </IconButton>
     </div>
   );
 }

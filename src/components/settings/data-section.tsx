@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Section, Setting } from "@/components/settings/controls";
 import { Button } from "@/components/ui/button";
+import { Confirm } from "@/components/ui/confirm";
 import { storageInfo } from "@/lib/commands";
 import { clearAllChats, clearImageCache, deleteEverything } from "@/lib/data";
 import { formatBytes } from "@/lib/format";
@@ -54,8 +55,8 @@ export function DataSection() {
         </Button>
       </Setting>
 
-      <div className="bg-muted grid grid-cols-3 gap-px overflow-hidden rounded-2xl text-[0.8125rem]">
-        <Stat label="Blogs" value={String(blogs)} />
+      <div className="bg-muted text-ui grid grid-cols-3 gap-px overflow-hidden rounded-2xl">
+        <Stat label="Articles" value={String(blogs)} />
         <Stat
           label="Database"
           value={info ? formatBytes(info.databaseBytes) : "…"}
@@ -86,8 +87,12 @@ export function DataSection() {
         {confirming === "chats" ? (
           <Confirm
             question="Delete all chats?"
-            onYes={() => void run("All chats deleted.", clearAllChats)}
-            onNo={() => setConfirming(null)}
+            keepLabel="Cancel"
+            onConfirm={(yes) =>
+              yes
+                ? void run("All chats deleted.", clearAllChats)
+                : setConfirming(null)
+            }
           />
         ) : (
           <Button
@@ -106,8 +111,12 @@ export function DataSection() {
         {confirming === "everything" ? (
           <Confirm
             question="Delete everything?"
-            onYes={() => void run("Everything deleted.", deleteEverything)}
-            onNo={() => setConfirming(null)}
+            keepLabel="Cancel"
+            onConfirm={(yes) =>
+              yes
+                ? void run("Everything deleted.", deleteEverything)
+                : setConfirming(null)
+            }
           />
         ) : (
           <Button
@@ -123,7 +132,7 @@ export function DataSection() {
       </Setting>
 
       {message && (
-        <p role="status" className="text-muted-foreground text-[0.8125rem]">
+        <p role="status" className="text-muted-foreground text-ui">
           {message}
         </p>
       )}
@@ -134,40 +143,8 @@ export function DataSection() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-card flex flex-col gap-0.5 px-4 py-3">
-      <span className="text-muted-foreground text-[0.6875rem]">{label}</span>
+      <span className="text-muted-foreground text-caption">{label}</span>
       <span className="font-medium tabular-nums">{value}</span>
     </div>
-  );
-}
-
-function Confirm({
-  question,
-  onYes,
-  onNo,
-}: {
-  question: string;
-  onYes: () => void;
-  onNo: () => void;
-}) {
-  return (
-    <span className="flex items-center gap-2 text-[0.8125rem]">
-      <span>{question}</span>
-      <Button
-        size="sm"
-        variant="destructive"
-        className="h-7 rounded-lg px-2.5 text-[0.75rem]"
-        onClick={onYes}
-      >
-        Delete
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 rounded-lg px-2.5 text-[0.75rem]"
-        onClick={onNo}
-      >
-        Cancel
-      </Button>
-    </span>
   );
 }

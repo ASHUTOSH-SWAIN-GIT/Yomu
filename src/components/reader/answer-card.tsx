@@ -10,9 +10,9 @@ export function AnswerCard({ item }: { item: PassageAnswer }) {
   return (
     <div
       data-answer-card
-      className="border-border bg-card relative rounded-xl border px-3.5 py-3 text-[0.8125rem] leading-relaxed"
+      className="border-border bg-card text-ui relative rounded-xl border px-3.5 py-3 leading-relaxed"
     >
-      <p className="text-muted-foreground flex items-center gap-1.5 text-[0.75rem] font-medium">
+      <p className="text-muted-foreground text-meta flex items-center gap-1.5 font-medium">
         <Sparkles className="size-3.5" aria-hidden />
         {item.question ?? "Explained"}
       </p>
@@ -28,7 +28,7 @@ export function AnswerCard({ item }: { item: PassageAnswer }) {
       <button
         type="button"
         onClick={() => setChatOpen(true)}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mt-1.5 rounded-sm text-[0.75rem] underline underline-offset-2 outline-none focus-visible:ring-2"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 text-meta mt-1.5 rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2"
       >
         Open in chat
       </button>

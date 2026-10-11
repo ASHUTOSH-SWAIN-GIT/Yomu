@@ -27,6 +27,40 @@ pub fn images_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("could not find the app data directory: {e}"))
 }
 
+/// Figures cut from a PDF's pages (see `src/lib/pdf/render.ts`) are named
+/// `pdf-figure://<paper>/<figure>.png`. They are kept in the cache folder
+/// beside downloaded images, but cannot be fetched again, so the size limit
+/// never evicts them; deleting their paper (or "delete everything") does.
+pub const FIGURE_SCHEME: &str = "pdf-figure://";
+const FIGURE_PREFIX: &str = "pdf-";
+/// A figure is drawn at three times the page: big, but bounded.
+const MAX_FIGURE_BYTES: usize = 20 * 1024 * 1024;
+
+/// The cache file for a figure's address.
+pub fn figure_file_name(url: &str) -> Result<String, String> {
+    if !url.starts_with(FIGURE_SCHEME) || url.len() > 300 {
+        return Err("not a PDF figure".into());
+    }
+    Ok(format!("{FIGURE_PREFIX}{}.png", file_stem(url)))
+}
+
+/// Saves a figure's PNG into the cache. Returns its file name.
+pub fn save_figure(dir: &Path, url: &str, png: &[u8]) -> Result<String, String> {
+    let name = figure_file_name(url)?;
+    if sniff_ext(png) != Some("png") {
+        return Err("a figure must be a PNG".into());
+    }
+    if png.len() > MAX_FIGURE_BYTES {
+        return Err("that figure is too large".into());
+    }
+    std::fs::create_dir_all(dir).map_err(|e| format!("could not create the image cache: {e}"))?;
+    let part = dir.join(format!("{name}.part"));
+    std::fs::write(&part, png).map_err(|e| format!("could not save the figure: {e}"))?;
+    std::fs::rename(&part, dir.join(&name))
+        .map_err(|e| format!("could not save the figure: {e}"))?;
+    Ok(name)
+}
+
 /// Stable, filesystem-safe name for a URL (first 32 hex chars of SHA-256).
 fn file_stem(url: &str) -> String {
     let digest = Sha256::digest(url.as_bytes());
@@ -180,6 +214,8 @@ fn evict_over(dir: &Path, max_bytes: u64) {
     };
     let mut files: Vec<_> = entries
         .flatten()
+        // Figures cut from PDFs cannot be downloaded again.
+        .filter(|e| !e.file_name().to_string_lossy().starts_with(FIGURE_PREFIX))
         .filter_map(|e| {
             let m = e.metadata().ok().filter(|m| m.is_file())?;
             Some((m.modified().ok()?, m.len(), e.path()))
@@ -259,6 +295,18 @@ pub async fn load_for_agent(
 ) -> Result<AgentImage, String> {
     use base64::Engine;
 
+    if url.starts_with(FIGURE_SCHEME) {
+        // A figure from a paper: already on disk, never downloaded.
+        let bytes = tokio::fs::read(dir.join(figure_file_name(url)?))
+            .await
+            .map_err(|_| {
+                "that figure's picture is missing; read the PDF again from the … menu".to_string()
+            })?;
+        return Ok(AgentImage {
+            mime: "image/png",
+            base64: base64::engine::general_purpose::STANDARD.encode(bytes),
+        });
+    }
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err("only web images can be sent to the agent".into());
     }
@@ -541,6 +589,62 @@ mod tests {
         evict_over(&dir, 20);
         assert!(!dir.join("old.png").exists());
         assert!(dir.join("mid.png").exists() && dir.join("new.png").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn figures_are_saved_as_pngs_under_a_safe_name() {
+        let dir = temp_dir("figures");
+        let url = "pdf-figure://abc/p3-1.png";
+        let name = save_figure(&dir, url, PNG).unwrap();
+        assert!(name.starts_with("pdf-") && name.ends_with(".png"));
+        assert_eq!(std::fs::read(dir.join(&name)).unwrap(), PNG);
+        // Same address, same file.
+        assert_eq!(save_figure(&dir, url, PNG).unwrap(), name);
+        assert!(save_figure(&dir, "https://a/b.png", PNG).is_err());
+        assert!(save_figure(&dir, url, b"<svg/>").is_err());
+        assert!(figure_file_name("pdf-figure://../../etc")
+            .unwrap()
+            .trim_start_matches("pdf-")
+            .trim_end_matches(".png")
+            .chars()
+            .all(|c| c.is_ascii_hexdigit()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn eviction_never_removes_figures() {
+        let dir = temp_dir("evict-figures");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("pdf-figure.png"), [0u8; 50]).unwrap();
+        std::fs::write(dir.join("web.png"), [0u8; 50]).unwrap();
+        evict_over(&dir, 10);
+        assert!(dir.join("pdf-figure.png").exists());
+        assert!(!dir.join("web.png").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_figure_goes_to_the_agent_from_disk() {
+        use base64::Engine;
+        let dir = temp_dir("agent-figure");
+        let url = "pdf-figure://abc/p3-1.png";
+        // No network is used: the client points nowhere.
+        let offline = reqwest::Client::builder()
+            .proxy(reqwest::Proxy::all("http://127.0.0.1:9").unwrap())
+            .build()
+            .unwrap();
+        let missing = load_for_agent(&offline, &dir, url).await.unwrap_err();
+        assert!(missing.contains("read the PDF again"), "{missing}");
+        save_figure(&dir, url, PNG).unwrap();
+        let image = load_for_agent(&offline, &dir, url).await.unwrap();
+        assert_eq!(image.mime, "image/png");
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD
+                .decode(&image.base64)
+                .unwrap(),
+            PNG
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

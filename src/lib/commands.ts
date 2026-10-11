@@ -34,6 +34,17 @@ export async function readPdfBytes(sha: string): Promise<Uint8Array> {
   return new Uint8Array(await invoke<ArrayBuffer>("read_pdf", { sha }));
 }
 
+/** Saves a figure cut from a PDF page into the image cache; returns its
+ * file name. The PNG goes as raw bytes, not JSON. */
+export async function savePdfFigure(
+  url: string,
+  png: Uint8Array,
+): Promise<string> {
+  return invoke<string>("save_pdf_figure", png, {
+    headers: { "x-figure-url": url },
+  });
+}
+
 /** Deletes imported PDFs whose id is not in `keep`. */
 export async function prunePdfs(keep: string[]): Promise<number> {
   return invoke<number>("prune_pdfs", { keep });

@@ -345,6 +345,42 @@ describe("prompts about a paper", () => {
     expect(prompt).not.toContain("That page:");
   });
 
+  it("sends a long paper as its outline and key sections", () => {
+    const h = (text: string, level = 2) =>
+      ({ type: "heading", level, text }) as const;
+    const blocks = [
+      p("A title page note."),
+      h("Abstract"),
+      p("We present a database."),
+      h("1 Introduction"),
+      p("Databases are hard."),
+      h("2 Design"),
+      p("z".repeat(40000)),
+      h("2.1 Storage", 3),
+      p("Tablets."),
+      h("6 Conclusions"),
+      p("It works."),
+    ];
+    const prompt = buildArticlePrompt(paper(blocks), "Summarize.");
+    expect(prompt).toContain(
+      "Outline:\n- Abstract\n- 1 Introduction\n- 2 Design\n  - 2.1 Storage\n- 6 Conclusions",
+    );
+    expect(prompt).toContain("We present a database.");
+    expect(prompt).toContain("## 1 Introduction\n\nDatabases are hard.");
+    expect(prompt).toContain("## 6 Conclusions\n\nIt works.");
+    expect(prompt).not.toContain("zzzz");
+    expect(prompt).toContain("shown as its outline and key sections");
+    expect(prompt.length).toBeLessThan(32000);
+  });
+
+  it("falls back to the first pages when a long paper has no key sections", () => {
+    const prompt = buildArticlePrompt(
+      paper([p("y".repeat(40000))]),
+      "Summarize.",
+    );
+    expect(prompt).toContain("first 30000 of 40000 characters");
+  });
+
   it("says which page a selected passage is on", () => {
     const blocks = [
       { ...p("one"), page: 1 },

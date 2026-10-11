@@ -8,3 +8,9 @@ export function usesOverlayTitleBar(): boolean {
     /Mac/.test(navigator.platform)
   );
 }
+
+/** The modifier key as shortcuts are written on this computer. */
+export const MOD =
+  typeof navigator !== "undefined" && /Mac/.test(navigator.platform)
+    ? "⌘"
+    : "Ctrl+";

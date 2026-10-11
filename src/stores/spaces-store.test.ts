@@ -33,6 +33,18 @@ describe("spaces-store", () => {
     expect(JSON.parse(data["yomu-spaces-extra"])).toEqual(["reading-list"]);
   });
 
+  it("renames a space, keeping its colour and its place as the active one", async () => {
+    const data = stubStorage();
+    const store = await freshStore();
+    store.getState().createSpace("Rust");
+    const slot = store.getState().slots["rust"];
+    store.getState().renameSpace("rust", "rust-lang");
+    expect(store.getState().extra).toEqual(["rust-lang"]);
+    expect(store.getState().slots).toEqual({ "rust-lang": slot });
+    expect(store.getState().active).toBe("rust-lang");
+    expect(JSON.parse(data["yomu-spaces-extra"])).toEqual(["rust-lang"]);
+  });
+
   it("rejects empty names and the reserved inbox name", async () => {
     stubStorage();
     const store = await freshStore();

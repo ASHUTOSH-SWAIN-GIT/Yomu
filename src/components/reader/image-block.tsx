@@ -3,7 +3,12 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { ImageOff, MessageSquareText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageLightbox } from "@/components/reader/image-lightbox";
-import { isRemoteImage, isSvgUrl, resolveImageUrl } from "@/lib/images";
+import {
+  isPdfFigure,
+  isRemoteImage,
+  isSvgUrl,
+  resolveImageUrl,
+} from "@/lib/images";
 import { useChatStore } from "@/stores/chat-store";
 import { useCommentsStore } from "@/stores/comments-store";
 import { useImageStore } from "@/stores/image-store";
@@ -13,11 +18,14 @@ import { useUiStore } from "@/stores/ui-store";
 export function ImageBlock({
   src: rawSrc,
   alt,
+  width,
   baseUrl,
   blockIndex,
 }: {
   src: string;
   alt: string | null;
+  /** Display width in em (a figure cut from a PDF). */
+  width?: number;
   /** The article's URL, for images saved with a relative `src`. */
   baseUrl: string;
   /** Position in the article, used to anchor a question about this image. */
@@ -48,6 +56,11 @@ export function ImageBlock({
   const src =
     dir && cached && !localBroken ? convertFileSrc(`${dir}/${cached}`) : remote;
   const isLocal = src !== remote;
+  // A figure cut from a PDF: shown at the size it has on the page, on white
+  // like the page. An equation's text is for search and the agent; the
+  // picture already shows it, so it gets no caption.
+  const figure = isPdfFigure(remote);
+  const caption = figure && /\/p\d+-eq\d+\.png$/.test(remote) ? null : alt;
 
   // Wait for the cache index so a cached image never touches the network.
   if (!loaded) {
@@ -107,8 +120,15 @@ export function ImageBlock({
           loading="lazy"
           // Don't tell the image host which article you're reading.
           referrerPolicy="no-referrer"
-          className="mx-auto max-w-full rounded-lg shadow-[var(--shadow-card)]"
-          style={{ visibility: natural ? "hidden" : "visible" }}
+          className={
+            figure
+              ? "mx-auto max-w-full rounded-md bg-white"
+              : "mx-auto max-w-full rounded-lg shadow-[var(--shadow-card)]"
+          }
+          style={{
+            visibility: natural ? "hidden" : "visible",
+            width: width ? `${width}em` : undefined,
+          }}
         />
       </button>
       {natural && (
@@ -154,9 +174,9 @@ export function ImageBlock({
           )}
         </div>
       )}
-      {alt && (
-        <figcaption className="text-muted-foreground mt-2 text-center font-sans text-[0.8125rem]">
-          {alt}
+      {caption && (
+        <figcaption className="text-muted-foreground text-ui mx-auto mt-2 max-w-[44em] text-center font-sans text-balance">
+          {caption}
         </figcaption>
       )}
     </figure>

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Command } from "cmdk";
 import {
   Archive,
+  ArchiveRestore,
   CornerDownRight,
+  Download,
   FileText,
   Focus,
   Image as ImageIcon,
@@ -15,12 +17,20 @@ import {
   Palette,
   PanelsTopLeft,
   Plus,
+  RefreshCw,
   Search,
   SlidersHorizontal,
   Sparkles,
   Sun,
 } from "lucide-react";
+import {
+  exportArticleAsMarkdown,
+  isArchived,
+  refetchArticle,
+  toggleArchived,
+} from "@/lib/article-actions";
 import { searchLibrary } from "@/lib/db";
+import { isPdfUrl } from "@/lib/pdf/identity";
 import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { pickAndOpenPdf } from "@/lib/pdf/pick";
@@ -48,8 +58,8 @@ import { useViewStore } from "@/stores/view-store";
 import { activateTab, allBundles, openTab, useTabsStore } from "@/stores/tabs";
 import { useUiStore } from "@/stores/ui-store";
 import type { SearchHit } from "@/types/library";
+import { MOD } from "@/lib/platform";
 
-const MOD = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl+";
 const MATCH_START = "\u0001";
 const MATCH_END = "\u0002";
 
@@ -246,11 +256,44 @@ function PaletteBody({ close }: { close: () => void }) {
                 .getState()
                 .askArticle(openArticle_, SUMMARY_LABEL),
           },
+          {
+            id: "refetch",
+            label: isPdfUrl(openArticle_.canonicalUrl)
+              ? "Read this PDF again"
+              : "Fetch this page again",
+            icon: <RefreshCw />,
+            run: () => void refetchArticle(openArticle_),
+          },
+          {
+            id: "export",
+            label: "Export this article as Markdown",
+            icon: <Download />,
+            run: () => void exportArticleAsMarkdown(openArticle_),
+          },
+          isArchived(openArticle_)
+            ? {
+                id: "unarchive",
+                label: "Move this article out of the archive",
+                icon: <ArchiveRestore />,
+                run: () => void toggleArchived(openArticle_),
+              }
+            : {
+                id: "archive",
+                label: "Archive this article",
+                icon: <Archive />,
+                run: () => void toggleArchived(openArticle_),
+              },
         ]
       : []),
     {
+      id: "welcome",
+      label: "Show the welcome tour",
+      icon: <Sparkles />,
+      run: () => ui().setWelcomeOpen(true),
+    },
+    {
       id: "tour",
-      label: "Open the tour",
+      label: "Open the sample article",
       icon: <Sparkles />,
       run: () => void openSampleArticle(),
     },
@@ -367,9 +410,9 @@ function PaletteBody({ close }: { close: () => void }) {
           value={query}
           onValueChange={setQuery}
           placeholder="Search, or go anywhere…"
-          className="placeholder:text-muted-foreground flex-1 bg-transparent text-[0.9375rem] outline-none"
+          className="placeholder:text-muted-foreground text-lead flex-1 bg-transparent outline-none"
         />
-        <kbd className="bg-muted text-muted-foreground rounded px-1.5 py-px font-sans text-[0.6875rem]">
+        <kbd className="bg-muted text-muted-foreground text-caption rounded px-1.5 py-px font-sans">
           esc
         </kbd>
       </div>
@@ -389,7 +432,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(a.id)}
               >
                 <span className="truncate">{a.title}</span>
-                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
+                <span className="text-muted-foreground text-caption ml-auto">
                   {a.site}
                 </span>
               </Row>
@@ -407,7 +450,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(a.id)}
               >
                 <span className="truncate">{a.title}</span>
-                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
+                <span className="text-muted-foreground text-caption ml-auto">
                   {a.site}
                 </span>
               </Row>
@@ -465,7 +508,7 @@ function PaletteBody({ close }: { close: () => void }) {
               >
                 <span>{a.label}</span>
                 {a.shortcut && (
-                  <kbd className="bg-muted text-muted-foreground ml-auto rounded px-1.5 py-px font-sans text-[0.6875rem]">
+                  <kbd className="bg-muted text-muted-foreground text-caption ml-auto rounded px-1.5 py-px font-sans">
                     {a.shortcut}
                   </kbd>
                 )}
@@ -488,7 +531,7 @@ function PaletteBody({ close }: { close: () => void }) {
               >
                 <span>Theme: {t.label}</span>
                 {theme === t.id && (
-                  <span className="text-muted-foreground ml-auto text-[0.6875rem]">
+                  <span className="text-muted-foreground text-caption ml-auto">
                     current
                   </span>
                 )}
@@ -510,7 +553,7 @@ function PaletteBody({ close }: { close: () => void }) {
                   <span className="block truncate">
                     {byId.get(h.articleId)?.title}
                   </span>
-                  <span className="text-muted-foreground block truncate text-[0.6875rem]">
+                  <span className="text-muted-foreground text-caption block truncate">
                     <Snippet text={h.snippet} />
                   </span>
                 </span>
@@ -529,7 +572,7 @@ function PaletteBody({ close }: { close: () => void }) {
                 onSelect={() => openArticle(h.articleId)}
               >
                 <span className="min-w-0">
-                  <span className="text-muted-foreground block truncate text-[0.6875rem]">
+                  <span className="text-muted-foreground text-caption block truncate">
                     <Snippet text={h.snippet} />
                   </span>
                   <span className="block truncate">
@@ -555,7 +598,7 @@ function PaletteBody({ close }: { close: () => void }) {
               >
                 <span>{a.label}</span>
                 {a.shortcut && (
-                  <kbd className="bg-muted text-muted-foreground ml-auto rounded px-1.5 py-px font-sans text-[0.6875rem]">
+                  <kbd className="bg-muted text-muted-foreground text-caption ml-auto rounded px-1.5 py-px font-sans">
                     {a.shortcut}
                   </kbd>
                 )}
@@ -565,7 +608,7 @@ function PaletteBody({ close }: { close: () => void }) {
         )}
       </Command.List>
 
-      <div className="border-border text-muted-foreground bg-muted/60 flex gap-4 border-t px-4 py-2 text-[0.6875rem]">
+      <div className="border-border text-muted-foreground bg-muted/60 text-caption flex gap-4 border-t px-4 py-2">
         <span>↑↓ move</span>
         <span>↵ open</span>
         <span>esc close</span>
@@ -583,7 +626,7 @@ function Group({
 }) {
   return (
     <Command.Group className="pb-1">
-      <div className="text-muted-foreground px-2.5 pt-2.5 pb-1 text-[0.6875rem] font-medium">
+      <div className="text-muted-foreground text-caption px-2.5 pt-2.5 pb-1 font-medium">
         {label}
       </div>
       {children}
@@ -607,7 +650,7 @@ function Row({
       value={value}
       onSelect={onSelect}
       className={cn(
-        "relative flex min-h-9 cursor-pointer items-center gap-3 rounded-lg px-2.5 py-1.5 text-[0.8125rem] outline-none",
+        "text-ui relative flex min-h-9 cursor-pointer items-center gap-3 rounded-lg px-2.5 py-1.5 outline-none",
         "data-[selected=true]:bg-accent data-[selected=true]:[&>svg]:text-foreground",
         "[&>svg]:text-muted-foreground [&>svg]:size-4 [&>svg]:shrink-0",
       )}

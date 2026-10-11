@@ -72,6 +72,7 @@ function BlockView({
         <ImageBlock
           src={block.src}
           alt={block.alt}
+          width={block.width}
           baseUrl={baseUrl}
           blockIndex={index}
         />

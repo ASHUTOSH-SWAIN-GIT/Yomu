@@ -48,7 +48,7 @@ export function WithContextMenu({
             // A press inside must not reach the window's "close" listener
             // before the item has been picked.
             onMouseDown={(e) => e.stopPropagation()}
-            className="pop-in bg-popover text-popover-foreground border-border fixed z-50 min-w-40 rounded-lg border p-1 font-sans text-[0.8125rem] shadow-[var(--shadow-float)]"
+            className="pop-in bg-popover text-popover-foreground border-border text-ui fixed z-50 min-w-40 rounded-lg border p-1 font-sans shadow-[var(--shadow-float)]"
             style={{ left: at.x, top: at.y }}
           >
             {items.map((item) => (

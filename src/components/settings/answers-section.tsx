@@ -38,9 +38,9 @@ export function AnswersSection() {
           rows={3}
           placeholder="e.g. keep answers short, reply in Hindi"
           aria-label="Answer style"
-          className="bg-muted placeholder:text-muted-foreground w-full resize-none rounded-xl px-4 py-3 text-[0.875rem] outline-none"
+          className="bg-muted placeholder:text-muted-foreground text-prose w-full resize-none rounded-xl px-4 py-3 outline-none"
         />
-        <div className="text-muted-foreground mt-1 text-right text-[0.6875rem] tabular-nums">
+        <div className="text-muted-foreground text-caption mt-1 text-right tabular-nums">
           {style.length} / {STYLE_MAX}
         </div>
       </Setting>
@@ -52,7 +52,7 @@ export function AnswersSection() {
             <button
               type="button"
               onClick={() => setChatModel(null)}
-              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 rounded-md text-[0.75rem] underline underline-offset-2 outline-none focus-visible:ring-2"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 text-meta rounded-md underline underline-offset-2 outline-none focus-visible:ring-2"
             >
               Use Auto
             </button>

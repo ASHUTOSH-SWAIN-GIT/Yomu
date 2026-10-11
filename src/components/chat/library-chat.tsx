@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/chat/composer";
+import { Thinking } from "@/components/chat/thinking";
 import { AgentActivity } from "@/components/chat/agent-activity";
 import { ContextNote } from "@/components/chat/context-note";
 import { ErrorNote } from "@/components/chat/error-note";
@@ -64,7 +65,7 @@ export function LibraryChat() {
       ready={ready}
       commands={LIBRARY_COMMANDS}
       placeholder={
-        ready ? "Ask anything about your blogs" : "Set up Explain to chat"
+        ready ? "Ask anything about your library" : "Set up an agent to chat"
       }
       autoFocus
       tall={!started}
@@ -72,7 +73,7 @@ export function LibraryChat() {
   );
 
   const context = (
-    <p className="text-muted-foreground text-center text-[0.75rem]">
+    <p className="text-muted-foreground text-meta text-center">
       Can also draw on your {count} saved {count === 1 ? "article" : "articles"}
       .
     </p>
@@ -81,7 +82,7 @@ export function LibraryChat() {
   if (!started) {
     return (
       <div className="mx-auto flex min-h-0 w-full max-w-[52rem] flex-1 flex-col justify-center px-6 pb-24">
-        <h1 className="mb-8 text-center text-[1.875rem] font-medium tracking-[-0.02em]">
+        <h1 className="text-headline mb-8 text-center font-medium tracking-[-0.02em]">
           What do you want to know?
         </h1>
         {box}
@@ -93,7 +94,7 @@ export function LibraryChat() {
               key={idea}
               type="button"
               onClick={() => send(idea)}
-              className="bg-muted text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 h-9 rounded-full px-4 text-[0.8125rem] outline-none focus-visible:ring-2"
+              className="bg-muted text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 text-ui h-9 rounded-full px-4 outline-none focus-visible:ring-2"
             >
               {idea}
             </button>
@@ -111,13 +112,13 @@ export function LibraryChat() {
             m.role === "user" ? (
               // Yours: a bubble on the right, as wide as the message.
               <li key={i} className="flex justify-end">
-                <p className="bg-muted max-w-[80%] rounded-3xl px-5 py-2.5 text-[0.9375rem] leading-6 whitespace-pre-wrap">
+                <p className="bg-muted text-lead max-w-[80%] rounded-3xl px-5 py-2.5 leading-6 whitespace-pre-wrap">
                   {m.text}
                 </p>
               </li>
             ) : (
               // The agent's: plain text on the page, with a copy button.
-              <li key={i} className="group text-[0.9375rem] leading-7">
+              <li key={i} className="group text-lead leading-7">
                 {m.trace && <AgentActivity progress={m.trace} finished />}
                 <Markdown>{m.text}</Markdown>
                 {!(streaming && i === messages.length - 1) && (
@@ -134,20 +135,7 @@ export function LibraryChat() {
               <AgentActivity progress={progress} />
             </li>
           )}
-          {waiting && (
-            <li
-              aria-label="Thinking"
-              className="text-muted-foreground flex gap-1 py-2"
-            >
-              {[0, 150, 300].map((delay) => (
-                <i
-                  key={delay}
-                  className="bg-muted-foreground size-1.5 animate-bounce rounded-full"
-                  style={{ animationDelay: `${delay}ms` }}
-                />
-              ))}
-            </li>
-          )}
+          {waiting && <Thinking />}
           {error && <ErrorNote error={error} onRetry={retry} />}
           <div ref={endRef} />
         </ul>

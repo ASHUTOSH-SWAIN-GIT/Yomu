@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** A titled block of the customize page. */
+/** A titled block of the settings page. */
 export function Section({
   id,
   title,
@@ -13,13 +13,9 @@ export function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-6 pt-10 first:pt-0">
-      <h2 className="text-[1.0625rem] font-semibold tracking-[-0.01em]">
-        {title}
-      </h2>
-      {note && (
-        <p className="text-muted-foreground mt-1 text-[0.8125rem]">{note}</p>
-      )}
+    <section id={id} className="scroll-mt-20">
+      <h2 className="text-heading font-semibold tracking-[-0.01em]">{title}</h2>
+      {note && <p className="text-muted-foreground text-ui mt-1">{note}</p>}
       <div className="mt-4 flex flex-col gap-5">{children}</div>
     </section>
   );
@@ -47,9 +43,9 @@ export function Setting({
       )}
     >
       <div className="min-w-0">
-        <div className="text-[0.875rem] font-medium">{label}</div>
+        <div className="text-prose font-medium">{label}</div>
         {hint && (
-          <div className="text-muted-foreground mt-0.5 text-[0.75rem] leading-snug">
+          <div className="text-muted-foreground text-meta mt-0.5 leading-snug">
             {hint}
           </div>
         )}

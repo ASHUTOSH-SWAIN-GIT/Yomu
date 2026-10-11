@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
  * choice with a check on the one in use. */
 export function Group({ title }: { title: string }) {
   return (
-    <div className="text-muted-foreground mt-1.5 px-2.5 pt-1 pb-0.5 text-[0.6875rem] font-semibold tracking-wide uppercase">
+    <div className="text-muted-foreground text-caption mt-1.5 px-2.5 pt-1 pb-0.5 font-semibold tracking-wide uppercase">
       {title}
     </div>
   );
@@ -31,7 +31,7 @@ export function Option({
       aria-checked={on}
       onClick={onClick}
       className={cn(
-        "hover:bg-accent focus-visible:ring-ring/60 flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2",
+        "hover:bg-accent focus-visible:ring-ring/60 text-ui flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left outline-none focus-visible:ring-2",
         on && "bg-accent/60",
       )}
     >
@@ -39,9 +39,7 @@ export function Option({
       <span className="min-w-0 flex-1 truncate">
         {label}
         {note && (
-          <span className="text-muted-foreground ml-1.5 text-[0.75rem]">
-            {note}
-          </span>
+          <span className="text-muted-foreground text-meta ml-1.5">{note}</span>
         )}
       </span>
       <Check

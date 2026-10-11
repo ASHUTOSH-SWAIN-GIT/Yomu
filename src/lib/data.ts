@@ -1,4 +1,4 @@
-import { prunePdfs, pruneImages } from "@/lib/commands";
+import { cachedImageNames, prunePdfs, pruneImages } from "@/lib/commands";
 import { deleteAllArticles, deleteAllChats } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { writeStorage } from "@/lib/storage";
@@ -27,9 +27,19 @@ export async function clearAllChats() {
 
 /** Deletes cached images (they are downloaded again when a blog is opened). */
 export async function clearImageCache(): Promise<number> {
-  const removed = await pruneImages([]);
-  // Nothing is cached any more, so the open blog must not point at files.
-  allBundles().forEach((tab) => partOf(tab, "images").setState({ files: {} }));
+  // Figures cut from papers stay: they cannot be downloaded again.
+  const figures = (await cachedImageNames()).filter((n) =>
+    n.startsWith("pdf-"),
+  );
+  const removed = await pruneImages(figures);
+  // Downloaded images are gone, so the open blog must not point at them.
+  allBundles().forEach((tab) =>
+    partOf(tab, "images").setState((s) => ({
+      files: Object.fromEntries(
+        Object.entries(s.files).filter(([, file]) => figures.includes(file)),
+      ),
+    })),
+  );
   return removed;
 }
 

@@ -148,7 +148,7 @@ export function AgentSection() {
               {on && customError && (
                 <p
                   role="alert"
-                  className="text-destructive mt-2 text-[0.75rem] break-words"
+                  className="text-destructive text-meta mt-2 break-words"
                 >
                   {customError}
                 </p>
@@ -172,12 +172,12 @@ export function AgentSection() {
                 onChange={(e) => setCommand(e.target.value)}
                 placeholder="my-agent"
                 spellCheck={false}
-                className="bg-muted placeholder:text-muted-foreground h-9 w-full rounded-lg px-3 font-mono text-[0.8125rem] outline-none"
+                className="bg-muted placeholder:text-muted-foreground text-ui h-9 w-full rounded-lg px-3 font-mono outline-none"
               />
               {command.trim() && found !== undefined && (
                 <span
                   className={cn(
-                    "mt-1 block truncate text-[0.6875rem]",
+                    "text-caption mt-1 block truncate",
                     found ? "text-muted-foreground" : "text-destructive",
                   )}
                 >
@@ -191,7 +191,7 @@ export function AgentSection() {
                 onChange={(e) => setArgs(e.target.value)}
                 placeholder="--acp"
                 spellCheck={false}
-                className="bg-muted placeholder:text-muted-foreground h-9 w-full rounded-lg px-3 font-mono text-[0.8125rem] outline-none"
+                className="bg-muted placeholder:text-muted-foreground text-ui h-9 w-full rounded-lg px-3 font-mono outline-none"
               />
             </Field>
             <Field label="Its data folders (optional, comma separated)">
@@ -200,7 +200,7 @@ export function AgentSection() {
                 onChange={(e) => setDataDirs(e.target.value)}
                 placeholder="~/.my-agent"
                 spellCheck={false}
-                className="bg-muted placeholder:text-muted-foreground h-9 w-full rounded-lg px-3 font-mono text-[0.8125rem] outline-none"
+                className="bg-muted placeholder:text-muted-foreground text-ui h-9 w-full rounded-lg px-3 font-mono outline-none"
               />
             </Field>
             <div className="flex items-center gap-3">
@@ -214,7 +214,7 @@ export function AgentSection() {
                 {usingCustom ? "Save and test" : "Use this agent"}
               </Button>
               {usingCustom && status === "ready" && !testing && (
-                <span className="text-muted-foreground flex items-center gap-1 text-[0.75rem]">
+                <span className="text-muted-foreground text-meta flex items-center gap-1">
                   <Check className="size-3.5" aria-hidden /> Started
                 </span>
               )}
@@ -222,7 +222,7 @@ export function AgentSection() {
             {usingCustom && customError && !testing && (
               <p
                 role="alert"
-                className="text-destructive text-[0.75rem] break-words"
+                className="text-destructive text-meta break-words"
               >
                 {customError}
               </p>
@@ -231,7 +231,7 @@ export function AgentSection() {
         </Card>
       </div>
       {sandboxed === false && (
-        <p role="note" className="text-muted-foreground mt-4 text-[0.8125rem]">
+        <p role="note" className="text-muted-foreground text-ui mt-4">
           This computer can't fence the agent in, so it runs with your own
           permissions.
         </p>
@@ -279,16 +279,16 @@ function Card({
           {on && <span className="bg-foreground size-2 rounded-full" />}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex items-center gap-2 text-[0.875rem] font-semibold">
+          <span className="text-prose flex items-center gap-2 font-semibold">
             {title}
             {badge && (
-              <span className="bg-background text-muted-foreground rounded-full px-2 py-0.5 text-[0.6875rem] font-normal">
+              <span className="bg-background text-muted-foreground text-caption rounded-full px-2 py-0.5 font-normal">
                 {badge}
               </span>
             )}
           </span>
           {note && (
-            <span className="text-muted-foreground text-[0.75rem]">{note}</span>
+            <span className="text-muted-foreground text-meta">{note}</span>
           )}
         </span>
       </button>
@@ -306,7 +306,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-muted-foreground mb-1 block text-[0.6875rem] font-medium">
+      <span className="text-muted-foreground text-caption mb-1 block font-medium">
         {label}
       </span>
       {children}

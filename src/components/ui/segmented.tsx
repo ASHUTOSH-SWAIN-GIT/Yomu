@@ -63,7 +63,7 @@ export function Segmented<T extends string>({
               }
             }}
             className={cn(
-              "focus-visible:ring-ring/60 min-w-7 rounded-md px-2 py-1 text-[0.72rem] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-[var(--dur-fast)] outline-none focus-visible:ring-2",
+              "focus-visible:ring-ring/60 text-caption min-w-7 rounded-md px-2 py-1 font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-[var(--dur-fast)] outline-none focus-visible:ring-2",
               checked
                 ? "text-foreground bg-card shadow-[var(--shadow-card)]"
                 : "text-muted-foreground hover:text-foreground",

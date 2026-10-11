@@ -28,20 +28,20 @@ export function CodeBlock({
 
   return (
     <div className="bg-muted my-[1.1em] overflow-hidden rounded-lg font-sans shadow-[inset_0_0_0_1px_var(--border)]">
-      <div className="border-border text-muted-foreground flex h-8 items-center border-b pr-1.5 pl-3.5 text-[0.6875rem] font-medium">
+      <div className="border-border text-muted-foreground text-caption flex h-8 items-center border-b pr-1.5 pl-3.5 font-medium">
         {language ?? "code"}
         <CopyButton text={content} />
       </div>
       {html ? (
         <div
-          className="overflow-x-auto font-mono text-[0.8125rem] leading-6 [&_pre]:m-0 [&_pre]:px-4 [&_pre]:py-3.5"
+          className="text-ui overflow-x-auto font-mono leading-6 [&_pre]:m-0 [&_pre]:px-4 [&_pre]:py-3.5"
           // Safe: `html` comes from our own Shiki render, not from the
           // scraped page. Article text inside is escaped by Shiki itself.
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
         // Unstyled fallback while Shiki loads, so layout doesn't jump.
-        <pre className="overflow-x-auto px-4 py-3.5 font-mono text-[0.8125rem] leading-6">
+        <pre className="text-ui overflow-x-auto px-4 py-3.5 font-mono leading-6">
           <code>{content}</code>
         </pre>
       )}

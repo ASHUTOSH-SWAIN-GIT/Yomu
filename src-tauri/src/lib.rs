@@ -83,6 +83,30 @@ fn open_pdf_original(app: tauri::AppHandle, sha: String) -> Result<(), String> {
         .map_err(|e| format!("could not open the PDF: {e}"))
 }
 
+/// Saves a figure cut from a PDF page (a PNG, sent as the raw request body
+/// with its `pdf-figure://` address in the `x-figure-url` header) into the
+/// image cache. Returns the file name, for the article's image index.
+#[tauri::command]
+async fn save_pdf_figure(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(png) = request.body() else {
+        return Err("expected the figure's bytes".into());
+    };
+    let url = request
+        .headers()
+        .get("x-figure-url")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("missing the figure's address")?
+        .to_string();
+    let png = png.clone();
+    let dir = imgcache::images_dir(&app)?;
+    tokio::task::spawn_blocking(move || imgcache::save_figure(&dir, &url, &png))
+        .await
+        .map_err(|e| format!("saving the figure failed: {e}"))?
+}
+
 /// Deletes saved PDFs whose id is not in `keep`; returns how many went.
 #[tauri::command]
 async fn prune_pdfs(app: tauri::AppHandle, keep: Vec<String>) -> Result<usize, String> {
@@ -368,6 +392,7 @@ pub fn run() {
             import_pdf,
             read_pdf,
             prune_pdfs,
+            save_pdf_figure,
             open_pdf_original,
             cached_image_names,
             prune_images,

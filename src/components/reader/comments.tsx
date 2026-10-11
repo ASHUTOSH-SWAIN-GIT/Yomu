@@ -10,10 +10,12 @@ import { rangeOfWords } from "@/hooks/use-comment-highlights";
 import { RESTACK } from "@/hooks/use-margin-stack";
 import { cn } from "@/lib/utils";
 import { useCommentsStore } from "@/stores/comments-store";
+import { toast } from "@/stores/toast-store";
+import { IconButton } from "@/components/ui/icon-button";
 import type { Comment } from "@/types/library";
 
 const buttonClass =
-  "hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-[0.8125rem] outline-none focus-visible:ring-2 [&>svg]:size-3.5";
+  "hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-ui outline-none focus-visible:ring-2 [&>svg]:size-3.5";
 
 /** What is offered over selected text: comment on it, or copy it. */
 export function AddCommentButton({
@@ -158,6 +160,7 @@ function CommentCard({ comment }: { comment: Comment }) {
   const setEditing = useCommentsStore((s) => s.setEditing);
   const update = useCommentsStore((s) => s.update);
   const remove = useCommentsStore((s) => s.remove);
+  const restore = useCommentsStore((s) => s.restore);
   // Edit and delete show while the pointer is on the comment (or a key
   // press has focus inside it).
   const [hovered, setHovered] = useState(false);
@@ -182,7 +185,7 @@ function CommentCard({ comment }: { comment: Comment }) {
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       className={cn(
-        "border-border bg-card relative rounded-xl border px-3.5 py-3 text-[0.875rem] leading-relaxed transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+        "border-border bg-card text-prose relative rounded-xl border px-3.5 py-3 leading-relaxed transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
         active && "-translate-x-3",
       )}
     >
@@ -203,13 +206,22 @@ function CommentCard({ comment }: { comment: Comment }) {
         <span className="absolute top-2.5 right-2.5 flex gap-0.5">
           <IconButton
             label="Edit comment"
+            size="sm"
             onClick={() => setEditing(comment.id)}
           >
             <Pencil aria-hidden />
           </IconButton>
           <IconButton
             label="Delete comment"
-            onClick={() => void remove(comment.id)}
+            size="sm"
+            danger
+            onClick={() => {
+              void remove(comment.id);
+              toast("Comment deleted", {
+                label: "Undo",
+                run: () => void restore(comment),
+              });
+            }}
           >
             <Trash2 aria-hidden />
           </IconButton>
@@ -248,7 +260,7 @@ function Composer({
 }) {
   const [text, setText] = useState(initial);
   return (
-    <div className="border-border bg-card focus-within:border-input flex items-center gap-2 rounded-xl border py-1.5 pr-1.5 pl-3.5 text-[0.875rem]">
+    <div className="border-border bg-card focus-within:border-input text-prose flex items-center gap-2 rounded-xl border py-1.5 pr-1.5 pl-3.5">
       <textarea
         autoFocus
         value={text}
@@ -278,27 +290,5 @@ function Composer({
         <ArrowUp className="size-4" aria-hidden />
       </button>
     </div>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 grid size-6 place-items-center rounded-md outline-none focus-visible:ring-2 [&>svg]:size-3.5"
-    >
-      {children}
-    </button>
   );
 }

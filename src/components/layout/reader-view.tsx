@@ -11,6 +11,7 @@ import { commentLayout } from "@/lib/reader-layout";
 import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
+import { CitationLayer } from "@/components/reader/citations";
 import { GlossaryLayer } from "@/components/reader/glossary";
 import { Outline } from "@/components/reader/outline";
 import { AddCommentButton, BlockComments } from "@/components/reader/comments";
@@ -25,6 +26,9 @@ import { readingMinutes } from "@/lib/reading";
 import { useReaderStore } from "@/stores/reader-store";
 import type { StoredArticle } from "@/types/library";
 
+/** Below this window width the sidebar, article and chat do not all fit. */
+const NARROW = 1100;
+
 export function ReaderView() {
   const state = useReaderStore((s) => s.state);
   const chatOpen = useViewStore((s) => s.chatOpen);
@@ -35,6 +39,19 @@ export function ReaderView() {
   const focusMode = useUiStore((s) => s.focusMode);
   const scrollRef = useRef<HTMLElement>(null);
   const setPastTitle = useViewStore((s) => s.setPastTitle);
+
+  // Opening the chat in a narrow window folds the docked sidebar away, so
+  // the article keeps a readable width (⌘B brings it back). Only when the
+  // chat is opened, not when a tab is drawn with it already open; and not
+  // saved, so the next launch still has the sidebar.
+  const chatWasOpen = useRef(chatOpen);
+  useEffect(() => {
+    if (chatOpen && !chatWasOpen.current && window.innerWidth < NARROW) {
+      if (useUiStore.getState().sidebarOpen)
+        useUiStore.setState({ sidebarOpen: false, sidebarPeek: false });
+    }
+    chatWasOpen.current = chatOpen;
+  }, [chatOpen]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -218,7 +235,7 @@ function Article({
                   if (sha) void openPdfOriginal(sha);
                 }}
                 title="Open the PDF in your PDF viewer"
-                className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-2 font-sans text-[0.75rem] leading-none font-medium"
+                className="text-muted-foreground hover:text-foreground text-meta mb-4 inline-flex items-center gap-2 font-sans leading-none font-medium"
               >
                 <FileText className="size-3.5" aria-hidden />
                 PDF
@@ -230,7 +247,7 @@ function Article({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={article.url}
-                className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-2 font-sans text-[0.75rem] leading-none font-medium"
+                className="text-muted-foreground hover:text-foreground text-meta mb-4 inline-flex items-center gap-2 font-sans leading-none font-medium"
               >
                 <i aria-hidden className="bg-space size-2 rounded-full" />
                 {article.site || new URL(article.url).hostname}
@@ -240,7 +257,7 @@ function Article({
             <h1 className="text-foreground font-serif text-[2em] leading-[1.15] font-semibold tracking-[-0.02em] text-balance">
               {article.title}
             </h1>
-            <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-[0.8125rem] leading-normal">
+            <div className="text-muted-foreground text-ui mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 font-sans leading-normal">
               {article.author && (
                 <span className="text-foreground font-medium">
                   {article.author}
@@ -287,6 +304,13 @@ function Article({
         blocks={article.blocks}
         page={pager?.index}
       />
+      {paper && (
+        <CitationLayer
+          articleRef={articleRef}
+          blocks={article.blocks}
+          page={pager?.index}
+        />
+      )}
       {selection && <AddCommentButton selection={selection} onDone={clear} />}
     </>
   );

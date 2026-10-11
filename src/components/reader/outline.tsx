@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { moveFocus } from "@/lib/list-focus";
 import { currentHeadingIndex } from "@/lib/reader-layout";
 import { requestBlock } from "@/lib/show-block";
 import { cn } from "@/lib/utils";
@@ -123,6 +124,10 @@ export function Outline({
       {
         <div
           inert={!open}
+          role="group"
+          aria-label="Headings"
+          // Up and down arrows move through the headings.
+          onKeyDown={moveFocus}
           className={cn(
             "bg-popover border-border absolute top-1/2 right-full mr-1 max-h-[70vh] w-72 origin-right -translate-y-1/2 overflow-y-auto rounded-xl border p-2 transition-[opacity,translate,scale] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]",
             open
@@ -134,10 +139,12 @@ export function Outline({
             <button
               key={h.index}
               type="button"
+              data-row
+              aria-current={i === current ? "location" : undefined}
               onClick={() => go(h.index)}
               style={{ paddingLeft: 12 + (h.level - minLevel) * 12 }}
               className={cn(
-                "hover:bg-accent block w-full rounded-md py-1.5 pr-3 text-left text-[0.8125rem] leading-snug",
+                "hover:bg-accent focus-visible:bg-accent text-ui block w-full rounded-md py-1.5 pr-3 text-left leading-snug outline-none",
                 i === current
                   ? "text-foreground font-medium"
                   : "text-muted-foreground",

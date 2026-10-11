@@ -8,7 +8,7 @@ import type { StoredArticle } from "@/types/library";
 /** What sits on top of a page after the first: where you are in the paper. */
 export function PageHead({ pager, title }: { pager: Pager; title: string }) {
   return (
-    <div className="text-muted-foreground mb-[2em] flex items-center gap-3 font-sans text-[0.75rem]">
+    <div className="text-muted-foreground text-meta mb-[2em] flex items-center gap-3 font-sans">
       <span className="text-foreground font-medium tabular-nums">
         Page {pager.index + 1} of {pager.pages.length}
       </span>
@@ -28,7 +28,7 @@ export function PageEnd({
   const next = pager.pages[pager.index + 1];
   if (!next) {
     return (
-      <div className="text-muted-foreground mt-[3em] border-t pt-6 text-center font-sans text-[0.8125rem]">
+      <div className="text-muted-foreground text-ui mt-[3em] border-t pt-6 text-center font-sans">
         End of the paper
       </div>
     );
@@ -46,10 +46,10 @@ export function PageEnd({
       className="hover:bg-muted/60 focus-visible:ring-ring/60 border-border group mt-[3em] flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left font-sans transition-colors outline-none focus-visible:ring-2"
     >
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-muted-foreground text-[0.75rem]">
+        <span className="text-muted-foreground text-meta">
           Next · page {pager.index + 2} of {pager.pages.length}
         </span>
-        <span className="truncate text-[0.875rem] font-medium">
+        <span className="text-prose truncate font-medium">
           {preview || "Continue"}
         </span>
       </span>
@@ -70,7 +70,7 @@ export function PageBar({ pager }: { pager: Pager }) {
   return (
     <nav
       aria-label="Pages"
-      className="bg-popover/90 sticky bottom-5 z-10 mx-auto mt-auto flex w-fit items-center gap-1 rounded-full px-1.5 py-1 font-sans text-[0.8125rem] shadow-[var(--shadow-float)] backdrop-blur"
+      className="bg-popover/90 text-ui sticky bottom-5 z-10 mx-auto mt-auto flex w-fit items-center gap-1 rounded-full px-1.5 py-1 font-sans shadow-[var(--shadow-float)] backdrop-blur"
     >
       <button
         type="button"

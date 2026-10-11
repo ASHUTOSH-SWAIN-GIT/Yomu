@@ -48,6 +48,9 @@ interface SpacesStore {
   createSpace: (name: string) => string | null;
   /** Forgets a space you created. Its articles are untagged by the caller. */
   deleteSpace: (id: string) => void;
+  /** Moves a space's own records (kept while empty, its colour) to a new id.
+   * Its articles are retagged by the caller. */
+  renameSpace: (from: string, to: string) => void;
   /** Gives every known space a stable colour slot. */
   syncSlots: (names: string[]) => void;
 }
@@ -87,6 +90,20 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     writeStorage(EXTRA_KEY, JSON.stringify(extra));
     set({ extra });
     if (get().active === id) get().setActive(INBOX);
+  },
+
+  renameSpace(from, to) {
+    const extra = [...new Set(get().extra.map((e) => (e === from ? to : e)))];
+    writeStorage(EXTRA_KEY, JSON.stringify(extra));
+    const slots = { ...get().slots };
+    if (from in slots && !(to in slots)) slots[to] = slots[from];
+    delete slots[from];
+    writeStorage(SLOTS_KEY, JSON.stringify(slots));
+    set({ extra, slots });
+    if (get().active === from) {
+      writeStorage(ACTIVE_KEY, to);
+      set({ active: to });
+    }
   },
 
   syncSlots(names) {

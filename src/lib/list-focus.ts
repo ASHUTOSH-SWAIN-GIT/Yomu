@@ -1,11 +1,16 @@
 import type { KeyboardEvent } from "react";
 
-/** Arrow keys (or j/k) move between the rows (`[data-row]`) of a list. */
+/** Arrow keys (or j/k) move between the rows (`[data-row]`) of a list. In a
+ * text box inside the list (its search) letters are typing, so only the
+ * down arrow moves, into the list. */
 export function moveFocus(e: KeyboardEvent<HTMLElement>) {
+  const typing = (e.target as HTMLElement).closest?.("input, textarea");
   const step =
-    e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowRight"
+    e.key === "ArrowDown" ||
+    (!typing && (e.key === "j" || e.key === "ArrowRight"))
       ? 1
-      : e.key === "ArrowUp" || e.key === "k" || e.key === "ArrowLeft"
+      : !typing &&
+          (e.key === "ArrowUp" || e.key === "k" || e.key === "ArrowLeft")
         ? -1
         : 0;
   if (!step) return;

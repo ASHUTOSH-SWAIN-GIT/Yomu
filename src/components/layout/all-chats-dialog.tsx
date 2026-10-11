@@ -12,6 +12,7 @@ import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
+import { IconButton } from "@/components/ui/icon-button";
 
 /** Every chat you have had with your blogs, with a box to search them.
  * Opened by "View all" under the sidebar's recent chats. */
@@ -49,10 +50,10 @@ function Body({ close }: { close: () => void }) {
   return (
     <>
       <div className="px-6 pt-6 pb-3">
-        <DialogTitle className="text-[1.25rem] font-bold tracking-[-0.01em]">
+        <DialogTitle className="text-title font-bold tracking-[-0.01em]">
           All chats
         </DialogTitle>
-        <DialogDescription className="text-muted-foreground mt-1 text-[0.8125rem]">
+        <DialogDescription className="text-muted-foreground text-ui mt-1">
           {chats.length} {chats.length === 1 ? "chat" : "chats"} with your
           blogs.
         </DialogDescription>
@@ -67,14 +68,14 @@ function Body({ close }: { close: () => void }) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
             aria-label="Search chats"
-            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.875rem] outline-none"
+            className="placeholder:text-muted-foreground text-prose min-w-0 flex-1 bg-transparent outline-none"
           />
         </label>
       </div>
 
       <ul className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {shown.length === 0 && (
-          <li className="text-muted-foreground px-3 py-8 text-center text-[0.8125rem]">
+          <li className="text-muted-foreground text-ui px-3 py-8 text-center">
             {q ? "No chat matches." : "No chats yet."}
           </li>
         )}
@@ -95,7 +96,7 @@ function Body({ close }: { close: () => void }) {
                   close();
                 }}
                 title={chat.title}
-                className="focus-visible:ring-ring/60 flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[0.875rem] outline-none focus-visible:ring-2"
+                className="focus-visible:ring-ring/60 text-prose flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none focus-visible:ring-2"
               >
                 <MessageCircle
                   className="text-muted-foreground size-4 shrink-0"
@@ -104,7 +105,7 @@ function Body({ close }: { close: () => void }) {
                 <span className="min-w-0 flex-1 truncate">{chat.title}</span>
               </button>
               {confirming === chat.id ? (
-                <span className="flex shrink-0 items-center gap-1 text-[0.75rem]">
+                <span className="text-meta flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -124,15 +125,15 @@ function Body({ close }: { close: () => void }) {
                   </button>
                 </span>
               ) : (
-                <button
-                  type="button"
+                <IconButton
+                  label={`Delete the chat “${chat.title}”`}
+                  size="md"
+                  danger
                   onClick={() => setConfirming(chat.id)}
-                  aria-label={`Delete the chat “${chat.title}”`}
-                  title="Delete this chat"
-                  className="text-muted-foreground hover:text-destructive hover:bg-background/60 focus-visible:ring-ring/60 grid size-7 shrink-0 place-items-center rounded-md outline-none focus-visible:ring-2"
+                  className="[&_svg]:size-4"
                 >
-                  <Trash2 className="size-4" aria-hidden />
-                </button>
+                  <Trash2 aria-hidden />
+                </IconButton>
               )}
             </div>
           </li>

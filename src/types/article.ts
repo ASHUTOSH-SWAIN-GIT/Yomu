@@ -22,7 +22,14 @@ export type Block = (
   | { type: "heading"; level: number; text: string }
   | { type: "paragraph"; spans: Span[] }
   | { type: "code"; language: string | null; content: string }
-  | { type: "image"; src: string; alt: string | null }
+  | {
+      type: "image";
+      src: string;
+      alt: string | null;
+      /** Display width in em of the article's text (a figure cut from a
+       * PDF, which is drawn larger than it shows). */
+      width?: number;
+    }
   | { type: "math"; tex: string }
   | { type: "list"; ordered: boolean; items: ListItem[] }
   | { type: "quote"; spans: Span[] }

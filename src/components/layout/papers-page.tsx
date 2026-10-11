@@ -8,9 +8,19 @@ import {
   Plus,
   Search,
 } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Actions, Confirm } from "@/components/layout/home-library";
+import { Actions } from "@/components/layout/home-library";
+import { Confirm } from "@/components/ui/confirm";
+import {
+  ProgressBar,
+  ReadState,
+  ReadingCard,
+} from "@/components/layout/reading-card";
+import { finished, inProgress, savedOn } from "@/lib/reading";
+import { toggleArchived } from "@/lib/article-actions";
 import { moveFocus } from "@/lib/list-focus";
+import { logError } from "@/lib/log";
 import { deleteArticle, openSavedArticle } from "@/lib/navigate";
 import { isPdfUrl } from "@/lib/pdf/identity";
 import { pickAndOpenPdf } from "@/lib/pdf/pick";
@@ -20,11 +30,7 @@ import { usePaperImports } from "@/stores/paper-imports-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import type { ArticleSummary } from "@/types/library";
-
-const MOD = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl+";
-
-const started = (a: ArticleSummary) => a.progress > 0.001;
-const finished = (a: ArticleSummary) => a.progress >= 0.95;
+import { MOD } from "@/lib/platform";
 
 /** Research papers: the PDFs opened from this computer, the one being read
  * in, and the way to add another. */
@@ -35,18 +41,18 @@ export function PapersPage() {
   const papers = articles.filter(
     (a) => isPdfUrl(a.canonicalUrl) && !a.archived,
   );
-  const reading = papers.filter((a) => started(a) && !finished(a)).slice(0, 3);
+  const reading = papers.filter(inProgress).slice(0, 3);
   const loading = state.status === "loading";
 
   return (
     <div className="relative mx-auto w-full max-w-[62rem] px-10 pt-14 pb-32">
       <header className="flex items-end justify-between gap-6">
         <div>
-          <p className="text-muted-foreground text-[0.8125rem]">Research</p>
-          <h1 className="font-display mt-1.5 text-[2.25rem] leading-[1.12] font-semibold tracking-[-0.025em]">
+          <p className="text-muted-foreground text-ui">Research</p>
+          <h1 className="font-display text-display mt-1.5 leading-[1.12] font-semibold tracking-[-0.025em]">
             Papers
           </h1>
-          <p className="text-muted-foreground mt-2 text-[0.8125rem]">
+          <p className="text-muted-foreground text-ui mt-2">
             Read PDFs page by page, and ask about any line.
           </p>
         </div>
@@ -63,19 +69,15 @@ export function PapersPage() {
         />
       )}
       {state.status === "error" && (
-        <div
-          role="alert"
-          className="bg-destructive/8 text-destructive mt-8 flex items-center gap-3 rounded-xl px-4 py-3 text-[0.8125rem] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--destructive)_30%,transparent)]"
+        <Alert
+          className="mt-8"
+          action={{
+            label: "Try another file",
+            onClick: () => void pickAndOpenPdf(),
+          }}
         >
-          <span className="min-w-0 flex-1">{state.message}</span>
-          <button
-            type="button"
-            onClick={() => void pickAndOpenPdf()}
-            className="shrink-0 font-medium underline underline-offset-2"
-          >
-            Try another file
-          </button>
-        </div>
+          {state.message}
+        </Alert>
       )}
 
       {papers.length === 0 ? (
@@ -84,12 +86,10 @@ export function PapersPage() {
         <>
           {reading.length > 0 && (
             <section className="mt-12">
-              <h2 className="text-[0.9375rem] font-semibold">
-                Continue reading
-              </h2>
+              <h2 className="text-lead font-semibold">Continue reading</h2>
               <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
                 {reading.map((a) => (
-                  <ReadingCard key={a.id} paper={a} />
+                  <ReadingCard key={a.id} article={a} />
                 ))}
               </div>
             </section>
@@ -119,7 +119,7 @@ function useFileDrag(): boolean {
         if (gone) unlisten();
         else off = unlisten;
       })
-      .catch(() => {});
+      .catch((err) => logError("listening for dropped PDFs failed", err));
     return () => {
       gone = true;
       off?.();
@@ -136,7 +136,7 @@ function DropZone({ active }: { active: boolean }) {
       type="button"
       onClick={() => void pickAndOpenPdf()}
       className={cn(
-        "text-muted-foreground hover:text-foreground hover:border-foreground/40 focus-visible:ring-ring/60 mt-8 flex w-full items-center justify-center gap-2.5 rounded-xl border border-dashed px-4 py-4 text-[0.8125rem] transition-colors outline-none focus-visible:ring-2",
+        "text-muted-foreground hover:text-foreground hover:border-foreground/40 focus-visible:ring-ring/60 text-ui mt-8 flex w-full items-center justify-center gap-2.5 rounded-xl border border-dashed px-4 py-4 transition-colors outline-none focus-visible:ring-2",
         active && "border-foreground/60 bg-accent text-foreground",
       )}
     >
@@ -147,7 +147,7 @@ function DropZone({ active }: { active: boolean }) {
           choose files
         </span>
       </span>
-      <kbd className="font-sans text-[0.6875rem] opacity-60">{MOD}O</kbd>
+      <kbd className="text-muted-foreground text-caption font-sans">{MOD}O</kbd>
     </button>
   );
 }
@@ -166,7 +166,7 @@ function ImportQueue() {
       aria-label="Adding papers"
       className="bg-muted/50 mt-4 rounded-xl px-4 py-3"
     >
-      <div className="flex items-center gap-3 text-[0.8125rem]">
+      <div className="text-ui flex items-center gap-3">
         <span className="font-medium">
           {finished
             ? `Added ${items.filter((i) => i.status === "added").length} of ${items.length}`
@@ -176,7 +176,7 @@ function ImportQueue() {
           <button
             type="button"
             onClick={clearDone}
-            className="text-muted-foreground hover:text-foreground ml-auto text-[0.75rem] underline underline-offset-2"
+            className="text-muted-foreground hover:text-foreground text-meta ml-auto underline underline-offset-2"
           >
             Clear
           </button>
@@ -186,7 +186,7 @@ function ImportQueue() {
         {items.map((i) => (
           <li
             key={i.id}
-            className="flex items-center gap-3 text-[0.8125rem]"
+            className="text-ui flex items-center gap-3"
             title={i.error}
           >
             <FileText
@@ -194,7 +194,7 @@ function ImportQueue() {
               aria-hidden
             />
             <span className="min-w-0 flex-1 truncate">{i.name}</span>
-            <span className="text-muted-foreground flex shrink-0 items-center gap-2 text-[0.75rem] tabular-nums">
+            <span className="text-muted-foreground text-meta flex shrink-0 items-center gap-2 tabular-nums">
               {i.status === "waiting" && "Waiting"}
               {i.status === "reading" && (
                 <>
@@ -229,7 +229,7 @@ function DropOverlay() {
     <div className="bg-background/80 pointer-events-none fixed inset-0 z-40 grid place-items-center backdrop-blur-sm">
       <div className="border-foreground/30 flex flex-col items-center gap-3 rounded-3xl border-2 border-dashed px-16 py-12">
         <FileUp className="size-8" aria-hidden />
-        <p className="text-[0.9375rem] font-medium">Drop PDFs to add them</p>
+        <p className="text-lead font-medium">Drop PDFs to add them</p>
       </div>
     </div>
   );
@@ -245,19 +245,19 @@ function Empty() {
           aria-hidden
         />
       </span>
-      <h2 className="mt-5 text-[1.0625rem] font-semibold">No papers yet</h2>
-      <p className="text-muted-foreground mt-1.5 max-w-[26rem] text-[0.8125rem] leading-relaxed">
+      <h2 className="text-heading mt-5 font-semibold">No papers yet</h2>
+      <p className="text-muted-foreground text-ui mt-1.5 max-w-[26rem] leading-relaxed">
         Open a research paper or any PDF from this computer. You'll read it a
         page at a time, with comments and the agent beside you.
       </p>
       <Button
         onClick={() => void pickAndOpenPdf()}
-        className="mt-6 h-9 gap-2 rounded-lg px-4 text-[0.8125rem]"
+        className="text-ui mt-6 h-9 gap-2 rounded-lg px-4"
       >
         <Plus className="size-4" aria-hidden />
         Open PDF
       </Button>
-      <p className="text-muted-foreground mt-3 text-[0.75rem]">
+      <p className="text-muted-foreground text-meta mt-3">
         or drop PDFs anywhere, several at once · {MOD}O
       </p>
     </div>
@@ -283,7 +283,7 @@ function Importing({
     >
       <FileText className="text-muted-foreground size-5 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3 text-[0.8125rem]">
+        <div className="text-ui flex items-baseline justify-between gap-3">
           <span className="truncate font-medium">{name}</span>
           <span className="text-muted-foreground shrink-0 tabular-nums">
             {detail ?? "Opening…"}
@@ -304,62 +304,7 @@ function Importing({
   );
 }
 
-function ProgressBar({
-  value,
-  className,
-}: {
-  value: number;
-  className?: string;
-}) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "bg-secondary block h-1 overflow-hidden rounded-full",
-        className,
-      )}
-    >
-      <span
-        className="bg-foreground/70 block h-full rounded-full"
-        style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }}
-      />
-    </span>
-  );
-}
-
-/** A paper you are partway through, as a card to pick up from. */
-function ReadingCard({ paper }: { paper: ArticleSummary }) {
-  return (
-    <button
-      type="button"
-      onClick={() => void openSavedArticle(paper.id)}
-      className="bg-card hover:border-input focus-visible:ring-ring/60 border-border flex flex-col rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2"
-    >
-      <FileText
-        className="text-muted-foreground size-4"
-        strokeWidth={1.75}
-        aria-hidden
-      />
-      <span className="mt-3 line-clamp-2 font-serif text-[0.9375rem] leading-snug font-medium">
-        {paper.title}
-      </span>
-      {paper.author && (
-        <span className="text-muted-foreground mt-1 truncate text-[0.75rem]">
-          {paper.author}
-        </span>
-      )}
-      <span className="mt-auto flex items-center gap-2.5 pt-4">
-        <ProgressBar value={paper.progress} className="flex-1" />
-        <span className="text-muted-foreground text-[0.6875rem] tabular-nums">
-          {Math.round(paper.progress * 100)}%
-        </span>
-      </span>
-    </button>
-  );
-}
-
 function PaperList({ papers }: { papers: ArticleSummary[] }) {
-  const setArchived = useLibraryStore((s) => s.setArchived);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const shown = query.trim()
@@ -368,8 +313,8 @@ function PaperList({ papers }: { papers: ArticleSummary[] }) {
   return (
     <section className="mt-12" onKeyDown={moveFocus}>
       <div className="flex items-center gap-2">
-        <h2 className="text-[0.9375rem] font-semibold">All papers</h2>
-        <span className="text-muted-foreground text-[0.8125rem] tabular-nums">
+        <h2 className="text-lead font-semibold">All papers</h2>
+        <span className="text-muted-foreground text-ui tabular-nums">
           {papers.length}
         </span>
         {/* A long list gets a way to find one paper in it. */}
@@ -381,13 +326,13 @@ function PaperList({ papers }: { papers: ArticleSummary[] }) {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Find a paper"
               aria-label="Find a paper"
-              className="placeholder:text-muted-foreground text-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
+              className="placeholder:text-muted-foreground text-foreground text-ui min-w-0 flex-1 bg-transparent outline-none"
             />
           </label>
         )}
       </div>
       {shown.length === 0 && (
-        <p className="text-muted-foreground mt-6 text-[0.8125rem]">
+        <p className="text-muted-foreground text-ui mt-6">
           No paper matches “{query.trim()}”.
         </p>
       )}
@@ -396,7 +341,7 @@ function PaperList({ papers }: { papers: ArticleSummary[] }) {
           confirmingId === a.id ? (
             <li key={a.id} className="bg-muted flex h-16 items-center px-3">
               <Confirm
-                title={a.title}
+                question={`Delete “${a.title}”?`}
                 className="w-full"
                 onConfirm={(yes) => {
                   setConfirmingId(null);
@@ -408,7 +353,7 @@ function PaperList({ papers }: { papers: ArticleSummary[] }) {
             <PaperRow
               key={a.id}
               paper={a}
-              onArchive={() => void setArchived(a.id, !a.archived)}
+              onArchive={() => void toggleArchived(a)}
               onDelete={() => setConfirmingId(a.id)}
             />
           ),
@@ -428,10 +373,7 @@ function PaperRow({
   onDelete: () => void;
 }) {
   const done = finished(paper);
-  const added = new Date(paper.scrapedAt).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-  });
+  const added = savedOn(paper);
   return (
     <li className="group hover:bg-muted/60 relative transition-colors duration-[var(--dur-fast)]">
       <button
@@ -451,29 +393,17 @@ function PaperRow({
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span
             className={cn(
-              "truncate font-serif text-[0.9375rem] font-medium",
+              "text-lead truncate font-serif font-medium",
               done && "text-muted-foreground",
             )}
           >
             {paper.title}
           </span>
-          <span className="text-muted-foreground truncate text-[0.75rem]">
+          <span className="text-muted-foreground text-meta truncate">
             {[paper.author, `Added ${added}`].filter(Boolean).join(" · ")}
           </span>
         </span>
-        {/* Where you are; hidden while the actions show in its place. */}
-        <span className="text-muted-foreground flex w-24 shrink-0 items-center justify-end gap-2 text-[0.75rem] tabular-nums group-focus-within:invisible group-hover:invisible">
-          {done ? (
-            "Finished"
-          ) : started(paper) ? (
-            <>
-              <ProgressBar value={paper.progress} className="w-12" />
-              {Math.round(paper.progress * 100)}%
-            </>
-          ) : (
-            "Not started"
-          )}
-        </span>
+        <ReadState article={paper} />
       </button>
       <Actions
         article={paper}

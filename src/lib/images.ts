@@ -55,3 +55,10 @@ export function isSvgUrl(src: string): boolean {
     return /\.svg(\?|#|$)/i.test(src);
   }
 }
+
+/** A figure, table or equation cut from a PDF's page (see lib/pdf/render.ts):
+ * a local picture with no web address. */
+export function isPdfFigure(src: string): boolean {
+  return src.startsWith(FIGURE_SCHEME);
+}
+export const FIGURE_SCHEME = "pdf-figure://";

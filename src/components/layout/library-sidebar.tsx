@@ -9,6 +9,7 @@ import {
   Inbox,
   MoreHorizontal,
   MessageCircle,
+  Pencil,
   SquarePen,
   Plus,
   SlidersHorizontal,
@@ -19,14 +20,17 @@ import { isPdfUrl } from "@/lib/pdf/identity";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { articlesInSpace, buildSpaces, INBOX } from "@/lib/spaces";
 import { WithContextMenu } from "@/components/ui/context-menu";
+import { Confirm } from "@/components/ui/confirm";
+import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
-import { removeCollection } from "@/lib/collections";
+import { removeCollection, renameCollection } from "@/lib/collections";
 import {
   goHome,
   openArticleInNewTab,
   openChatInNewTab,
   openSavedArticle,
 } from "@/lib/navigate";
+import { useAgentStore } from "@/stores/agent-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
@@ -39,8 +43,9 @@ const CHATS_FOLDED_KEY = "yomu-sidebar-chats-folded";
 /** Previous chats shown before "View all". */
 const RECENT_CHATS = 5;
 
-/** The library's navigation, on the window frame beside the page: Home, your
- * collections, the archive, and the way to add a collection. */
+/** The library's navigation, on the window frame beside the page: Home,
+ * Papers, chats, your collections and the archive, with Settings at the
+ * foot. */
 export function LibrarySidebar() {
   const articles = useLibraryStore((s) => s.articles);
   const extra = useSpacesStore((s) => s.extra);
@@ -90,6 +95,9 @@ export function LibrarySidebar() {
   // The collection last clicked: it is the one whose options show.
   const [selected, setSelected] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const agentStatus = useAgentStore((s) => s.status);
+  const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const settingsPage = useViewStore((s) => s.settingsPage);
   const setSettingsPage = useViewStore((s) => s.setSettingsPage);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
@@ -131,13 +139,14 @@ export function LibrarySidebar() {
         onMouseEnter={() => !sidebarOpen && peekSidebar(true)}
         onMouseLeave={() => peekSidebar(false)}
         className={cn(
-          "bg-frame border-border absolute left-0 flex w-52 flex-col gap-0.5 overflow-y-auto px-2 pb-3 text-[0.8125rem] transition-[translate,box-shadow,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[translate]",
+          "bg-frame border-border text-ui absolute left-0 flex w-52 flex-col gap-0.5 overflow-y-auto px-2 pb-3 transition-[translate,box-shadow,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[translate]",
           // Docked: the full height of the window, with the contents a little
           // below the top. Floating (the hover peek): a small panel under the
           // top bar, which already starts below it.
+          // (On macOS the window buttons sit above the contents.)
           shape === "docked"
-            ? "top-0 bottom-0 border-r pt-8"
-            : "top-11 bottom-2 left-2 rounded-md border pt-2",
+            ? "top-0 bottom-0 border-r pt-2 [.platform-mac_&]:pt-8"
+            : "top-11 bottom-2 left-2 rounded-xl border pt-2",
           // Shown, or slid out of sight (and out of reach of the keyboard).
           shown
             ? "translate-x-0"
@@ -145,6 +154,14 @@ export function LibrarySidebar() {
           shape === "floating" && shown && "shadow-[var(--shadow-float)]",
         )}
       >
+        {shape === "docked" && (
+          // The strip beside the macOS window buttons drags the window.
+          <div
+            data-tauri-drag-region
+            aria-hidden
+            className="absolute inset-x-0 top-0 hidden h-8 [.platform-mac_&]:block"
+          />
+        )}
         <Item
           on={
             !reading &&
@@ -190,9 +207,7 @@ export function LibrarySidebar() {
           </Item>
         )}
 
-        <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
-          Chat
-        </h2>
+        <Label>Chats</Label>
         <Item
           on={
             !reading &&
@@ -211,15 +226,14 @@ export function LibrarySidebar() {
         </Item>
         <PreviousChats leave={leave} />
 
-        <h2 className="text-foreground mt-5 mb-1 px-2.5 text-[0.8125rem] font-bold">
-          My collection
-        </h2>
+        <Label>Collections</Label>
         <Item on={false} onClick={() => setNaming(true)} icon={<Plus />}>
           New collection
         </Item>
         {naming && (
           // A new folder appears in the list, ready to be named.
-          <NewFolder
+          <FolderName
+            label="New collection name"
             onDone={(name) => {
               setNaming(false);
               const id = name ? createSpace(name) : null;
@@ -233,13 +247,29 @@ export function LibrarySidebar() {
         {named.map((space) => {
           const blogs = articlesInSpace(articles, space.id);
           const open = !folded.includes(space.id);
+          if (renaming === space.id) {
+            return (
+              <FolderName
+                key={space.id}
+                label={`Rename ${space.name}`}
+                initial={space.name}
+                onDone={(name) => {
+                  setRenaming(null);
+                  if (name)
+                    void renameCollection(space.id, name).then(
+                      (id) => id && setSelected(id),
+                    );
+                }}
+              />
+            );
+          }
           return (
             <div key={space.id} className="group relative flex flex-col">
               {blogs.length > 0 && (
                 <button
                   type="button"
                   onClick={() => toggleFolded(space.id)}
-                  aria-label={`${open ? "Hide" : "Show"} the blogs in ${space.name}`}
+                  aria-label={`${open ? "Hide" : "Show"} the articles in ${space.name}`}
                   aria-expanded={open}
                   className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 absolute top-[5px] left-1 z-10 grid size-5 place-items-center rounded-sm outline-none focus-visible:ring-2"
                 >
@@ -252,62 +282,71 @@ export function LibrarySidebar() {
                   />
                 </button>
               )}
-              <Item
-                className="pl-7"
-                on={selected === space.id}
-                onClick={() => {
-                  // Clicking a collection opens or folds its blogs and shows
-                  // its options.
-                  setSelected(space.id);
-                  setConfirming(null);
-                  if (blogs.length > 0) toggleFolded(space.id);
-                }}
-                icon={open ? <FolderOpen /> : <Folder />}
-                count={selected === space.id ? undefined : space.count}
+              <WithContextMenu
+                items={[
+                  {
+                    label: "Rename",
+                    onSelect: () => setRenaming(space.id),
+                  },
+                  {
+                    label: "Delete",
+                    onSelect: () => {
+                      setSelected(space.id);
+                      setConfirming(space.id);
+                    },
+                  },
+                ]}
               >
-                {space.name}
-              </Item>
-              {selected === space.id && (
-                <button
-                  type="button"
-                  onClick={() => setConfirming(space.id)}
-                  aria-label={`Delete ${space.name}`}
-                  title="Delete collection (the blogs are kept)"
-                  className="text-muted-foreground hover:text-destructive hover:bg-background/60 focus-visible:ring-ring/60 absolute top-[5px] right-1.5 grid size-5 place-items-center rounded-sm outline-none focus-visible:ring-2"
+                <Item
+                  className={cn("pl-7", selected === space.id && "pr-14")}
+                  on={selected === space.id}
+                  onClick={() => {
+                    // Clicking a collection opens or folds its articles and
+                    // shows its options.
+                    setSelected(space.id);
+                    setConfirming(null);
+                    if (blogs.length > 0) toggleFolded(space.id);
+                  }}
+                  onDoubleClick={() => setRenaming(space.id)}
+                  icon={open ? <FolderOpen /> : <Folder />}
+                  count={selected === space.id ? undefined : space.count}
                 >
-                  <Trash2 className="size-3.5" aria-hidden />
-                </button>
+                  {space.name}
+                </Item>
+              </WithContextMenu>
+              {selected === space.id && (
+                <span className="absolute top-[3px] right-1 flex">
+                  <IconButton
+                    label={`Rename ${space.name}`}
+                    size="sm"
+                    onClick={() => setRenaming(space.id)}
+                  >
+                    <Pencil aria-hidden />
+                  </IconButton>
+                  <IconButton
+                    label={`Delete ${space.name}`}
+                    size="sm"
+                    danger
+                    onClick={() => setConfirming(space.id)}
+                  >
+                    <Trash2 aria-hidden />
+                  </IconButton>
+                </span>
               )}
               {confirming === space.id && (
-                <div className="bg-accent/60 mx-1 mt-0.5 mb-1 flex flex-col gap-2 rounded-md p-2 text-[0.75rem]">
-                  <span>
-                    Delete “{space.name}”?
-                    <span className="text-muted-foreground">
-                      {" "}
-                      The blogs are kept.
-                    </span>
-                  </span>
-                  <span className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirming(null);
-                        setSelected(null);
-                        void removeCollection(space.id);
-                      }}
-                      className="bg-destructive text-destructive-foreground focus-visible:ring-ring/60 h-6 rounded-md px-2.5 font-medium outline-none focus-visible:ring-2"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirming(null)}
-                      className="hover:bg-accent focus-visible:ring-ring/60 h-6 rounded-md px-2.5 outline-none focus-visible:ring-2"
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                </div>
+                <Confirm
+                  stacked
+                  question={`Delete “${space.name}”?`}
+                  note="Its articles are kept."
+                  keepLabel="Cancel"
+                  className="bg-accent/60 mx-1 mt-0.5 mb-1 rounded-md p-2"
+                  onConfirm={(yes) => {
+                    setConfirming(null);
+                    if (!yes) return;
+                    setSelected(null);
+                    void removeCollection(space.id);
+                  }}
+                />
               )}
               {open && blogs.length > 0 && (
                 <ul className="mt-0.5 mb-1 flex flex-col gap-px">
@@ -327,7 +366,7 @@ export function LibrarySidebar() {
                           title={a.title}
                           aria-current={readingId === a.id ? "page" : undefined}
                           className={cn(
-                            "focus-visible:ring-ring/60 flex h-7 w-full items-center gap-2 rounded-md pr-2 pl-7 text-left text-[0.75rem] outline-none focus-visible:ring-2",
+                            "focus-visible:ring-ring/60 text-meta flex h-7 w-full items-center gap-2 rounded-md pr-2 pl-7 text-left outline-none focus-visible:ring-2",
                             readingId === a.id
                               ? "bg-accent text-foreground font-medium"
                               : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
@@ -353,7 +392,7 @@ export function LibrarySidebar() {
 
         {archived > 0 && (
           <>
-            <div className="mt-5" />
+            <div className="mt-4" />
             <Item
               on={!reading && showArchive}
               onClick={() => {
@@ -369,28 +408,51 @@ export function LibrarySidebar() {
           </>
         )}
 
-        <h2 className="text-foreground mt-6 mb-1 px-2.5 text-[0.8125rem] font-bold">
-          Customize
-        </h2>
-        <Item
-          on={!reading && settingsPage}
-          onClick={() => {
-            setSettingsPage(true);
-            setSelected(null);
-            leave();
-          }}
-          icon={<SlidersHorizontal />}
-        >
-          Settings
-        </Item>
+        <div className="mt-auto flex flex-col gap-0.5 pt-4">
+          {(agentStatus === "setup" || agentStatus === "off") && (
+            <Item
+              on={false}
+              onClick={() => setSetupOpen(true)}
+              icon={
+                <i
+                  aria-hidden
+                  className="border-muted-foreground mx-[5px] !size-1.5 rounded-full border"
+                />
+              }
+            >
+              {agentStatus === "off" ? "Turn on an agent" : "Set up an agent"}
+            </Item>
+          )}
+          <Item
+            on={!reading && settingsPage}
+            onClick={() => {
+              setSettingsPage(true);
+              setSelected(null);
+              leave();
+            }}
+            icon={<SlidersHorizontal />}
+          >
+            Settings
+          </Item>
+        </div>
       </nav>
     </div>
+  );
+}
+
+/** A small heading over a group of items. */
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-muted-foreground text-caption mt-5 mb-1 px-2.5 font-medium">
+      {children}
+    </h2>
   );
 }
 
 function Item({
   on,
   onClick,
+  onDoubleClick,
   icon,
   count,
   className,
@@ -399,6 +461,7 @@ function Item({
   className?: string;
   on: boolean;
   onClick: () => void;
+  onDoubleClick?: () => void;
   icon: React.ReactNode;
   count?: number;
   children: React.ReactNode;
@@ -407,6 +470,7 @@ function Item({
     <button
       type="button"
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       aria-current={on ? "page" : undefined}
       className={cn(
         "focus-visible:ring-ring/60 flex h-[30px] items-center gap-2.5 rounded-md px-2.5 text-left outline-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
@@ -419,7 +483,7 @@ function Item({
       {icon}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {count !== undefined && count > 0 && (
-        <span className="text-muted-foreground text-[0.6875rem] font-normal tabular-nums">
+        <span className="text-muted-foreground text-caption font-normal tabular-nums">
           {count}
         </span>
       )}
@@ -427,9 +491,18 @@ function Item({
   );
 }
 
-/** A new, unnamed folder in the list: type its name, Enter to keep it. */
-function NewFolder({ onDone }: { onDone: (name: string | null) => void }) {
-  const [value, setValue] = useState("");
+/** A folder being named (a new one, or one being renamed): type the name,
+ * Enter keeps it, Escape leaves it as it was. */
+function FolderName({
+  label,
+  initial = "",
+  onDone,
+}: {
+  label: string;
+  initial?: string;
+  onDone: (name: string | null) => void;
+}) {
+  const [value, setValue] = useState(initial);
   return (
     <form
       onSubmit={(e) => {
@@ -441,14 +514,15 @@ function NewFolder({ onDone }: { onDone: (name: string | null) => void }) {
       <Folder className="text-muted-foreground size-4 shrink-0" aria-hidden />
       <input
         autoFocus
+        onFocus={(e) => e.currentTarget.select()}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && onDone(null)}
         onBlur={() => onDone(value.trim() || null)}
-        placeholder="Name this folder"
-        aria-label="New collection name"
+        placeholder="Name this collection"
+        aria-label={label}
         maxLength={32}
-        className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
+        className="placeholder:text-muted-foreground text-ui min-w-0 flex-1 bg-transparent outline-none"
       />
     </form>
   );
@@ -486,7 +560,7 @@ function PreviousChats({ leave }: { leave: () => void }) {
         type="button"
         onClick={toggleFolded}
         aria-expanded={!folded}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 mb-0.5 flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 text-ui mb-0.5 flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-left outline-none focus-visible:ring-2"
       >
         <ChevronRight
           className={cn(
@@ -498,7 +572,7 @@ function PreviousChats({ leave }: { leave: () => void }) {
         Previous chats
       </button>
       {!folded && chats.length === 0 && (
-        <p className="text-muted-foreground px-2.5 py-1 text-[0.8125rem] leading-snug">
+        <p className="text-muted-foreground text-ui px-2.5 py-1 leading-snug">
           Your chats will be listed here.
         </p>
       )}
@@ -526,7 +600,7 @@ function PreviousChats({ leave }: { leave: () => void }) {
                   title={chat.title}
                   aria-current={open ? "page" : undefined}
                   className={cn(
-                    "focus-visible:ring-ring/60 flex h-[30px] w-full items-center gap-2.5 rounded-md pr-8 pl-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2",
+                    "focus-visible:ring-ring/60 text-ui flex h-[30px] w-full items-center gap-2.5 rounded-md pr-8 pl-2.5 text-left outline-none focus-visible:ring-2",
                     open
                       ? "bg-accent text-foreground font-medium"
                       : "text-foreground/80 hover:bg-accent/70 hover:text-foreground",
@@ -540,39 +614,27 @@ function PreviousChats({ leave }: { leave: () => void }) {
                 </button>
               </WithContextMenu>
               {open && (
-                <button
-                  type="button"
+                <IconButton
+                  label="Delete this chat"
+                  size="sm"
+                  danger
                   onClick={() => setConfirming(chat.id)}
-                  aria-label={`Delete the chat “${chat.title}”`}
-                  title="Delete this chat"
-                  className="text-muted-foreground hover:text-destructive hover:bg-background/60 focus-visible:ring-ring/60 absolute top-[5px] right-1.5 grid size-5 place-items-center rounded-sm outline-none focus-visible:ring-2"
+                  className="absolute top-[3px] right-1"
                 >
-                  <Trash2 className="size-3.5" aria-hidden />
-                </button>
+                  <Trash2 aria-hidden />
+                </IconButton>
               )}
               {confirming === chat.id && (
-                <div className="bg-accent/60 mx-1 mt-0.5 mb-1 flex flex-col gap-2 rounded-md p-2 text-[0.75rem]">
-                  <span>Delete this chat?</span>
-                  <span className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirming(null);
-                        void deleteChat(chat.id);
-                      }}
-                      className="bg-destructive text-destructive-foreground focus-visible:ring-ring/60 h-6 rounded-md px-2.5 font-medium outline-none focus-visible:ring-2"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirming(null)}
-                      className="hover:bg-accent focus-visible:ring-ring/60 h-6 rounded-md px-2.5 outline-none focus-visible:ring-2"
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                </div>
+                <Confirm
+                  stacked
+                  question="Delete this chat?"
+                  keepLabel="Cancel"
+                  className="bg-accent/60 mx-1 mt-0.5 mb-1 rounded-md p-2"
+                  onConfirm={(yes) => {
+                    setConfirming(null);
+                    if (yes) void deleteChat(chat.id);
+                  }}
+                />
               )}
             </li>
           );
@@ -582,7 +644,7 @@ function PreviousChats({ leave }: { leave: () => void }) {
         <button
           type="button"
           onClick={() => setAllChatsOpen(true)}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 mt-0.5 flex h-[30px] items-center gap-2.5 rounded-md pl-2.5 text-left text-[0.8125rem] outline-none focus-visible:ring-2"
+          className="text-muted-foreground hover:text-foreground hover:bg-accent/70 focus-visible:ring-ring/60 text-ui mt-0.5 flex h-[30px] items-center gap-2.5 rounded-md pl-2.5 text-left outline-none focus-visible:ring-2"
         >
           <MoreHorizontal className="size-4 shrink-0" aria-hidden />
           View all

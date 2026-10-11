@@ -1,10 +1,12 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/toaster";
 import { AllChatsDialog } from "@/components/layout/all-chats-dialog";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { LibrarySidebar } from "@/components/layout/library-sidebar";
 import { TabPages } from "@/components/layout/tab-pages";
 import { ShortcutsDialog } from "@/components/layout/shortcuts-dialog";
+import { WelcomeTour } from "@/components/layout/welcome-tour";
 import { AgentConsentDialog } from "@/components/layout/agent-consent-dialog";
 import { SetupDialog } from "@/components/layout/setup-dialog";
 import { TopBar } from "@/components/layout/top-bar";
@@ -17,7 +19,8 @@ import { openLinkFromClipboard } from "@/lib/open-link";
 import { openPdfs, pickAndOpenPdf } from "@/lib/pdf/pick";
 import { shortcutFor } from "@/lib/shortcuts";
 import { watchBookmarks } from "@/stores/bookmarks-store";
-import { applyZoom, savedZoom, stepZoom } from "@/lib/zoom";
+import { applyZoom, stepZoom } from "@/lib/zoom";
+import { toast } from "@/stores/toast-store";
 import { useAgentStore } from "@/stores/agent-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useLibraryStore } from "@/stores/library-store";
@@ -137,10 +140,11 @@ export function AppShell() {
   // Zoom the whole app: Cmd/Ctrl + and - step it, Cmd/Ctrl 0 resets it. The
   // level is saved, so the app opens at the same size next time.
   useEffect(() => {
-    let level = savedZoom();
-    if (level !== 1) void applyZoom(level);
+    const { zoom } = useUiStore.getState();
+    if (zoom !== 1) void applyZoom(zoom);
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const { zoom: level, setZoom } = useUiStore.getState();
       const next =
         e.key === "=" || e.key === "+"
           ? stepZoom(level, 1)
@@ -151,8 +155,8 @@ export function AppShell() {
               : null;
       if (next === null) return;
       e.preventDefault();
-      level = next;
-      void applyZoom(level);
+      setZoom(next);
+      toast(`Zoom ${Math.round(next * 100)}%`);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -177,6 +181,8 @@ export function AppShell() {
       <SetupDialog />
       <AgentConsentDialog />
       <ShortcutsDialog />
+      <WelcomeTour />
+      <Toaster />
 
       {focusMode && (
         // A thin hover zone along the top edge reveals the way out; it is
@@ -189,7 +195,7 @@ export function AppShell() {
             onClick={() => setFocusMode(false)}
           >
             Exit focus mode
-            <kbd className="text-muted-foreground text-[0.6875rem]">Esc</kbd>
+            <kbd className="text-muted-foreground text-caption">Esc</kbd>
           </Button>
         </div>
       )}
