@@ -41,7 +41,10 @@ import {
   buildLibraryPrompt,
   type PromptOptions,
 } from "@/lib/prompt";
+import { isPdfUrl } from "@/lib/pdf/identity";
+import { readingSpot } from "@/lib/pdf/pages";
 import { useAgentStore } from "@/stores/agent-store";
+import { useLibraryStore } from "@/stores/library-store";
 import { partOf, registerPart, tabStore } from "@/stores/tabs";
 import "@/stores/reader-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -142,6 +145,15 @@ function specFor(
 // it. Never consulted for a long article, which always sends only the
 // passage's nearby blocks (see lib/prompt.ts).
 const fullContextSentFor = new Set<string>();
+
+/** For a paper: the page the reader is on now (its progress is the page). */
+function spotFor(article: StoredArticle) {
+  if (!isPdfUrl(article.canonicalUrl)) return undefined;
+  const progress =
+    useLibraryStore.getState().articles.find((a) => a.id === article.id)
+      ?.progress ?? article.progress;
+  return readingSpot(article.blocks, progress);
+}
 
 /** The last few messages as plain text, for a session that lost its history. */
 function transcript(messages: ChatMessage[]): string {
@@ -559,6 +571,7 @@ registerPart(
                   article,
                   articleInstruction(lastUser.text),
                   notes(),
+                  spotFor(article),
                 ),
               };
             }
@@ -613,18 +626,25 @@ registerPart(
           // The live session already holds the article and the conversation, so
           // it only needs the question. A new session gets the article again,
           // plus the recent conversation it has not seen.
-          await runTurn(chat, (fresh, alreadySent) => ({
-            text:
-              alreadySent && !fresh
-                ? question
-                : buildArticlePrompt(
-                    article,
-                    [transcript(earlier), articleInstruction(question)]
-                      .filter(Boolean)
-                      .join("\n\n"),
-                    notes(),
-                  ),
-          }));
+          await runTurn(chat, (fresh, alreadySent) => {
+            const spot = spotFor(article);
+            return {
+              text:
+                alreadySent && !fresh
+                  ? // The reader may have turned pages since the last question.
+                    spot
+                    ? `${question}\n\n(The reader is now on page ${spot.page}, ${spot.index + 1} of ${spot.count}.)`
+                    : question
+                  : buildArticlePrompt(
+                      article,
+                      [transcript(earlier), articleInstruction(question)]
+                        .filter(Boolean)
+                        .join("\n\n"),
+                      notes(),
+                      spot,
+                    ),
+            };
+          });
         },
 
         async editLast(article, text) {
@@ -664,6 +684,7 @@ registerPart(
               article,
               articleInstruction(question),
               notes(),
+              spotFor(article),
             ),
           }));
         },

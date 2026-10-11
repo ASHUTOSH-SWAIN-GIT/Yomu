@@ -1,6 +1,8 @@
 import { blockText } from "@/lib/article-text";
 import type { PriorExplanation } from "@/lib/exchanges";
 import { parseImageQuote } from "@/lib/images";
+import { isPdfUrl } from "@/lib/pdf/identity";
+import type { ReadingSpot } from "@/lib/pdf/pages";
 import type { Block } from "@/types/article";
 import type { Highlight, RelatedArticle, StoredArticle } from "@/types/library";
 
@@ -74,6 +76,22 @@ function contextFor(
   const to = Math.min(blocks.length, blockIndex + NEARBY_BLOCKS + 1);
   return blocks.slice(from, to).map(blockText).filter(Boolean).join("\n\n");
 }
+
+/** Names the article (or paper) and how the agent can read more of it
+ * itself: the full text is one tool call away, so nothing has to be crammed
+ * into the prompt, and the agent decides what it needs. */
+function aboutArticle(article: StoredArticle): string[] {
+  const paper = isPdfUrl(article.canonicalUrl);
+  return [
+    paper
+      ? `Paper (a PDF the reader opened): ${article.title}`
+      : `Article: ${article.title} (${article.url})`,
+    `Its id in the reader's library: ${article.id}. If you have tools from a server named "yomu", read_article with this id reads it in full, or from a heading (\`section\`)${paper ? " or a page (`page`)" : ""}; use it whenever the text here is not enough. ${CITE_LINKS}`,
+  ];
+}
+
+/** At most this much of the page on screen goes into a prompt. */
+const PAGE_MAX_CHARS = 6000;
 
 export interface PromptOptions {
   /** The user's own question; absent means "just explain this passage." */
@@ -155,9 +173,12 @@ export function buildPrompt(
       WEB_LOOKUP +
       " Reply in Markdown.",
     "",
-    `Article: ${article.title} (${article.url})`,
+    ...aboutArticle(article),
     toc,
     section ? `Section: ${section}` : null,
+    article.blocks[highlight.blockIndex]?.page !== undefined
+      ? `The passage is on page ${article.blocks[highlight.blockIndex].page} of the PDF.`
+      : null,
     "",
     context !== null ? "Article context:" : null,
     context,
@@ -190,19 +211,31 @@ export function buildArticlePrompt(
   article: StoredArticle,
   instruction: string,
   personalizationNotes: string[] = [],
+  /** For a paper: the page the reader is on. */
+  spot?: ReadingSpot,
 ): string {
   const body = fullArticleText(article.blocks);
   const truncated = body.length > ARTICLE_MAX_CHARS;
+  const where = spot
+    ? `The reader is on page ${spot.page} (${spot.index + 1} of ${spot.count}).` +
+      // A paper cut short may not include that page: give it here.
+      (truncated && spot.text
+        ? `\nThat page:\n"""\n${spot.text.slice(0, PAGE_MAX_CHARS)}\n"""`
+        : "")
+    : null;
   return [
     "You are helping a developer read a technical article, which is below. Treat it as the main source and quote it when that helps, but you may also use your own knowledge to explain a term, add context or answer a related question. Give complete, clear answers: thorough when the question needs it, short when it does not. " +
       WEB_LOOKUP +
       " Reply in Markdown.",
     "",
-    `Article: ${article.title} (${article.url})`,
+    ...aboutArticle(article),
     "",
     body.slice(0, ARTICLE_MAX_CHARS) +
-      (truncated ? "\n\n[article truncated]" : ""),
+      (truncated
+        ? `\n\n[This is the first ${ARTICLE_MAX_CHARS} of ${body.length} characters; the rest is not shown here. Read it with read_article (id above) when the question needs it, rather than guessing.]`
+        : ""),
     "",
+    ...(where ? [where, ""] : []),
     [instruction, ...personalizationNotes].join("\n"),
   ].join("\n");
 }

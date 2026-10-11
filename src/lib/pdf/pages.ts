@@ -67,3 +67,33 @@ export function pageOfProgress(progress: number, count: number): number {
   if (count <= 1 || !(progress > 0)) return 0;
   return Math.min(count - 1, Math.max(0, Math.round(progress * count) - 1));
 }
+
+/** Where the reader is in a paper: the page on screen and its text. */
+export interface ReadingSpot {
+  /** The PDF's page number. */
+  page: number;
+  /** Its position among the paper's pages, from 0, and how many there are. */
+  index: number;
+  count: number;
+  text: string;
+}
+
+export function readingSpot(
+  blocks: Block[],
+  progress: number,
+): ReadingSpot | undefined {
+  const pages = paperPages(blocks);
+  if (pages.length === 0) return undefined;
+  const index = pageOfProgress(progress, pages.length);
+  const p = pages[index];
+  return {
+    page: p.number,
+    index,
+    count: pages.length,
+    text: blocks
+      .slice(p.start, p.end)
+      .map(blockText)
+      .filter(Boolean)
+      .join("\n\n"),
+  };
+}

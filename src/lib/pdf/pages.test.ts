@@ -4,6 +4,7 @@ import {
   pageOfProgress,
   paperPages,
   progressOfPage,
+  readingSpot,
 } from "@/lib/pdf/pages";
 import type { Block } from "@/types/article";
 
@@ -70,5 +71,19 @@ describe("paper pages", () => {
     expect(pageOfProgress(0, 10)).toBe(0);
     expect(pageOfProgress(0.37, 10)).toBe(3);
     expect(pageOfProgress(5, 10)).toBe(9);
+  });
+});
+
+describe("where the reader is", () => {
+  it("is the page their progress points at, with its text", () => {
+    const blocks = [para("one", 1), para("two", 2), para("three", 2)];
+    expect(readingSpot(blocks, progressOfPage(1, 2))).toEqual({
+      page: 2,
+      index: 1,
+      count: 2,
+      text: "two\n\nthree",
+    });
+    expect(readingSpot(blocks, 0)?.page).toBe(1);
+    expect(readingSpot([], 0.5)).toBeUndefined();
   });
 });

@@ -5,6 +5,7 @@ import { CollectionPicker } from "@/components/layout/collection-picker";
 import { SiteLogoTile, SiteMark } from "@/components/layout/article-cover";
 import { articleColor } from "@/lib/spaces";
 import { deleteArticle, openSavedArticle } from "@/lib/navigate";
+import { moveFocus } from "@/lib/list-focus";
 import { cn } from "@/lib/utils";
 import { useLibraryStore } from "@/stores/library-store";
 import type { ArticleSummary } from "@/types/library";
@@ -62,23 +63,6 @@ export function LibraryList({
       </ul>
     </div>
   );
-}
-
-function moveFocus(e: React.KeyboardEvent<HTMLElement>) {
-  const step =
-    e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowRight"
-      ? 1
-      : e.key === "ArrowUp" || e.key === "k" || e.key === "ArrowLeft"
-        ? -1
-        : 0;
-  if (!step) return;
-  const rows = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-row]")];
-  const i = rows.indexOf(document.activeElement as HTMLElement);
-  const next = rows[Math.min(Math.max(i + step, 0), rows.length - 1)];
-  if (next) {
-    e.preventDefault();
-    next.focus();
-  }
 }
 
 interface ItemProps {
@@ -221,7 +205,7 @@ function Row({
   );
 }
 
-function Actions({
+export function Actions({
   article,
   onArchive,
   onDelete,
@@ -271,7 +255,7 @@ function Actions({
   );
 }
 
-function Confirm({
+export function Confirm({
   title,
   keepLabel = "Keep",
   note,

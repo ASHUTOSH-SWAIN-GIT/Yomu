@@ -304,13 +304,14 @@ fn tool_list() -> Value {
         },
         {
             "name": "read_article",
-            "description": "Read a saved blog by id. Every paragraph starts with its number (¶7), which you can cite. Long blogs come in parts: the reply says where the next part starts (use `offset`). Use `section` to jump to a heading.",
+            "description": "Read a saved blog or paper by id. Every paragraph starts with its number (¶7), which you can cite. A PDF paper is marked by page (— Page 7 —). Long ones come in parts: the reply says where the next part starts (use `offset`). Use `section` to jump to a heading, or `page` to a page of a paper.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "id": { "type": "string", "description": "The blog's id, from search_library or list_articles" },
                     "section": { "type": "string", "description": "Part of a heading's text, to start reading there" },
-                    "offset": { "type": "integer", "description": "Character to start from, to continue a long blog" }
+                    "offset": { "type": "integer", "description": "Character to start from, to continue a long blog" },
+                    "page": { "type": "integer", "description": "Page of a PDF paper to start reading at" }
                 },
                 "required": ["id"]
             }
@@ -547,10 +548,18 @@ async fn read_article(db: &SqlitePool, args: &Value) -> Result<String, String> {
     // Text of each block, with where each heading starts.
     let mut text = String::new();
     let mut headings: Vec<(usize, String)> = Vec::new();
+    // Where each page of a PDF starts (blocks of a paper carry their page).
+    let mut pages: Vec<(usize, u64)> = Vec::new();
     for (number, block) in blocks.iter().enumerate() {
         let piece = block_text(block);
         if piece.is_empty() {
             continue;
+        }
+        if let Some(page) = block.get("page").and_then(Value::as_u64) {
+            if pages.last().map(|(_, p)| *p) != Some(page) {
+                pages.push((text.chars().count(), page));
+                text.push_str(&format!("— Page {page} —\n\n"));
+            }
         }
         // Every paragraph is numbered, so an answer can point at one.
         let piece = format!("¶{number} {piece}");
@@ -569,6 +578,23 @@ async fn read_article(db: &SqlitePool, args: &Value) -> Result<String, String> {
     }
 
     let mut start = args.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
+    if let Some(page) = args.get("page").and_then(Value::as_u64) {
+        match pages.iter().find(|(_, p)| *p >= page) {
+            Some((at, _)) => start = *at,
+            None if pages.is_empty() => {
+                return Err(
+                    "This is not a PDF paper, so it has no pages. Use `section` or `offset`."
+                        .into(),
+                )
+            }
+            None => {
+                return Err(format!(
+                    "There is no page {page}; the last is page {}.",
+                    pages.last().map(|(_, p)| *p).unwrap_or(0)
+                ))
+            }
+        }
+    }
     if let Some(section) = text_arg(args, "section") {
         let wanted = section.to_lowercase();
         match headings
@@ -798,6 +824,13 @@ mod tests {
             { "type": "heading", "level": 2, "text": "Durability" },
             { "type": "paragraph", "spans": [{ "text": "Safekeepers hold the write-ahead log." }] },
         ]);
+        let paper = json!([
+            { "type": "heading", "level": 2, "text": "1 Introduction", "page": 1 },
+            { "type": "paragraph", "spans": [{ "text": "Recurrent models are slow." }], "page": 1 },
+            { "type": "heading", "level": 2, "text": "2 Model", "page": 2 },
+            { "type": "paragraph", "spans": [{ "text": "Attention is all you need." }], "page": 2 },
+            { "type": "paragraph", "spans": [{ "text": "Results are good." }], "page": 3 },
+        ]);
         let long = json!([
             { "type": "heading", "level": 1, "text": "Long read" },
             { "type": "paragraph", "spans": [{ "text": "word ".repeat(5000) }] },
@@ -810,6 +843,7 @@ mod tests {
                 "Neon separates storage and compute. Safekeepers hold the write-ahead log.",
             ),
             ("a2", "Long read", long, "word word"),
+            ("p1", "A Paper", paper, "Recurrent models are slow."),
         ] {
             sqlx::query(
                 "INSERT INTO articles (id, url, canonical_url, title, site, blocks_json, scraped_at, text_content)
@@ -977,6 +1011,24 @@ mod tests {
         assert_eq!(comments, "- On \"Neon separates\" (¶1): Remember this");
         let (no_comments, _) = tool(&f, "get_comments", json!({ "id": "a2" })).await;
         assert!(no_comments.contains("no comments"));
+    }
+
+    #[tokio::test]
+    async fn a_paper_is_marked_by_page_and_read_from_one() {
+        let f = fixture("paper").await;
+        let (all, _) = tool(&f, "read_article", json!({ "id": "p1" })).await;
+        assert!(
+            all.contains("— Page 1 —") && all.contains("— Page 2 —") && all.contains("— Page 3 —"),
+            "{all}"
+        );
+        let (from2, error) = tool(&f, "read_article", json!({ "id": "p1", "page": 2 })).await;
+        assert!(!error, "{from2}");
+        assert!(from2.contains("— Page 2 —") && from2.contains("Attention"));
+        assert!(!from2.contains("Recurrent"));
+        let (past, error) = tool(&f, "read_article", json!({ "id": "p1", "page": 9 })).await;
+        assert!(error && past.contains("the last is page 3"), "{past}");
+        let (blog, error) = tool(&f, "read_article", json!({ "id": "a1", "page": 2 })).await;
+        assert!(error && blog.contains("not a PDF paper"), "{blog}");
     }
 
     #[tokio::test]

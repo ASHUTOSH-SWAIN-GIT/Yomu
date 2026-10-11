@@ -20,7 +20,13 @@ import type { StoredArticle } from "@/types/library";
 
 export type ReaderState =
   | { status: "empty" }
-  | { status: "loading"; url: string; detail?: string }
+  | {
+      status: "loading";
+      url: string;
+      detail?: string;
+      /** How far along, 0 to 1, when that is known (a PDF's pages). */
+      fraction?: number;
+    }
   | { status: "error"; url: string; message: string }
   | { status: "ready"; article: StoredArticle };
 
@@ -100,6 +106,7 @@ registerPart("reader", () =>
                 status: "loading",
                 url: name,
                 detail: `Reading page ${p.page} of ${p.pages}…`,
+                fraction: p.page / p.pages,
               },
             }),
         );

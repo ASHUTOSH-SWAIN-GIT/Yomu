@@ -289,17 +289,69 @@ describe("buildArticlePrompt", () => {
     );
   });
 
-  it("truncates very long articles and says so", () => {
+  it("cuts very long articles, says so, and says how to read the rest", () => {
     const article = makeArticle([p("y".repeat(40000))]);
     const prompt = buildArticlePrompt(article, "Summarize.");
-    expect(prompt).toContain("[article truncated]");
-    expect(prompt.length).toBeLessThan(31000);
+    expect(prompt).toContain("first 30000 of 40000 characters");
+    expect(prompt).toContain("read_article");
+    expect(prompt.length).toBeLessThan(32000);
   });
 
-  it("does not mark short articles as truncated", () => {
+  it("does not mark short articles as cut", () => {
     expect(
       buildArticlePrompt(makeArticle([p("short")]), "Summarize."),
-    ).not.toContain("truncated");
+    ).not.toContain("characters; the rest");
+  });
+
+  it("gives the article's id, so the agent can read it with its tools", () => {
+    const article = makeArticle([p("short")]);
+    const prompt = buildArticlePrompt(article, "Summarize.");
+    expect(prompt).toContain(`Its id in the reader's library: ${article.id}.`);
+    expect(prompt).toContain("read_article");
+    expect(prompt).not.toContain("`page`");
+  });
+});
+
+describe("prompts about a paper", () => {
+  const paper = (blocks: ReturnType<typeof p>[]) => ({
+    ...makeArticle(blocks),
+    canonicalUrl: "pdf:abc",
+    url: "file:///papers/a.pdf",
+  });
+
+  it("names it as a PDF and offers reading by page", () => {
+    const prompt = buildArticlePrompt(paper([p("text")]), "Summarize.");
+    expect(prompt).toContain("Paper (a PDF the reader opened)");
+    expect(prompt).toContain("`page`");
+    expect(prompt).not.toContain("file:///");
+  });
+
+  it("says where the reader is, with that page's text when the paper is cut", () => {
+    const blocks = [
+      { ...p("y".repeat(40000)), page: 1 },
+      { ...p("the page on screen"), page: 2 },
+    ];
+    const spot = { page: 2, index: 1, count: 2, text: "the page on screen" };
+    const prompt = buildArticlePrompt(paper(blocks), "Explain.", [], spot);
+    expect(prompt).toContain("The reader is on page 2 (2 of 2).");
+    expect(prompt).toContain('That page:\n"""\nthe page on screen');
+  });
+
+  it("does not repeat the page when the whole paper is there", () => {
+    const blocks = [{ ...p("short"), page: 1 }];
+    const spot = { page: 1, index: 0, count: 1, text: "short" };
+    const prompt = buildArticlePrompt(paper(blocks), "Explain.", [], spot);
+    expect(prompt).toContain("The reader is on page 1 (1 of 1).");
+    expect(prompt).not.toContain("That page:");
+  });
+
+  it("says which page a selected passage is on", () => {
+    const blocks = [
+      { ...p("one"), page: 1 },
+      { ...p("two words"), page: 3 },
+    ];
+    const prompt = buildPrompt(paper(blocks), highlight(1, "two"));
+    expect(prompt).toContain("The passage is on page 3 of the PDF.");
   });
 });
 
