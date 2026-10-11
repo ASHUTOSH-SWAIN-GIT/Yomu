@@ -13,9 +13,13 @@ export function BlockRenderer({
   blocks,
   baseUrl,
   aside,
+  range,
 }: {
   blocks: Block[];
   baseUrl: string;
+  /** Only blocks `[start, end)` (a page of a paper); indexes stay those of
+   * the whole article, which is what comments and highlights point at. */
+  range?: [number, number];
   /** Something that goes with a block (its comments). It sits outside the
    * block's own box, which clips what is drawn outside it, and which is
    * where the text positions of a selection are counted. */
@@ -23,23 +27,26 @@ export function BlockRenderer({
 }) {
   return (
     <>
-      {blocks.map((block, i) => (
-        // The index is what highlights are anchored to (see
-        // hooks/use-text-selection.ts).
-        // Margins inside a block do NOT collapse with its neighbours (content-visibility
-        // isolates it), so each block owns half of the gap it wants.
-        // content-visibility skips layout/paint of off-screen blocks, which
-        // keeps very long docs pages smooth.
-        <div key={i} className="relative">
-          <div
-            data-block-index={i}
-            className="[contain-intrinsic-size:auto_80px] [content-visibility:auto]"
-          >
-            <BlockView block={block} baseUrl={baseUrl} index={i} />
+      {(range ? blocks.slice(range[0], range[1]) : blocks).map((block, at) => {
+        const i = at + (range?.[0] ?? 0);
+        return (
+          // The index is what highlights are anchored to (see
+          // hooks/use-text-selection.ts).
+          // Margins inside a block do NOT collapse with its neighbours (content-visibility
+          // isolates it), so each block owns half of the gap it wants.
+          // content-visibility skips layout/paint of off-screen blocks, which
+          // keeps very long docs pages smooth.
+          <div key={i} className="relative">
+            <div
+              data-block-index={i}
+              className="[contain-intrinsic-size:auto_80px] [content-visibility:auto]"
+            >
+              <BlockView block={block} baseUrl={baseUrl} index={i} />
+            </div>
+            {aside?.(i)}
           </div>
-          {aside?.(i)}
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }

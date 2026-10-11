@@ -6,6 +6,7 @@ export type ShortcutId =
   | "focus-ask"
   | "focus-mode"
   | "paste-link"
+  | "open-pdf"
   | "settings"
   | "new-chat"
   | "home"
@@ -43,6 +44,7 @@ export function shortcutFor(e: KeyLike): ShortcutId | null {
   if (key === "j") return "focus-ask";
   if (key === ".") return "focus-mode";
   if (key === "n") return "new-chat";
+  if (key === "o") return "open-pdf";
   if (key === "t") return "new-tab";
   if (key === "w") return "close-tab";
   if (key === "e") return "toggle-chat";
@@ -69,6 +71,7 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
     title: "Reading",
     items: [
       ["⇧V", "Open the link on your clipboard"],
+      ["O", "Open a PDF from this computer"],
       ["E", "Show or hide the chat beside the article"],
       ["J", "Ask: jump to the chat box"],
       [".", "Focus mode (Esc leaves it)"],

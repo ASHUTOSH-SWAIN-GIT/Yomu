@@ -29,10 +29,13 @@ export function GlossaryLayer({
   articleRef,
   articleId,
   blocks,
+  page,
 }: {
   articleRef: RefObject<HTMLElement | null>;
   articleId: string;
   blocks: Block[];
+  /** The page of a paper on screen; its words are found again on a turn. */
+  page?: number;
 }) {
   const terms = useGlossaryStore((s) => s.terms);
   const load = useGlossaryStore((s) => s.load);
@@ -77,7 +80,7 @@ export function GlossaryLayer({
       CSS.highlights.delete(HIGHLIGHT);
       painted.current = [];
     };
-  }, [articleRef, articleId, blocks, find]);
+  }, [articleRef, articleId, blocks, find, page]);
 
   // Pointing at a term opens its card after a short rest, and moving off it
   // closes the card.

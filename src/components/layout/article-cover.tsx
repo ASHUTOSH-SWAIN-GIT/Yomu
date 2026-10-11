@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FileText } from "lucide-react";
+import { isPdfUrl } from "@/lib/pdf/identity";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -116,7 +118,13 @@ export function SiteLogoTile({
   const { src, next } = useSiteLogo(url, icon);
   return (
     <span className={cn("grid size-10 shrink-0 place-items-center", className)}>
-      {src ? (
+      {isPdfUrl(url) ? (
+        <FileText
+          aria-hidden
+          className="text-muted-foreground size-5"
+          strokeWidth={1.75}
+        />
+      ) : src ? (
         <img
           src={src}
           alt=""
@@ -150,6 +158,15 @@ export function SiteFavicon({
   className?: string;
 }) {
   const { src, next } = useSiteLogo(url, icon);
+  if (isPdfUrl(url)) {
+    return (
+      <FileText
+        aria-hidden
+        className={cn("text-muted-foreground size-4 shrink-0", className)}
+        strokeWidth={1.75}
+      />
+    );
+  }
   if (!src) {
     return (
       <span

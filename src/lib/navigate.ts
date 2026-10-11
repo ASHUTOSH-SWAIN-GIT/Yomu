@@ -1,3 +1,4 @@
+import { requestBlock } from "@/lib/show-block";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
@@ -26,6 +27,8 @@ export async function openSavedArticle(articleId: string) {
  * page may still be loading (and restoring where you left off), so it keeps
  * trying for a moment and settles once more after the layout does. */
 function showParagraph(block: number) {
+  // A paper turns to the page that has it first.
+  requestBlock(block);
   let tries = 0;
   const find = () =>
     document.querySelector<HTMLElement>(

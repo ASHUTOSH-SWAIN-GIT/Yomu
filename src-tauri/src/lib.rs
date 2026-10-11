@@ -4,6 +4,7 @@ mod db;
 mod env;
 mod imgcache;
 mod mcp;
+mod pdf;
 mod scraper;
 
 use std::sync::Arc;
@@ -48,6 +49,47 @@ async fn image_cache_dir(app: tauri::AppHandle) -> Result<String, String> {
         .await
         .map_err(|e| format!("could not create the image cache: {e}"))?;
     Ok(dir.to_string_lossy().into_owned())
+}
+
+/// Copies a PDF the user picked into Yomu's own folder (once, by hash).
+#[tauri::command]
+async fn import_pdf(app: tauri::AppHandle, path: String) -> Result<pdf::PdfImport, String> {
+    let dir = pdf::pdfs_dir(&app)?;
+    tokio::task::spawn_blocking(move || pdf::import_in(std::path::Path::new(&path), &dir))
+        .await
+        .map_err(|e| format!("importing the PDF failed: {e}"))?
+}
+
+/// The bytes of an imported PDF, as raw binary (no JSON encoding).
+#[tauri::command]
+async fn read_pdf(app: tauri::AppHandle, sha: String) -> Result<tauri::ipc::Response, String> {
+    let dir = pdf::pdfs_dir(&app)?;
+    let bytes = tokio::task::spawn_blocking(move || pdf::read_in(&dir, &sha))
+        .await
+        .map_err(|e| format!("reading the PDF failed: {e}"))??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Opens the saved copy of a PDF in the system's PDF viewer.
+#[tauri::command]
+fn open_pdf_original(app: tauri::AppHandle, sha: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = pdf::file_for(&pdf::pdfs_dir(&app)?, &sha)?;
+    if !path.exists() {
+        return Err("the saved PDF is missing".into());
+    }
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|e| format!("could not open the PDF: {e}"))
+}
+
+/// Deletes saved PDFs whose id is not in `keep`; returns how many went.
+#[tauri::command]
+async fn prune_pdfs(app: tauri::AppHandle, keep: Vec<String>) -> Result<usize, String> {
+    let dir = pdf::pdfs_dir(&app)?;
+    tokio::task::spawn_blocking(move || pdf::prune_in(&dir, &keep))
+        .await
+        .map_err(|e| format!("cleaning up PDFs failed: {e}"))
 }
 
 /// Where Yomu keeps its data and how much space it takes, for the settings.
@@ -323,6 +365,10 @@ pub fn run() {
             canonicalize_url,
             cache_images,
             image_cache_dir,
+            import_pdf,
+            read_pdf,
+            prune_pdfs,
+            open_pdf_original,
             cached_image_names,
             prune_images,
             storage_info,

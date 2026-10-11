@@ -817,6 +817,15 @@ export async function saveArticleImages(
 }
 
 /** Every cached file some article still uses (everything else can be pruned). */
+/** The ids of the PDFs in the library (their saved copies are kept). */
+export async function listPdfShas(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select<{ canonical_url: string }[]>(
+    "SELECT canonical_url FROM articles WHERE canonical_url LIKE 'pdf:%'",
+  );
+  return rows.map((r) => r.canonical_url.slice("pdf:".length));
+}
+
 export async function listUsedImageFiles(): Promise<string[]> {
   const db = await getDb();
   const rows = await db.select<{ file: string }[]>(

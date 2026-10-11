@@ -1,3 +1,4 @@
+import { isPdfUrl } from "@/lib/pdf/identity";
 import { useState, type FormEvent } from "react";
 import {
   Archive,
@@ -101,7 +102,11 @@ export function ArticleTools({ article }: { article: StoredArticle }) {
         <PopoverContent className="flex w-52 flex-col gap-0.5 p-1">
           <MenuItem
             icon={<RefreshCw className="size-3.5" />}
-            label="Re-fetch article"
+            label={
+              isPdfUrl(article.canonicalUrl)
+                ? "Read the PDF again"
+                : "Re-fetch article"
+            }
             onClick={() => {
               setOpen(false);
               void rescrape(article);

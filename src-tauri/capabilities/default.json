@@ -12,6 +12,7 @@
     "updater:default",
     "process:allow-restart",
     "dialog:allow-save",
+    "dialog:allow-open",
     "fs:allow-write-text-file",
     "core:window:allow-start-dragging",
     "core:window:allow-internal-toggle-maximize",

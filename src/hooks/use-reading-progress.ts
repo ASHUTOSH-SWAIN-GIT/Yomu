@@ -16,10 +16,12 @@ export function useReadingProgress(
   scrollRef: RefObject<HTMLElement | null>,
   articleId: string,
   initialProgress: number,
+  /** Off for a paper, whose progress is its page (see paper-pager.tsx). */
+  enabled = true,
 ) {
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !enabled) return;
 
     let restoring = true;
     let saved = initialProgress;
@@ -59,5 +61,5 @@ export function useReadingProgress(
     // `initialProgress` is deliberately read once per article: later
     // changes come from this hook itself and must not re-trigger a restore.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollRef, articleId]);
+  }, [scrollRef, articleId, enabled]);
 }

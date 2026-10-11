@@ -11,7 +11,10 @@ import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
 import { useThemeEffect } from "@/hooks/use-theme";
 import { goHome } from "@/lib/navigate";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
+import { openPdfOnPapersPage, pickAndOpenPdf } from "@/lib/pdf/pick";
 import { shortcutFor } from "@/lib/shortcuts";
 import { watchBookmarks } from "@/stores/bookmarks-store";
 import { applyZoom, savedZoom, stepZoom } from "@/lib/zoom";
@@ -75,6 +78,7 @@ export function AppShell() {
         );
       } else if (command === "focus-mode") ui.setFocusMode(!ui.focusMode);
       else if (command === "paste-link") void openLinkFromClipboard();
+      else if (command === "open-pdf") void pickAndOpenPdf();
       else if (command === "new-tab") openTab();
       else if (command === "close-tab")
         closeTab(useTabsStore.getState().activeId);
@@ -105,6 +109,27 @@ export function AppShell() {
   // Pages bookmarked into a browser folder named Yomu are saved on their own,
   // including ones bookmarked while the app was closed.
   useEffect(() => watchBookmarks(), []);
+
+  // A PDF dropped on the window opens like one chosen from the dialog.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let gone = false;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type !== "drop") return;
+        const pdf = event.payload.paths.find((p) => /\.pdf$/i.test(p));
+        if (pdf) openPdfOnPapersPage(pdf);
+      })
+      .then((unlisten) => {
+        if (gone) unlisten();
+        else off = unlisten;
+      })
+      .catch((err) => logError("listening for dropped files failed", err));
+    return () => {
+      gone = true;
+      off?.();
+    };
+  }, []);
 
   // Zoom the whole app: Cmd/Ctrl + and - step it, Cmd/Ctrl 0 resets it. The
   // level is saved, so the app opens at the same size next time.

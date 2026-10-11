@@ -426,6 +426,19 @@ html.dark {
     transform: none;
   }
 }
+/* A paper's page turning: the new page comes in from the side it lies on. */
+@keyframes yomu-page-next {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+@keyframes yomu-page-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
 @keyframes yomu-fade {
   from {
     opacity: 0;

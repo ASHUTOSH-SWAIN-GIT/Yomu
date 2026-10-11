@@ -18,7 +18,7 @@ export interface ListItem {
   depth: number;
 }
 
-export type Block =
+export type Block = (
   | { type: "heading"; level: number; text: string }
   | { type: "paragraph"; spans: Span[] }
   | { type: "code"; language: string | null; content: string }
@@ -26,7 +26,11 @@ export type Block =
   | { type: "math"; tex: string }
   | { type: "list"; ordered: boolean; items: ListItem[] }
   | { type: "quote"; spans: Span[] }
-  | { type: "table"; header: string[]; rows: string[][] };
+  | { type: "table"; header: string[]; rows: string[][] }
+) & {
+  /** The page of the PDF the block starts on (PDFs only). */
+  page?: number;
+};
 
 export interface ScrapedArticle {
   /** The site's logo address, when the page declares one. */

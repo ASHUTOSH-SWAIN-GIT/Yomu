@@ -16,6 +16,7 @@ import {
 import { searchLibrary } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
+import { pickAndOpenPdf } from "@/lib/pdf/pick";
 import { openSampleArticle } from "@/lib/sample-article";
 import { filterByQuery } from "@/lib/palette";
 import { cn } from "@/lib/utils";
@@ -114,6 +115,13 @@ function PaletteBody({ close }: { close: () => void }) {
       icon: <LinkIcon />,
       shortcut: `${MOD}⇧V`,
       run: () => void openLinkFromClipboard(),
+    },
+    {
+      id: "open-pdf",
+      label: "Open a PDF…",
+      icon: <FileText />,
+      shortcut: `${MOD}O`,
+      run: () => void pickAndOpenPdf(),
     },
     ...(openArticleId
       ? [

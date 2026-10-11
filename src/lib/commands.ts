@@ -17,6 +17,33 @@ export async function scrapeUrl(url: string): Promise<ScrapedArticle> {
   return invoke<ScrapedArticle>("scrape_url", { url });
 }
 
+/** What `import_pdf` returns (src-tauri/src/pdf.rs). */
+export interface PdfImport {
+  sha: string;
+  fileName: string;
+  bytes: number;
+}
+
+/** Copies a PDF the user picked into Yomu's folder (once, by hash). */
+export async function importPdf(path: string): Promise<PdfImport> {
+  return invoke<PdfImport>("import_pdf", { path });
+}
+
+/** The bytes of an imported PDF. */
+export async function readPdfBytes(sha: string): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<ArrayBuffer>("read_pdf", { sha }));
+}
+
+/** Deletes imported PDFs whose id is not in `keep`. */
+export async function prunePdfs(keep: string[]): Promise<number> {
+  return invoke<number>("prune_pdfs", { keep });
+}
+
+/** Opens the saved copy of a PDF in the system's viewer. */
+export async function openPdfOriginal(sha: string): Promise<void> {
+  return invoke<void>("open_pdf_original", { sha });
+}
+
 /** Normalizes a URL with no network round trip, for cache lookups. */
 export async function canonicalizeUrl(url: string): Promise<string> {
   return invoke<string>("canonicalize_url", { url });

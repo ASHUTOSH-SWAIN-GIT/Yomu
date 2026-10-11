@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Archive,
   ChevronRight,
+  FileText,
   Folder,
   FolderOpen,
   Home,
@@ -14,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { SiteFavicon } from "@/components/layout/article-cover";
+import { isPdfUrl } from "@/lib/pdf/identity";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { articlesInSpace, buildSpaces, INBOX } from "@/lib/spaces";
 import { WithContextMenu } from "@/components/ui/context-menu";
@@ -47,6 +49,8 @@ export function LibrarySidebar() {
   const showArchive = useViewStore((s) => s.showArchive);
   const showInbox = useViewStore((s) => s.showInbox);
   const setShowInbox = useViewStore((s) => s.setShowInbox);
+  const papersPage = useViewStore((s) => s.papersPage);
+  const setPapersPage = useViewStore((s) => s.setPapersPage);
   const setShowArchive = useViewStore((s) => s.setShowArchive);
   const libraryChat = useViewStore((s) => s.libraryChat);
   const setLibraryChat = useViewStore((s) => s.setLibraryChat);
@@ -107,6 +111,9 @@ export function LibrarySidebar() {
   );
   const archived = articles.filter((a) => a.archived).length;
   const inboxCount = articles.filter((a) => a.inbox && !a.archived).length;
+  const papers = articles.filter(
+    (a) => isPdfUrl(a.canonicalUrl) && !a.archived,
+  ).length;
   const named = spaces.filter((s) => s.id !== INBOX);
 
   return (
@@ -143,6 +150,7 @@ export function LibrarySidebar() {
             !reading &&
             !showArchive &&
             !showInbox &&
+            !papersPage &&
             !libraryChat &&
             !settingsPage
           }
@@ -154,6 +162,18 @@ export function LibrarySidebar() {
           icon={<Home />}
         >
           Home
+        </Item>
+        <Item
+          on={!reading && papersPage}
+          onClick={() => {
+            setPapersPage(true);
+            setSelected(null);
+            leave();
+          }}
+          icon={<FileText />}
+          count={papers || undefined}
+        >
+          Papers
         </Item>
         {(inboxCount > 0 || showInbox) && (
           <Item

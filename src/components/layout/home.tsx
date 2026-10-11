@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { LibraryChat } from "@/components/chat/library-chat";
 import { SettingsPage } from "@/components/settings/settings-page";
 import { LibraryList } from "@/components/layout/home-library";
+import { Fetching } from "@/components/layout/fetching";
 import { Welcome } from "@/components/layout/home-welcome";
+import { PapersPage } from "@/components/layout/papers-page";
+import { isPdfUrl } from "@/lib/pdf/identity";
 import { useAgentStore } from "@/stores/agent-store";
 import { useViewStore } from "@/stores/view-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -24,6 +27,7 @@ export function Home() {
   const showInbox = useViewStore((s) => s.showInbox);
   const libraryChat = useViewStore((s) => s.libraryChat);
   const settingsPage = useViewStore((s) => s.settingsPage);
+  const papersPage = useViewStore((s) => s.papersPage);
 
   const agentStatus = useAgentStore((s) => s.status);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
@@ -34,7 +38,10 @@ export function Home() {
     ? articles.filter((a) => a.inbox && !a.archived)
     : articles.filter(
         // A bookmarked page waits in the Inbox until it is in a collection.
-        (a) => a.archived === showArchive && (showArchive || !a.inbox),
+        // PDFs have their own page (Papers).
+        (a) =>
+          a.archived === showArchive &&
+          (showArchive || (!a.inbox && !isPdfUrl(a.canonicalUrl))),
       );
 
   function submit(e: FormEvent) {
@@ -50,6 +57,7 @@ export function Home() {
       : "Read anything. Ask about any line.";
 
   if (settingsPage) return <SettingsPage />;
+  if (papersPage) return <PapersPage />;
   if (libraryChat) return <LibraryChat />;
 
   return (
@@ -122,7 +130,9 @@ export function Home() {
           </button>
         </p>
       )}
-      {state.status === "loading" && <Fetching url={state.url} />}
+      {state.status === "loading" && (
+        <Fetching url={state.url} detail={state.detail} />
+      )}
       {state.status === "error" && (
         <p
           role="alert"
@@ -145,27 +155,6 @@ export function Home() {
       ) : (
         <LibraryList list={list} archive={showArchive} slots={slots} />
       )}
-    </div>
-  );
-}
-
-/** While a link is fetched: a bar that keeps sliding (the wait has no known
- * length, so it never claims a percentage) and what is being fetched. */
-function Fetching({ url }: { url: string }) {
-  let host = url;
-  try {
-    host = new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    // Not a URL; show it as typed.
-  }
-  return (
-    <div role="status" aria-live="polite" className="mt-4">
-      <div className="bg-secondary relative h-[3px] w-full overflow-hidden rounded-full">
-        <div className="bg-foreground absolute inset-y-0 left-0 w-1/3 animate-[yomu-slide_1.3s_cubic-bezier(0.4,0,0.2,1)_infinite] rounded-full" />
-      </div>
-      <p className="text-muted-foreground mt-2.5 text-[0.8125rem]">
-        Fetching {host}…
-      </p>
     </div>
   );
 }

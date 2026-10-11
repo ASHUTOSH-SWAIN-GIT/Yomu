@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, FileText } from "lucide-react";
+import { openPdfOriginal } from "@/lib/commands";
+import { isPdfUrl, pdfShaOf } from "@/lib/pdf/identity";
+import { PageBar, PageEnd, PageHead } from "@/components/reader/paper-pager";
+import { usePaperPager } from "@/hooks/use-paper-pager";
 import { BlockRenderer } from "@/components/reader/block-renderer";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatResizeHandle } from "@/components/chat/chat-resize-handle";
@@ -45,7 +49,11 @@ export function ReaderView() {
       <div className="relative h-full min-w-0 flex-1">
         <main ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
           {state.status === "ready" ? (
-            <Article article={state.article} scrollRef={scrollRef} />
+            <Article
+              key={state.article.id}
+              article={state.article}
+              scrollRef={scrollRef}
+            />
           ) : (
             <Home />
           )}
@@ -124,12 +132,15 @@ function Article({
   article: StoredArticle;
   scrollRef: RefObject<HTMLElement | null>;
 }) {
-  useReadingProgress(scrollRef, article.id, article.progress);
+  const paper = isPdfUrl(article.canonicalUrl);
+  // A paper is read a page at a time; a blog scrolls.
+  const pager = usePaperPager(article, scrollRef, paper);
+  useReadingProgress(scrollRef, article.id, article.progress, !paper);
   const articleRef = useRef<HTMLElement>(null);
   const loadedFor = useCommentsStore((s) => s.articleId);
   const load = useCommentsStore((s) => s.load);
   const { selection, clear } = useCommentSelection(articleRef, scrollRef);
-  useCommentHighlights(articleRef);
+  useCommentHighlights(articleRef, pager?.index);
 
   useEffect(() => {
     if (loadedFor !== article.id) void load(article.id);
@@ -170,7 +181,13 @@ function Article({
   const editingId = useCommentsStore((s) => s.editingId);
   // Notes in the margin must not run into each other.
   const highlights = useChatStore((s) => s.highlights);
-  useMarginStack(articleRef, beside, [comments, draft, editingId, highlights]);
+  useMarginStack(articleRef, beside, [
+    comments,
+    draft,
+    editingId,
+    highlights,
+    pager?.index,
+  ]);
   const shiftLeft = hasComments && layout.left !== null ? layout.left : null;
 
   const minutes = readingMinutes(article.blocks);
@@ -189,50 +206,86 @@ function Article({
         }}
         className="mx-auto w-full max-w-[var(--reader-measure)] px-8 pt-20 pb-24 transition-[margin] duration-[var(--dur)] ease-[var(--ease)]"
       >
-        <header className="mb-[2em]">
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={article.url}
-            className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-2 font-sans text-[0.75rem] leading-none font-medium"
-          >
-            <i aria-hidden className="bg-space size-2 rounded-full" />
-            {article.site || new URL(article.url).hostname}
-            <ArrowUpRight className="size-3 opacity-60" aria-hidden />
-          </a>
-          <h1 className="text-foreground font-serif text-[2em] leading-[1.15] font-semibold tracking-[-0.02em] text-balance">
-            {article.title}
-          </h1>
-          <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-[0.8125rem] leading-normal">
-            {article.author && (
-              <span className="text-foreground font-medium">
-                {article.author}
-              </span>
+        {pager && pager.index > 0 ? (
+          <PageHead pager={pager} title={article.title} />
+        ) : (
+          <header className="mb-[2em]">
+            {paper ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const sha = pdfShaOf(article.canonicalUrl);
+                  if (sha) void openPdfOriginal(sha);
+                }}
+                title="Open the PDF in your PDF viewer"
+                className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-2 font-sans text-[0.75rem] leading-none font-medium"
+              >
+                <FileText className="size-3.5" aria-hidden />
+                PDF
+                <ArrowUpRight className="size-3 opacity-60" aria-hidden />
+              </button>
+            ) : (
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={article.url}
+                className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-2 font-sans text-[0.75rem] leading-none font-medium"
+              >
+                <i aria-hidden className="bg-space size-2 rounded-full" />
+                {article.site || new URL(article.url).hostname}
+                <ArrowUpRight className="size-3 opacity-60" aria-hidden />
+              </a>
             )}
-            <span>{minutes} min read</span>
-          </div>
-          <div aria-hidden className="mt-7 flex items-center gap-2">
-            <i className="bg-honey h-[3px] w-8 rounded-full" />
-            <i className="bg-border h-px flex-1" />
-          </div>
-        </header>
-        <BlockRenderer
-          blocks={article.blocks}
-          baseUrl={article.url}
-          aside={(index) => (
-            <BlockComments
-              blockIndex={index}
-              beside={beside}
-              articleRef={articleRef}
-            />
+            <h1 className="text-foreground font-serif text-[2em] leading-[1.15] font-semibold tracking-[-0.02em] text-balance">
+              {article.title}
+            </h1>
+            <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-[0.8125rem] leading-normal">
+              {article.author && (
+                <span className="text-foreground font-medium">
+                  {article.author}
+                </span>
+              )}
+              <span>{minutes} min read</span>
+              {pager && <span>{pager.pages.length} pages</span>}
+            </div>
+            <div aria-hidden className="mt-7 flex items-center gap-2">
+              <i className="bg-honey h-[3px] w-8 rounded-full" />
+              <i className="bg-border h-px flex-1" />
+            </div>
+          </header>
+        )}
+        <div
+          // A new key on each turn replays the entrance.
+          key={pager?.index ?? 0}
+          className={cn(
+            pager?.direction === "next" &&
+              "motion-safe:animate-[yomu-page-next_260ms_cubic-bezier(0.32,0.72,0,1)]",
+            pager?.direction === "prev" &&
+              "motion-safe:animate-[yomu-page-prev_260ms_cubic-bezier(0.32,0.72,0,1)]",
           )}
-        />
+        >
+          <BlockRenderer
+            blocks={article.blocks}
+            baseUrl={article.url}
+            range={pager ? [pager.page.start, pager.page.end] : undefined}
+            aside={(index) => (
+              <BlockComments
+                blockIndex={index}
+                beside={beside}
+                articleRef={articleRef}
+              />
+            )}
+          />
+        </div>
+        {pager && <PageEnd pager={pager} article={article} />}
       </article>
+      {pager && <PageBar pager={pager} />}
       <GlossaryLayer
         articleRef={articleRef}
         articleId={article.id}
         blocks={article.blocks}
+        page={pager?.index}
       />
       {selection && <AddCommentButton selection={selection} onDone={clear} />}
     </>

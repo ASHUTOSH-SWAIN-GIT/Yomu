@@ -10,6 +10,9 @@ export interface ViewStore {
   /** The settings page is open. */
   settingsPage: boolean;
   setSettingsPage: (on: boolean) => void;
+  /** The page of imported PDFs (papers) is open. */
+  papersPage: boolean;
+  setPapersPage: (on: boolean) => void;
   /** Home shows archived blogs instead of the active collection. */
   showArchive: boolean;
   setShowArchive: (on: boolean) => void;
@@ -32,10 +35,20 @@ export interface ViewStore {
 registerPart("view", () =>
   createStore<ViewStore>((set) => ({
     libraryChat: false,
-    setLibraryChat: (libraryChat) => set({ libraryChat, settingsPage: false }),
+    setLibraryChat: (libraryChat) =>
+      set({ libraryChat, settingsPage: false, papersPage: false }),
     settingsPage: false,
     setSettingsPage: (settingsPage) =>
-      set({ settingsPage, libraryChat: false }),
+      set({ settingsPage, libraryChat: false, papersPage: false }),
+    papersPage: false,
+    setPapersPage: (papersPage) =>
+      set({
+        papersPage,
+        libraryChat: false,
+        settingsPage: false,
+        showArchive: false,
+        showInbox: false,
+      }),
     showArchive: false,
     setShowArchive: (showArchive) =>
       set({
@@ -43,6 +56,7 @@ registerPart("view", () =>
         showInbox: false,
         libraryChat: false,
         settingsPage: false,
+        papersPage: false,
       }),
     showInbox: false,
     setShowInbox: (showInbox) =>
@@ -51,6 +65,7 @@ registerPart("view", () =>
         showArchive: false,
         libraryChat: false,
         settingsPage: false,
+        papersPage: false,
       }),
     showHome: () =>
       set({
@@ -58,6 +73,7 @@ registerPart("view", () =>
         showInbox: false,
         libraryChat: false,
         settingsPage: false,
+        papersPage: false,
       }),
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),

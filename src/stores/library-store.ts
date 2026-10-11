@@ -4,11 +4,12 @@ import {
   backfillSearchText,
   deleteArticle,
   listArticles,
+  listPdfShas,
   listUsedImageFiles,
   removeArticleTag,
   setArticleArchived,
 } from "@/lib/db";
-import { pruneImages } from "@/lib/commands";
+import { prunePdfs, pruneImages } from "@/lib/commands";
 import { logError } from "@/lib/log";
 import type { ArticleSummary } from "@/types/library";
 
@@ -48,6 +49,12 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
       await pruneImages(await listUsedImageFiles());
     } catch (err) {
       logError("pruning cached images failed", err);
+    }
+    // And the saved copy of a PDF nothing in the library refers to.
+    try {
+      await prunePdfs(await listPdfShas());
+    } catch (err) {
+      logError("pruning saved PDFs failed", err);
     }
     // Refetch rather than filter locally, so the list stays correct even
     // if something else changed the table in the meantime.

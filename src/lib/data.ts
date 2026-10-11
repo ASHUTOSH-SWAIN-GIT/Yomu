@@ -1,4 +1,4 @@
-import { pruneImages } from "@/lib/commands";
+import { prunePdfs, pruneImages } from "@/lib/commands";
 import { deleteAllArticles, deleteAllChats } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { writeStorage } from "@/lib/storage";
@@ -41,6 +41,9 @@ export async function deleteEverything() {
   } catch (err) {
     logError("clearing the image cache failed", err);
   }
+  await prunePdfs([]).catch((err) =>
+    logError("clearing saved PDFs failed", err),
+  );
   // Every tab goes: what they showed is gone.
   resetTabs();
   useSpacesStore.getState().reset();

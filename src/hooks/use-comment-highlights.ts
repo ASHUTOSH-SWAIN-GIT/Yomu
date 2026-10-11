@@ -30,6 +30,8 @@ export function rangeOfWords(
  */
 export function useCommentHighlights(
   articleRef: RefObject<HTMLElement | null>,
+  /** The page of a paper on screen: its words are found again on a turn. */
+  page?: number,
 ) {
   const items = useCommentsStore((s) => s.items);
   const draft = useCommentsStore((s) => s.draft);
@@ -75,7 +77,7 @@ export function useCommentHighlights(
       CSS.highlights.delete("yomu-comment");
       CSS.highlights.delete("yomu-comment-active");
     };
-  }, [articleRef, items, draft, activeId, tabActive]);
+  }, [articleRef, items, draft, activeId, tabActive, page]);
 
   // Words that were asked about get a thin underline, so the answer card
   // beside them is easy to tie to its words.
@@ -104,7 +106,7 @@ export function useCommentHighlights(
     return () => {
       CSS.highlights.delete("yomu-asked");
     };
-  }, [articleRef, asked, tabActive]);
+  }, [articleRef, asked, tabActive, page]);
 
   // Pointing at commented words makes them (and their comment) react.
   useEffect(() => {

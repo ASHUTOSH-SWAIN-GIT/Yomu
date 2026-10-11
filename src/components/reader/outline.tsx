@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { currentHeadingIndex } from "@/lib/reader-layout";
+import { requestBlock } from "@/lib/show-block";
 import { cn } from "@/lib/utils";
 import type { Block } from "@/types/article";
 
@@ -76,8 +77,19 @@ export function Outline({
   if (headings.length < 2) return null;
 
   const go = (index: number) => {
-    blockEl(index)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setOpen(false);
+    const el = blockEl(index);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    // On another page of a paper: turn to it, then scroll once it is drawn.
+    requestBlock(index);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        blockEl(index)?.scrollIntoView({ block: "start" }),
+      ),
+    );
   };
   const minLevel = Math.min(...headings.map((h) => h.level));
 
