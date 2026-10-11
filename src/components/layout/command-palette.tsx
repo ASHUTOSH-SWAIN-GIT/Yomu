@@ -1,32 +1,51 @@
 import { useEffect, useMemo, useState } from "react";
 import { Command } from "cmdk";
 import {
+  Archive,
+  CornerDownRight,
   FileText,
   Focus,
   Image as ImageIcon,
+  Inbox,
   Link as LinkIcon,
   Keyboard,
   MessageSquare,
   Library,
+  Moon,
+  Palette,
+  PanelsTopLeft,
   Plus,
   Search,
   SlidersHorizontal,
   Sparkles,
+  Sun,
 } from "lucide-react";
 import { searchLibrary } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
 import { pickAndOpenPdf } from "@/lib/pdf/pick";
 import { openSampleArticle } from "@/lib/sample-article";
-import { filterByQuery } from "@/lib/palette";
+import { filterByQuery, matchesQuery } from "@/lib/palette";
+import { resolveTheme } from "@/lib/appearance";
+import {
+  goToArchive,
+  goToHome,
+  goToInbox,
+  goToPapers,
+  goToSettings,
+  openLibraryChat,
+  startNewChat,
+} from "@/lib/go";
+import { THEMES } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { SUMMARY_LABEL } from "@/lib/scope";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
-import { goHome, openSavedArticle } from "@/lib/navigate";
+import { openSavedArticle, showParagraph } from "@/lib/navigate";
+import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useViewStore } from "@/stores/view-store";
-import { openTab } from "@/stores/tabs";
+import { activateTab, allBundles, openTab, useTabsStore } from "@/stores/tabs";
 import { useUiStore } from "@/stores/ui-store";
 import type { SearchHit } from "@/types/library";
 
@@ -42,10 +61,30 @@ interface Action {
   run: () => void;
 }
 
+/** The sections of the settings page, as the page's own links name them. */
+const SETTINGS_SECTIONS = [
+  { id: "reading", label: "Appearance and reading" },
+  { id: "answers", label: "AI answers" },
+  { id: "agent", label: "Agent" },
+  { id: "bookmarks", label: "Bookmarks" },
+  { id: "data", label: "Data" },
+];
+
+/** What a tab is showing, for the list of open tabs. */
+function tabLabel(id: string): string {
+  const bundle = allBundles().find((b) => b.id === id);
+  const state = bundle?.parts.reader?.getState().state;
+  if (state?.status === "ready") return state.article.title;
+  if (bundle?.parts.view?.getState().libraryChat) return "Chat";
+  return "Home";
+}
+
 /**
- * Cmd/Ctrl+K: one place to find anything (articles, chat answers, commands)
- * and to run commands. Search is full-text (see searchLibrary); with no
- * query it lists recent articles and commands.
+ * Cmd/Ctrl+K: the way to get anywhere in the app. It finds articles (by
+ * title or full text), chats and their answers, goes to any page, settings
+ * section, open tab or heading of the article being read, switches the
+ * theme, and runs commands. With no query it lists recent articles and the
+ * main places.
  */
 export function CommandPalette() {
   const open = useUiStore((s) => s.paletteOpen);
@@ -72,6 +111,11 @@ function PaletteBody({ close }: { close: () => void }) {
   const reader = useReaderStore((s) => s.state);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const chats = useLibraryChatStore((s) => s.chats);
+  const tabIds = useTabsStore((s) => s.ids);
+  const activeTab = useTabsStore((s) => s.activeId);
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
 
   // Debounced full-text search over article text and chats.
   useEffect(() => {
@@ -99,16 +143,84 @@ function PaletteBody({ close }: { close: () => void }) {
     close();
   }
 
-  const openArticleId = reader.status === "ready" ? reader.article : null;
+  const openArticle_ = reader.status === "ready" ? reader.article : null;
   const ui = useUiStore.getState;
-  const actions: Action[] = [
+  const dark =
+    resolveTheme(
+      theme,
+      window.matchMedia("(prefers-color-scheme: dark)").matches,
+    ).mode === "dark";
+  const inboxCount = articles.filter((a) => a.inbox && !a.archived).length;
+  const archivedCount = articles.filter((a) => a.archived).length;
+
+  // Places to go.
+  const places: Action[] = [
     {
-      id: "library",
+      id: "home",
       label: "Go to Home",
       icon: <Library />,
       shortcut: `${MOD}⇧H`,
-      run: () => void goHome(),
+      run: goToHome,
     },
+    {
+      id: "papers",
+      label: "Go to Papers",
+      icon: <FileText />,
+      run: goToPapers,
+    },
+    ...(inboxCount > 0
+      ? [
+          {
+            id: "inbox",
+            label: `Go to Inbox (${inboxCount})`,
+            icon: <Inbox />,
+            run: goToInbox,
+          },
+        ]
+      : []),
+    ...(archivedCount > 0
+      ? [
+          {
+            id: "archive",
+            label: "Go to Archive",
+            icon: <Archive />,
+            run: goToArchive,
+          },
+        ]
+      : []),
+    {
+      id: "new-chat",
+      label: "New chat with your library",
+      icon: <MessageSquare />,
+      shortcut: `${MOD}N`,
+      run: startNewChat,
+    },
+    {
+      id: "settings",
+      label: "Open settings",
+      icon: <SlidersHorizontal />,
+      shortcut: `${MOD},`,
+      run: () => goToSettings(),
+    },
+    ...SETTINGS_SECTIONS.map((s) => ({
+      id: `settings-${s.id}`,
+      label: `Settings: ${s.label}`,
+      icon: <SlidersHorizontal />,
+      run: () => goToSettings(s.id),
+    })),
+    ...(tabIds.length > 1
+      ? tabIds
+          .filter((id) => id !== activeTab)
+          .map((id) => ({
+            id: `tab-${id}`,
+            label: `Switch to tab: ${tabLabel(id)}`,
+            icon: <PanelsTopLeft />,
+            run: () => activateTab(id),
+          }))
+      : []),
+  ];
+
+  const actions: Action[] = [
     {
       id: "paste-link",
       label: "Open link from clipboard",
@@ -123,7 +235,7 @@ function PaletteBody({ close }: { close: () => void }) {
       shortcut: `${MOD}O`,
       run: () => void pickAndOpenPdf(),
     },
-    ...(openArticleId
+    ...(openArticle_
       ? [
           {
             id: "summarize",
@@ -132,7 +244,7 @@ function PaletteBody({ close }: { close: () => void }) {
             run: () =>
               void useChatStore
                 .getState()
-                .askArticle(openArticleId, SUMMARY_LABEL),
+                .askArticle(openArticle_, SUMMARY_LABEL),
           },
         ]
       : []),
@@ -150,16 +262,6 @@ function PaletteBody({ close }: { close: () => void }) {
       run: () => ui().setFocusMode(!ui().focusMode),
     },
     {
-      id: "settings",
-      label: "Open settings",
-      icon: <SlidersHorizontal />,
-      shortcut: `${MOD},`,
-      run: () => {
-        useViewStore.getState().setSettingsPage(true);
-        if (useReaderStore.getState().state.status === "ready") void goHome();
-      },
-    },
-    {
       id: "chat",
       label: "Show or hide the chat",
       icon: <MessageSquare />,
@@ -173,6 +275,18 @@ function PaletteBody({ close }: { close: () => void }) {
       icon: <Plus />,
       shortcut: `${MOD}T`,
       run: () => openTab(),
+    },
+    {
+      id: "theme-toggle",
+      label: dark ? "Switch to the light theme" : "Switch to the dark theme",
+      icon: dark ? <Sun /> : <Moon />,
+      run: () =>
+        setTheme(
+          resolveTheme(
+            theme,
+            window.matchMedia("(prefers-color-scheme: dark)").matches,
+          ).pair,
+        ),
     },
     {
       id: "shortcuts",
@@ -190,12 +304,49 @@ function PaletteBody({ close }: { close: () => void }) {
       run: () => ui().setBlockRemoteImages(!ui().blockRemoteImages),
     },
   ];
+  // The individual settings sections only show once you search for them.
+  const shownPlaces = query.trim()
+    ? filterByQuery(places, query, (a) => a.label)
+    : places.filter((p) => !p.id.startsWith("settings-"));
   const shownActions = filterByQuery(actions, query, (a) => a.label);
+
+  // Chats: the newest few, or the ones whose title matches.
+  const shownChats = (
+    query.trim()
+      ? chats.filter((c) => matchesQuery(c.title, query))
+      : chats.slice(0, 3)
+  ).slice(0, 6);
+
+  // Headings of the article being read, to jump to.
+  const headings = (openArticle_?.blocks ?? []).flatMap((b, index) =>
+    b.type === "heading" ? [{ index, text: b.text }] : [],
+  );
+  const shownHeadings = (
+    query.trim()
+      ? headings.filter((h) => matchesQuery(h.text, query))
+      : headings
+  ).slice(0, query.trim() ? 20 : 6);
+
+  // Themes only show once you search, so they don't crowd the empty list.
+  const shownThemes = query.trim()
+    ? THEMES.filter((t) => matchesQuery(`theme ${t.label}`, query)).slice(0, 6)
+    : [];
+
+  // Titles match as you type; full-text hits (below) add to them.
+  const titleHits = query.trim()
+    ? articles
+        .filter((a) =>
+          matchesQuery(`${a.title} ${a.site} ${a.author ?? ""}`, query),
+        )
+        .slice(0, 6)
+    : [];
 
   // Results only count for the current query (they may lag a keystroke).
   const current = query.trim() ? hits : [];
+  const titled = new Set(titleHits.map((a) => a.id));
   const articleHits = current.filter(
-    (h) => h.kind === "article" && byId.has(h.articleId),
+    (h) =>
+      h.kind === "article" && byId.has(h.articleId) && !titled.has(h.articleId),
   );
   const chatHits = current.filter(
     (h) => h.kind === "chat" && byId.has(h.articleId),
@@ -215,7 +366,7 @@ function PaletteBody({ close }: { close: () => void }) {
         <Command.Input
           value={query}
           onValueChange={setQuery}
-          placeholder="Search articles, chats and commands…"
+          placeholder="Search, or go anywhere…"
           className="placeholder:text-muted-foreground flex-1 bg-transparent text-[0.9375rem] outline-none"
         />
         <kbd className="bg-muted text-muted-foreground rounded px-1.5 py-px font-sans text-[0.6875rem]">
@@ -246,8 +397,108 @@ function PaletteBody({ close }: { close: () => void }) {
           </Group>
         )}
 
-        {articleHits.length > 0 && (
+        {titleHits.length > 0 && (
           <Group label="Articles">
+            {titleHits.map((a) => (
+              <Row
+                key={`t-${a.id}`}
+                value={`t-${a.id}`}
+                icon={<FileText />}
+                onSelect={() => openArticle(a.id)}
+              >
+                <span className="truncate">{a.title}</span>
+                <span className="text-muted-foreground ml-auto text-[0.6875rem]">
+                  {a.site}
+                </span>
+              </Row>
+            ))}
+          </Group>
+        )}
+
+        {shownHeadings.length > 0 && (
+          <Group label="In this article">
+            {shownHeadings.map((h) => (
+              <Row
+                key={`h-${h.index}`}
+                value={`h-${h.index}`}
+                icon={<CornerDownRight />}
+                onSelect={() => {
+                  close();
+                  showParagraph(h.index);
+                }}
+              >
+                <span className="truncate">{h.text}</span>
+              </Row>
+            ))}
+          </Group>
+        )}
+
+        {shownChats.length > 0 && (
+          <Group label="Chats">
+            {shownChats.map((c) => (
+              <Row
+                key={`chat-${c.id}`}
+                value={`chat-${c.id}`}
+                icon={<MessageSquare />}
+                onSelect={() => {
+                  openLibraryChat(c.id);
+                  close();
+                }}
+              >
+                <span className="truncate">{c.title}</span>
+              </Row>
+            ))}
+          </Group>
+        )}
+
+        {shownPlaces.length > 0 && (
+          <Group label="Go to">
+            {shownPlaces.map((a) => (
+              <Row
+                key={a.id}
+                value={`go-${a.id}`}
+                icon={a.icon}
+                onSelect={() => {
+                  a.run();
+                  close();
+                }}
+              >
+                <span>{a.label}</span>
+                {a.shortcut && (
+                  <kbd className="bg-muted text-muted-foreground ml-auto rounded px-1.5 py-px font-sans text-[0.6875rem]">
+                    {a.shortcut}
+                  </kbd>
+                )}
+              </Row>
+            ))}
+          </Group>
+        )}
+
+        {shownThemes.length > 0 && (
+          <Group label="Themes">
+            {shownThemes.map((t) => (
+              <Row
+                key={`theme-${t.id}`}
+                value={`theme-${t.id}`}
+                icon={<Palette />}
+                onSelect={() => {
+                  setTheme(t.id);
+                  close();
+                }}
+              >
+                <span>Theme: {t.label}</span>
+                {theme === t.id && (
+                  <span className="text-muted-foreground ml-auto text-[0.6875rem]">
+                    current
+                  </span>
+                )}
+              </Row>
+            ))}
+          </Group>
+        )}
+
+        {articleHits.length > 0 && (
+          <Group label="Mentioned in articles">
             {articleHits.map((h) => (
               <Row
                 key={`a-${h.articleId}`}

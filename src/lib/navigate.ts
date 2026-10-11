@@ -26,7 +26,7 @@ export async function openSavedArticle(articleId: string) {
 /** Brings the paragraph into view and flashes it, so the eye finds it. The
  * page may still be loading (and restoring where you left off), so it keeps
  * trying for a moment and settles once more after the layout does. */
-function showParagraph(block: number) {
+export function showParagraph(block: number) {
   // A paper turns to the page that has it first.
   requestBlock(block);
   let tries = 0;

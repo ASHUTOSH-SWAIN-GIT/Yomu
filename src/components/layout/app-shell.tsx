@@ -59,6 +59,10 @@ export function AppShell() {
     function onKeyDown(e: KeyboardEvent) {
       const ui = useUiStore.getState();
 
+      // In the app Esc only ever closes something. Left unhandled it would
+      // also reach the window, and on macOS that takes a full screen window
+      // out of full screen. (Dialogs and menus see it first, so they close.)
+      if (e.key === "Escape" && !e.isComposing) e.preventDefault();
       if (e.key === "Escape" && ui.focusMode) return ui.setFocusMode(false);
 
       const command = shortcutFor(e);
