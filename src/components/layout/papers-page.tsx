@@ -1,13 +1,22 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { FileText, FileUp, Plus } from "lucide-react";
+import {
+  Check,
+  CircleAlert,
+  FileText,
+  FileUp,
+  Plus,
+  Search,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Actions, Confirm } from "@/components/layout/home-library";
 import { moveFocus } from "@/lib/list-focus";
 import { deleteArticle, openSavedArticle } from "@/lib/navigate";
 import { isPdfUrl } from "@/lib/pdf/identity";
 import { pickAndOpenPdf } from "@/lib/pdf/pick";
+import { matchesQuery } from "@/lib/palette";
 import { cn } from "@/lib/utils";
+import { usePaperImports } from "@/stores/paper-imports-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import type { ArticleSummary } from "@/types/library";
@@ -41,18 +50,10 @@ export function PapersPage() {
             Read PDFs page by page, and ask about any line.
           </p>
         </div>
-        {papers.length > 0 && (
-          <Button
-            onClick={() => void pickAndOpenPdf()}
-            disabled={loading}
-            className="h-9 shrink-0 gap-2 rounded-lg px-3.5 text-[0.8125rem]"
-          >
-            <Plus className="size-4" aria-hidden />
-            Open PDF
-            <kbd className="font-sans text-[0.6875rem] opacity-60">{MOD}O</kbd>
-          </Button>
-        )}
       </header>
+
+      {papers.length > 0 && <DropZone active={dragging} />}
+      <ImportQueue />
 
       {state.status === "loading" && (
         <Importing
@@ -127,12 +128,108 @@ function useFileDrag(): boolean {
   return over;
 }
 
+/** Where more papers go: always in sight once there is a list, and lit up
+ * while a file is dragged over the window. Clicking it picks files. */
+function DropZone({ active }: { active: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={() => void pickAndOpenPdf()}
+      className={cn(
+        "text-muted-foreground hover:text-foreground hover:border-foreground/40 focus-visible:ring-ring/60 mt-8 flex w-full items-center justify-center gap-2.5 rounded-xl border border-dashed px-4 py-4 text-[0.8125rem] transition-colors outline-none focus-visible:ring-2",
+        active && "border-foreground/60 bg-accent text-foreground",
+      )}
+    >
+      <FileUp className="size-4" aria-hidden />
+      <span>
+        Drop PDFs here to add them, several at once, or{" "}
+        <span className="text-foreground underline underline-offset-2">
+          choose files
+        </span>
+      </span>
+      <kbd className="font-sans text-[0.6875rem] opacity-60">{MOD}O</kbd>
+    </button>
+  );
+}
+
+/** The PDFs being added together, each with how far along it is. */
+function ImportQueue() {
+  const items = usePaperImports((s) => s.items);
+  const clearDone = usePaperImports((s) => s.clearDone);
+  if (items.length === 0) return null;
+  const done = items.filter(
+    (i) => i.status !== "waiting" && i.status !== "reading",
+  ).length;
+  const finished = done === items.length;
+  return (
+    <section
+      aria-label="Adding papers"
+      className="bg-muted/50 mt-4 rounded-xl px-4 py-3"
+    >
+      <div className="flex items-center gap-3 text-[0.8125rem]">
+        <span className="font-medium">
+          {finished
+            ? `Added ${items.filter((i) => i.status === "added").length} of ${items.length}`
+            : `Adding papers · ${done} of ${items.length}`}
+        </span>
+        {finished && (
+          <button
+            type="button"
+            onClick={clearDone}
+            className="text-muted-foreground hover:text-foreground ml-auto text-[0.75rem] underline underline-offset-2"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <ul className="mt-2 flex max-h-56 flex-col gap-1.5 overflow-y-auto">
+        {items.map((i) => (
+          <li
+            key={i.id}
+            className="flex items-center gap-3 text-[0.8125rem]"
+            title={i.error}
+          >
+            <FileText
+              className="text-muted-foreground size-3.5 shrink-0"
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1 truncate">{i.name}</span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-2 text-[0.75rem] tabular-nums">
+              {i.status === "waiting" && "Waiting"}
+              {i.status === "reading" && (
+                <>
+                  <ProgressBar value={i.fraction ?? 0} className="w-16" />
+                  {Math.round((i.fraction ?? 0) * 100)}%
+                </>
+              )}
+              {i.status === "added" && (
+                <>
+                  <Check className="size-3.5" aria-hidden /> Added
+                </>
+              )}
+              {i.status === "already" && "Already in Papers"}
+              {i.status === "failed" && (
+                <span className="text-destructive flex items-center gap-1">
+                  <CircleAlert className="size-3.5" aria-hidden />
+                  {i.error?.includes("no selectable text")
+                    ? "Scanned, no text"
+                    : "Could not read"}
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function DropOverlay() {
   return (
     <div className="bg-background/80 pointer-events-none fixed inset-0 z-40 grid place-items-center backdrop-blur-sm">
       <div className="border-foreground/30 flex flex-col items-center gap-3 rounded-3xl border-2 border-dashed px-16 py-12">
         <FileUp className="size-8" aria-hidden />
-        <p className="text-[0.9375rem] font-medium">Drop the PDF to open it</p>
+        <p className="text-[0.9375rem] font-medium">Drop PDFs to add them</p>
       </div>
     </div>
   );
@@ -161,7 +258,7 @@ function Empty() {
         Open PDF
       </Button>
       <p className="text-muted-foreground mt-3 text-[0.75rem]">
-        or drop a file anywhere · {MOD}O
+        or drop PDFs anywhere, several at once · {MOD}O
       </p>
     </div>
   );
@@ -264,16 +361,38 @@ function ReadingCard({ paper }: { paper: ArticleSummary }) {
 function PaperList({ papers }: { papers: ArticleSummary[] }) {
   const setArchived = useLibraryStore((s) => s.setArchived);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const shown = query.trim()
+    ? papers.filter((a) => matchesQuery(`${a.title} ${a.author ?? ""}`, query))
+    : papers;
   return (
     <section className="mt-12" onKeyDown={moveFocus}>
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-center gap-2">
         <h2 className="text-[0.9375rem] font-semibold">All papers</h2>
         <span className="text-muted-foreground text-[0.8125rem] tabular-nums">
           {papers.length}
         </span>
+        {/* A long list gets a way to find one paper in it. */}
+        {papers.length > 5 && (
+          <label className="bg-muted text-muted-foreground focus-within:ring-ring/60 ml-auto flex h-8 w-56 items-center gap-2 rounded-lg px-2.5 focus-within:ring-2">
+            <Search className="size-3.5 shrink-0" aria-hidden />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find a paper"
+              aria-label="Find a paper"
+              className="placeholder:text-muted-foreground text-foreground min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none"
+            />
+          </label>
+        )}
       </div>
+      {shown.length === 0 && (
+        <p className="text-muted-foreground mt-6 text-[0.8125rem]">
+          No paper matches “{query.trim()}”.
+        </p>
+      )}
       <ul className="divide-border mt-3 flex flex-col divide-y">
-        {papers.map((a) =>
+        {shown.map((a) =>
           confirmingId === a.id ? (
             <li key={a.id} className="bg-muted flex h-16 items-center px-3">
               <Confirm

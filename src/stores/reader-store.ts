@@ -1,5 +1,5 @@
 import { createStore } from "zustand";
-import { canonicalizeUrl, importPdf, scrapeUrl } from "@/lib/commands";
+import { canonicalizeUrl, scrapeUrl } from "@/lib/commands";
 import {
   getArticleByCanonicalUrl,
   getArticleById,
@@ -7,13 +7,9 @@ import {
 } from "@/lib/db";
 import { saveToDefaultCollection } from "@/lib/default-collection";
 import { logError } from "@/lib/log";
-import {
-  baseName,
-  fileUrl,
-  isPdfUrl,
-  pdfCanonicalUrl,
-} from "@/lib/pdf/identity";
-import { readSavedPdf, reimportPdf } from "@/lib/pdf/import";
+import { addPaper } from "@/lib/pdf/add";
+import { baseName, isPdfUrl } from "@/lib/pdf/identity";
+import { reimportPdf } from "@/lib/pdf/import";
 import { useLibraryStore } from "@/stores/library-store";
 import { registerPart, tabStore } from "@/stores/tabs";
 import type { StoredArticle } from "@/types/library";
@@ -86,36 +82,17 @@ registerPart("reader", () =>
       const name = baseName(path);
       set({ state: { status: "loading", url: name, detail: "Opening…" } });
       try {
-        const copy = await importPdf(path);
-        // The same file, opened before: the saved copy keeps its comments
-        // and chat, and is not read again.
-        const cached = await getArticleByCanonicalUrl(
-          pdfCanonicalUrl(copy.sha),
+        const { article } = await addPaper(path, (p) =>
+          set({
+            state: {
+              status: "loading",
+              url: name,
+              detail: `Reading page ${p.page} of ${p.pages}…`,
+              fraction: p.page / p.pages,
+            },
+          }),
         );
-        if (cached) {
-          set({ state: { status: "ready", article: cached } });
-          return;
-        }
-        const scraped = await readSavedPdf(
-          copy.sha,
-          copy.fileName,
-          fileUrl(path),
-          (p) =>
-            set({
-              state: {
-                status: "loading",
-                url: name,
-                detail: `Reading page ${p.page} of ${p.pages}…`,
-                fraction: p.page / p.pages,
-              },
-            }),
-        );
-        const saved = await upsertArticle(scraped);
-        set({ state: { status: "ready", article: saved } });
-        await saveToDefaultCollection(saved.id).catch((err) =>
-          logError("saving to the default collection failed", err),
-        );
-        await useLibraryStore.getState().refresh();
+        set({ state: { status: "ready", article } });
       } catch (err) {
         logError(`opening ${path} failed`, err);
         set({

@@ -14,7 +14,7 @@ import { goHome } from "@/lib/navigate";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
-import { openPdfOnPapersPage, pickAndOpenPdf } from "@/lib/pdf/pick";
+import { openPdfs, pickAndOpenPdf } from "@/lib/pdf/pick";
 import { shortcutFor } from "@/lib/shortcuts";
 import { watchBookmarks } from "@/stores/bookmarks-store";
 import { applyZoom, savedZoom, stepZoom } from "@/lib/zoom";
@@ -121,8 +121,7 @@ export function AppShell() {
     getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type !== "drop") return;
-        const pdf = event.payload.paths.find((p) => /\.pdf$/i.test(p));
-        if (pdf) openPdfOnPapersPage(pdf);
+        openPdfs(event.payload.paths);
       })
       .then((unlisten) => {
         if (gone) unlisten();
