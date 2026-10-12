@@ -78,6 +78,10 @@ One-time setup, in the repo's Settings > Secrets:
 
 Local build: `TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/yomu-updater.key)" npm run tauri build` (the key is required because updater artifacts are enabled).
 
+## Usage counts
+
+Release builds send one anonymous ping when the app opens: a random install ID and your OS (macOS, Windows or Linux), so the author can see how many people use Yomu. Nothing about what you read or ask. Turn it off in Settings → Data.
+
 ## Troubleshooting
 
 - **The agent says "Off":** turn it on in Settings → Agent.

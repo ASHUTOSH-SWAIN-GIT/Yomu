@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { Section, Setting } from "@/components/settings/controls";
+import { Section, Setting, Switch } from "@/components/settings/controls";
 import { Button } from "@/components/ui/button";
 import { Confirm } from "@/components/ui/confirm";
-import { storageInfo } from "@/lib/commands";
+import {
+  setTelemetryEnabled,
+  storageInfo,
+  telemetryEnabled,
+} from "@/lib/commands";
 import { clearAllChats, clearImageCache, deleteEverything } from "@/lib/data";
 import { formatBytes } from "@/lib/format";
 import { logError } from "@/lib/log";
@@ -26,6 +30,19 @@ export function DataSection() {
       .catch((err) => logError("reading the storage info failed", err));
   }, []);
   useEffect(load, [load]);
+
+  const [usageCounts, setUsageCounts] = useState(true);
+  useEffect(() => {
+    telemetryEnabled()
+      .then(setUsageCounts)
+      .catch((err) => logError("reading the usage counts setting failed", err));
+  }, []);
+  function toggleUsageCounts(on: boolean) {
+    setUsageCounts(on);
+    setTelemetryEnabled(on).catch((err) =>
+      logError("saving the usage counts setting failed", err),
+    );
+  }
 
   async function run(label: string, work: () => Promise<unknown>) {
     setBusy(true);
@@ -70,6 +87,17 @@ export function DataSection() {
           }
         />
       </div>
+
+      <Setting
+        label="Count me as a user"
+        hint="Sends a random install ID and your OS when Yomu opens, so the author can count users. Nothing about what you read or ask."
+      >
+        <Switch
+          checked={usageCounts}
+          onChange={toggleUsageCounts}
+          label="Count me as a user"
+        />
+      </Setting>
 
       <Setting label="Clear saved images">
         <Button

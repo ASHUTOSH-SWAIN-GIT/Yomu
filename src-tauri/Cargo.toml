@@ -1,6 +1,6 @@
 [package]
 name = "yomu"
-version = "0.1.2"
+version = "0.1.4"
 description = "Yomu, an agent native technical reader"
 authors = ["you"]
 edition = "2021"
@@ -43,6 +43,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
 sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 chrono = "0.4.45"
 encoding_rs = "0.8.42"

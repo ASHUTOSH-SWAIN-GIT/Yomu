@@ -166,3 +166,12 @@ export async function agentPrompt(
 export async function scanBookmarks(folder: string): Promise<BookmarkScan> {
   return invoke<BookmarkScan>("scan_bookmarks", { folder });
 }
+
+/** Anonymous usage counts (src-tauri/src/telemetry.rs). */
+export async function telemetryEnabled(): Promise<boolean> {
+  return invoke<boolean>("telemetry_enabled");
+}
+
+export async function setTelemetryEnabled(enabled: boolean): Promise<void> {
+  return invoke("telemetry_set_enabled", { enabled });
+}

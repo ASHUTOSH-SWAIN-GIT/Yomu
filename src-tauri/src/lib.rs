@@ -6,6 +6,7 @@ mod imgcache;
 mod mcp;
 mod pdf;
 mod scraper;
+mod telemetry;
 
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -341,6 +342,7 @@ pub fn run() {
         )
         .manage(Arc::clone(&harness))
         .setup(move |app| {
+            telemetry::ping(app.handle());
             // The library as a read-only server the agent can use (see
             // mcp.rs). If it cannot start the agent still works, with the
             // passages Yomu puts in each question.
@@ -409,7 +411,9 @@ pub fn run() {
             agent_list_models,
             agent_set_model,
             agent_cancel,
-            agent_prompt
+            agent_prompt,
+            telemetry::telemetry_enabled,
+            telemetry::telemetry_set_enabled
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

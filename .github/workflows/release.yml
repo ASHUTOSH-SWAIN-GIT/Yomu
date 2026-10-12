@@ -52,6 +52,9 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Where anonymous usage counts go (src-tauri/src/telemetry.rs).
+          # Unset means the build sends nothing.
+          YOMU_TELEMETRY_URL: ${{ vars.YOMU_TELEMETRY_URL }}
           # Updater signature (required, the build fails without it).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
