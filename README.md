@@ -29,7 +29,7 @@ Get the installer for your system from the [latest release](https://github.com/A
 | Windows | `.exe` installer or `.msi`                    |
 | Linux   | `.AppImage`, `.deb` or `.rpm`                 |
 
-Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen warn on first open. Yomu checks for a new release once at startup and updates itself.
+Builds are not notarized yet, so macOS Gatekeeper and Windows SmartScreen warn on first open. On macOS, right-click Yomu in Applications and choose **Open** (or allow it under System Settings > Privacy & Security). macOS builds are ad-hoc signed, which Apple Silicon requires; without that signature the app is reported as "damaged and can't be opened". Yomu checks for a new release once at startup and updates itself.
 
 ## What it does
 
