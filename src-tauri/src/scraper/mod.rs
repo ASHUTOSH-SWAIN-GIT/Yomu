@@ -342,7 +342,7 @@ fn widen_to_siblings(blocks: Vec<Block>, doc: &Html, base: &url::Url) -> Vec<Blo
         .map(|t| squash(&t))
         .filter(|t| !t.is_empty())
         .collect();
-    if paras.len() < 2 {
+    if paras.is_empty() {
         return blocks;
     }
     let head = |t: &str| t.chars().take(60).collect::<String>();
@@ -380,7 +380,7 @@ fn widen_to_siblings(blocks: Vec<Block>, doc: &Html, base: &url::Url) -> Vec<Blo
     let parent = container
         .ancestors()
         .filter_map(ElementRef::wrap)
-        .take(4)
+        .take(6)
         .take_while(|a| !matches!(a.value().name(), "body" | "html"))
         .find(|a| prose(*a) * 10 >= own * 13);
     let Some(parent) = parent.filter(|_| own > 0) else {
@@ -493,6 +493,31 @@ mod extract_tests {
             .any(|b| matches!(b, Block::Heading { text, .. } if text == "Takeaways")));
         assert!(text.contains("Delta"));
         assert!(!text.contains("menu"));
+    }
+
+    #[test]
+    fn single_paragraph_result_widens_through_deeply_nested_rows() {
+        // Shape taken from anoma.ly: one paragraph per row, each nested six
+        // levels below the container that holds them all.
+        let row = |text: String| {
+            format!(
+                "<div><section><div><article><div><div><p>{text}</p></div></div></article></div></section></div>"
+            )
+        };
+        let html = format!(
+            "<html><body><main>{}{}{}</main></body></html>",
+            row(long("Alpha")),
+            row(long("Beta")),
+            row(long("Gamma"))
+        );
+        let doc = Html::parse_document(&html);
+        let base = url::Url::parse("https://blog.example/post").unwrap();
+        let first = vec![Block::Paragraph {
+            spans: vec![blocks::Span::plain(long("Alpha"))],
+        }];
+        let widened = widen_to_siblings(first, &doc, &base);
+        let text = widened.iter().filter_map(block_text).collect::<String>();
+        assert!(text.contains("Beta") && text.contains("Gamma"));
     }
 
     /// Readability strips <picture> and src-less <img>; `extract` must still

@@ -549,6 +549,9 @@ fn collect_spans_inner(
                         let link = elem.attr("href").map(|s| s.to_string()).or(href.clone());
                         collect_spans_inner(child_el, bold, italic, code, link, out)
                     }
+                    // `aria-hidden` breaks are layout, not content: custom
+                    // typesetters (anoma.ly) put one inside every word.
+                    "br" if elem.attr("aria-hidden") == Some("true") => {}
                     "br" => out.push(Span::plain("\n".to_string())),
                     // Nested lists are emitted as their own deeper items
                     // (see `collect_list_items`).
@@ -934,6 +937,35 @@ kind: Pod</code></pre>"#;
                 rows: vec![vec!["a".into(), "b".into()]],
             }]
         );
+    }
+
+    #[test]
+    fn ignores_aria_hidden_breaks_inside_words() {
+        // Shape taken from anoma.ly, whose typesetter puts a layout `<br>` in
+        // front of every word (and splits hyphenated words across two).
+        let html = r#"<p><span class="t"><span class="j-body">
+            <span class="j-word"><br aria-hidden="true"><span>It</span></span><span> </span>
+            <span class="j-word"><br aria-hidden="true"><span>was</span></span><span> </span>
+            <span class="j-word"><br aria-hidden="true"><span>an</span></span><span> </span>
+            <span class="j-word"><br aria-hidden="true"><span>over<i class="j-hyphen"></i></span><br aria-hidden="true"><span>haul.</span></span>
+            </span></span></p>"#;
+        let blocks = html_to_blocks(html);
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert_eq!(text, "It was an overhaul.");
+    }
+
+    #[test]
+    fn keeps_real_line_breaks() {
+        let blocks = html_to_blocks("<p>one<br>two</p>");
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        assert_eq!(text, "one\ntwo");
     }
 
     #[test]
