@@ -1,8 +1,35 @@
-# Yomu
+<p align="center">
+  <img src="docs/media/logo.png" alt="Yomu" width="120" />
+</p>
 
-A desktop reader for technical blogs, docs and research papers, with an AI agent from your own computer beside every article.
+<h1 align="center">Yomu</h1>
+
+<p align="center"><b>Read deeply. Ask anything.</b><br />
+A desktop reader for technical blogs, docs and research papers, with an AI agent from your own computer beside every article.</p>
+
+<p align="center">
+  <a href="https://github.com/ASHUTOSH-SWAIN-GIT/Yomu/releases/latest">Download</a> ·
+  <a href="https://yomu.lowkeydev.me">Website</a> ·
+  <a href="docs/media/yomu-demo.mp4">Watch the demo</a>
+</p>
+
+<p align="center">
+  <a href="docs/media/yomu-demo.mp4"><img src="docs/media/demo-poster.jpg" alt="Yomu demo (1 minute)" width="760" /></a>
+</p>
 
 You open a blog post or a PDF, Yomu turns it into a clean, distraction-free page, and you can ask an agent (Codex, Claude Code, OpenCode, or any ACP agent you already have installed) about what you are reading. Everything is stored locally; there is no Yomu account and no API key.
+
+## Download
+
+Get the installer for your system from the [latest release](https://github.com/ASHUTOSH-SWAIN-GIT/Yomu/releases/latest):
+
+| System  | File                                          |
+| ------- | --------------------------------------------- |
+| macOS   | `.dmg` (Apple Silicon `aarch64`, Intel `x64`) |
+| Windows | `.exe` installer or `.msi`                    |
+| Linux   | `.AppImage`, `.deb` or `.rpm`                 |
+
+Builds are not code-signed yet, so macOS Gatekeeper and Windows SmartScreen warn on first open. Yomu checks for a new release once at startup and updates itself.
 
 ## What it does
 
@@ -11,6 +38,7 @@ You open a blog post or a PDF, Yomu turns it into a clean, distraction-free page
 - **Chat with an agent about it:** the chat panel beside the article knows what you are reading, including the page you are on in a paper. The agent can also search and read the rest of your library through Yomu's built-in tools.
 - **Comment:** select any passage to leave a note in the margin.
 - **Remember terms:** words the agent has explained before are underlined in other articles, with the earlier answer on hover.
+- **Themes and typefaces:** light or dark, with typefaces picked for long reading sessions.
 - **Organise:** put articles in collections, keep several open as tabs, and search everything with `Cmd/Ctrl+K`.
 - **Bookmarks inbox:** bookmark a page into a folder named **Yomu** in Chrome, Brave or Helium, and it shows up in Yomu's Inbox. No extension is needed.
 
@@ -23,7 +51,7 @@ Yomu does not ship its own AI. It launches an agent that is already on your comp
 - **Sandboxed:** on macOS and Linux the agent runs fenced in. On Windows it runs with your own permissions, and Settings says so.
 - **Your token stays with the agent:** Yomu never reads your agent's login. It only starts the official program.
 
-## Requirements
+## Build from source
 
 | Tool                | Why                                                           |
 | ------------------- | ------------------------------------------------------------- |
@@ -32,7 +60,7 @@ Yomu does not ship its own AI. It launches an agent that is already on your comp
 | An agent CLI        | Codex (paid ChatGPT plan), Claude Code or OpenCode            |
 | Tauri prerequisites | https://tauri.app/start/prerequisites/                        |
 
-## Development
+### Run it
 
 ```bash
 npm install
@@ -68,7 +96,7 @@ cargo test real_codex -- --ignored --nocapture  # optional: real Codex, uses pla
 
 ## Releasing
 
-Pushing a tag like `v0.1.0` runs `.github/workflows/release.yml`: it builds macOS (Apple Silicon and Intel), Windows and Linux installers and creates a draft GitHub release that includes `latest.json`, which the in-app updater reads (checked once at startup, signature verified against the public key in `tauri.conf.json`).
+Pushing a tag like `v1.0.0` runs `.github/workflows/release.yml`: it builds macOS (Apple Silicon and Intel), Windows and Linux installers and creates a draft GitHub release that includes `latest.json`, which the in-app updater reads (checked once at startup, signature verified against the public key in `tauri.conf.json`).
 
 One-time setup, in the repo's Settings > Secrets:
 
@@ -89,4 +117,5 @@ Release builds send one anonymous ping when the app opens: a random install ID a
 - **"Codex isn't signed in":** run `codex login`.
 - **Usage limit message:** your agent plan's allowance is used up; try again after it resets.
 - **"This PDF has no selectable text":** it's a scan; Yomu can't read scanned pages yet.
+- **macOS says the app is from an unidentified developer:** builds are unsigned. Right-click the app and choose **Open** the first time.
 - **Logs:** in the OS app log directory (macOS: `~/Library/Logs/com.yomu.app/`). They stay on your machine.
