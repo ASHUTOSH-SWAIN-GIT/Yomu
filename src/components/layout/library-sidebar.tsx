@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { SiteFavicon } from "@/components/layout/article-cover";
+import { UpdateBanner } from "@/components/layout/update-banner";
 import { isPdfUrl } from "@/lib/pdf/identity";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { articlesInSpace, buildSpaces, INBOX } from "@/lib/spaces";
@@ -409,6 +410,7 @@ export function LibrarySidebar() {
         )}
 
         <div className="mt-auto flex flex-col gap-0.5 pt-4">
+          <UpdateBanner />
           {(agentStatus === "setup" || agentStatus === "off") && (
             <Item
               on={false}

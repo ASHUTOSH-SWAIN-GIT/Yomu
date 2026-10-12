@@ -35,11 +35,16 @@ export function UpdateBanner() {
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="border-border bg-card mb-1 flex flex-col gap-2 rounded-lg border p-2.5 text-xs">
       <span className="text-muted-foreground">
         Yomu {update.version} is available
       </span>
-      <Button size="sm" disabled={installing} onClick={() => void install()}>
+      <Button
+        size="sm"
+        className="w-full"
+        disabled={installing}
+        onClick={() => void install()}
+      >
         {installing ? "Installing…" : "Update and restart"}
       </Button>
     </div>

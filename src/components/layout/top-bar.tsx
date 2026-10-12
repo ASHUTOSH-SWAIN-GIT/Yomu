@@ -9,7 +9,6 @@ import {
 import { ArticleMenu } from "@/components/layout/article-menu";
 import { CollectionPicker } from "@/components/layout/collection-picker";
 import { IconButton } from "@/components/ui/icon-button";
-import { UpdateBanner } from "@/components/layout/update-banner";
 import { resolveTheme } from "@/lib/appearance";
 import { MOD } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -103,7 +102,6 @@ export function TopBar() {
       )}
 
       <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-        <UpdateBanner />
         {article && (
           <CollectionPicker
             articleId={article.id}
