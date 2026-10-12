@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FileText } from "lucide-react";
 import { isPdfUrl } from "@/lib/pdf/identity";
+import { logoCandidates } from "@/lib/site-logo";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -78,25 +79,15 @@ export function SiteMark({ site, color }: { site: string; color: string }) {
 }
 
 /** The site's logo address to show, trying the icon the page declared, then
- * its touch icon, then its favicon. Fetched from the site itself (already
+ * its touch icon and favicon, then those of its parent domains (see
+ * `logoCandidates`). Fetched from the site itself (already
  * contacted to save the blog), never a third party, and none when remote
  * images are blocked. `next` moves to the following candidate after a
  * failed load; `src` is `undefined` once none is left. */
 function useSiteLogo(url: string, icon?: string | null) {
   const blocked = useUiStore((s) => s.blockRemoteImages);
   const [tried, setTried] = useState(0);
-  const sources: string[] = icon ? [icon] : [];
-  try {
-    const page = new URL(url);
-    if (/^https?:$/.test(page.protocol)) {
-      sources.push(
-        new URL("/apple-touch-icon.png", page).href,
-        new URL("/favicon.ico", page).href,
-      );
-    }
-  } catch {
-    // Not a web address (the built-in tour): use the initial.
-  }
+  const sources = logoCandidates(url, icon);
   return {
     src: blocked ? undefined : sources[tried],
     next: () => setTried((n) => n + 1),

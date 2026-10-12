@@ -84,7 +84,7 @@
   --reader-font: var(--font-sans);
   --reader-size: 1.0625rem;
   --reader-leading: 1.72;
-  --reader-measure: 64ch;
+  --reader-measure: 90ch;
 }
 
 /* Commented words are marked in yellow, like a highlighter, in every theme
