@@ -519,7 +519,9 @@ fn collect_spans_inner(
     for child in el.children() {
         match child.value() {
             Node::Text(text) => {
-                let text = text.to_string();
+                // Source HTML is often hard-wrapped; a browser shows those
+                // newlines as spaces, and only a `<br>` breaks the line.
+                let text = text.replace(['\n', '\r', '\t'], " ");
                 if !text.is_empty() {
                     out.push(Span {
                         text,
@@ -956,6 +958,22 @@ kind: Pod</code></pre>"#;
         let text: String = spans.iter().map(|s| s.text.as_str()).collect();
         let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
         assert_eq!(text, "It was an overhaul.");
+    }
+
+    #[test]
+    fn newlines_in_hard_wrapped_source_become_spaces() {
+        // Shape taken from ai-papers.aktagon.com, whose paragraphs are wrapped
+        // at about 70 characters in the HTML itself.
+        let blocks =
+            html_to_blocks("<p>a fixed-size input called\na context window. In\nlate 2023</p>");
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        assert_eq!(
+            text,
+            "a fixed-size input called a context window. In late 2023"
+        );
     }
 
     #[test]
