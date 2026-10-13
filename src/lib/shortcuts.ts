@@ -15,7 +15,8 @@ export type ShortcutId =
   | "new-tab"
   | "close-tab"
   | "next-tab"
-  | "prev-tab";
+  | "prev-tab"
+  | "find";
 
 export interface KeyLike {
   key: string;
@@ -48,6 +49,7 @@ export function shortcutFor(e: KeyLike): ShortcutId | null {
   if (key === "t") return "new-tab";
   if (key === "w") return "close-tab";
   if (key === "e") return "toggle-chat";
+  if (key === "f") return "find";
   if (key === "/") return "shortcuts";
   return null;
 }
@@ -72,6 +74,7 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
     items: [
       ["⇧V", "Open the link on your clipboard"],
       ["O", "Open a PDF from this computer"],
+      ["F", "Find in the article (Enter for the next match)"],
       ["E", "Show or hide the chat beside the article"],
       ["J", "Ask: jump to the chat box"],
       [".", "Focus mode (Esc leaves it)"],

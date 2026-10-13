@@ -12,6 +12,7 @@ import { SetupDialog } from "@/components/layout/setup-dialog";
 import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
 import { useThemeEffect } from "@/hooks/use-theme";
+import { OPEN_FIND } from "@/lib/find";
 import { goHome } from "@/lib/navigate";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { logError } from "@/lib/log";
@@ -92,7 +93,10 @@ export function AppShell() {
       else if (command === "next-tab") switchTab(1);
       else if (command === "prev-tab") switchTab(-1);
       else if (command === "shortcuts") ui.setShortcutsOpen(!ui.shortcutsOpen);
-      else if (command === "toggle-chat") {
+      else if (command === "find") {
+        if (useReaderStore.getState().state.status === "ready")
+          window.dispatchEvent(new Event(OPEN_FIND));
+      } else if (command === "toggle-chat") {
         const view = useViewStore.getState();
         if (useReaderStore.getState().state.status === "ready")
           view.setChatOpen(!view.chatOpen);

@@ -12,6 +12,7 @@ import { useReadingProgress } from "@/hooks/use-reading-progress";
 import { cn } from "@/lib/utils";
 import { Home } from "@/components/layout/home";
 import { CitationLayer } from "@/components/reader/citations";
+import { FindBar } from "@/components/reader/find-bar";
 import { GlossaryLayer } from "@/components/reader/glossary";
 import { Outline } from "@/components/reader/outline";
 import { AddCommentButton, BlockComments } from "@/components/reader/comments";
@@ -211,6 +212,12 @@ function Article({
 
   return (
     <>
+      <FindBar
+        articleRef={articleRef}
+        scrollRef={scrollRef}
+        blocks={article.blocks}
+        page={pager?.index}
+      />
       <article
         ref={articleRef}
         // The reading preferences (typeface, size, width) are CSS variables set

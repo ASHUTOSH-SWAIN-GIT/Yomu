@@ -431,6 +431,18 @@ html.dark {
   background-color: var(--mark-active);
 }
 
+/* Find in the article (⌘F): every match a pale yellow, the one you are on
+   a full yellow, as in a browser. Yellow in every theme, since it has to
+   stand apart from the theme's own marks. */
+::highlight(yomu-find) {
+  background-color: color-mix(in oklab, #f5c518 35%, transparent);
+}
+
+::highlight(yomu-find-active) {
+  background-color: #f5c518;
+  color: #1a1a1a;
+}
+
 /* Entrances that answer an action (a menu opening, the Ask bar appearing).
    One short motion, no choreography. */
 @keyframes yomu-pop {

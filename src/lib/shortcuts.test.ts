@@ -21,6 +21,7 @@ describe("shortcutFor", () => {
     ["/", "shortcuts"],
     ["t", "new-tab"],
     ["w", "close-tab"],
+    ["f", "find"],
   ])("Cmd+%s is %s", (k, id) => {
     expect(shortcutFor(key(k))).toBe(id);
   });
