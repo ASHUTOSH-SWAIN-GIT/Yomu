@@ -38,4 +38,26 @@ describe("articleText", () => {
     ];
     expect(articleText(blocks)).toBe("a\n\nb");
   });
+
+  it("keeps formulas as $TeX$ in paragraphs, lists and quotes", () => {
+    const spans = [
+      { text: "capacity " },
+      { text: String.raw`0.7 \times C`, math: true },
+      { text: " tokens" },
+    ];
+    const tex = String.raw`$0.7 \times C$`;
+    expect(blockText({ type: "paragraph", spans })).toBe(
+      `capacity ${tex} tokens`,
+    );
+    expect(
+      blockText({
+        type: "list",
+        ordered: false,
+        items: [{ spans: [{ text: "C", math: true }], depth: 0 }],
+      }),
+    ).toBe("- $C$");
+    expect(blockText({ type: "quote", spans })).toBe(
+      `> capacity ${tex} tokens`,
+    );
+  });
 });

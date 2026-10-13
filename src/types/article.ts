@@ -10,6 +10,8 @@ export interface Span {
   italic?: boolean;
   code?: boolean;
   href?: string;
+  /** `text` is TeX to typeset inline (from Pandoc/MathJax markup), not prose. */
+  math?: boolean;
 }
 
 export interface ListItem {

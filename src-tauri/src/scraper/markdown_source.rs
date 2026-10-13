@@ -305,6 +305,8 @@ fn handle_inline_event<'a>(
             italic,
             code,
             href,
+            math: false,
+            display: false,
         }),
         Event::Code(t) => out.push(Span {
             text: t.into_string(),
@@ -312,6 +314,8 @@ fn handle_inline_event<'a>(
             italic,
             code: true,
             href,
+            math: false,
+            display: false,
         }),
         Event::SoftBreak => out.push(Span::plain(" ".to_string())),
         Event::HardBreak => out.push(Span::plain("\n".to_string())),
@@ -341,6 +345,8 @@ fn handle_inline_event<'a>(
                     italic,
                     code,
                     href,
+                    math: false,
+                    display: false,
                 });
             }
         }
