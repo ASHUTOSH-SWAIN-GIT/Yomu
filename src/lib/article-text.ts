@@ -1,4 +1,7 @@
-import type { Block } from "@/types/article";
+import type { Block, Span } from "@/types/article";
+
+/** A span as plain text: a formula keeps its TeX, in `$...$`. */
+export const spanText = (s: Span) => (s.math ? `$${s.text}$` : s.text);
 
 /** Plain-ish text of one block. Used for the agent's context, for the
  * search index, and (with structure kept) for Markdown export. */
@@ -7,7 +10,7 @@ export function blockText(block: Block): string {
     case "heading":
       return `${"#".repeat(block.level)} ${block.text}`;
     case "paragraph":
-      return block.spans.map((s) => s.text).join("");
+      return block.spans.map(spanText).join("");
     case "code":
       return "```" + (block.language ?? "") + "\n" + block.content + "\n```";
     case "math":
@@ -18,12 +21,12 @@ export function blockText(block: Block): string {
       return block.items
         .map(
           (item, i) =>
-            `${"  ".repeat(item.depth)}${block.ordered ? `${i + 1}.` : "-"} ${item.spans.map((s) => s.text).join("")}`,
+            `${"  ".repeat(item.depth)}${block.ordered ? `${i + 1}.` : "-"} ${item.spans.map(spanText).join("")}`,
         )
         .join("\n");
     case "quote":
       return block.spans
-        .map((s) => s.text)
+        .map(spanText)
         .join("")
         .split("\n")
         .map((line) => `> ${line}`)

@@ -1,4 +1,5 @@
 import type { Span } from "@/types/article";
+import { InlineMath } from "@/components/reader/math-block";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,12 +25,16 @@ export function SpanText({ span }: { span: Span }) {
       "rounded-[0.3em] bg-muted px-[0.32em] py-[0.08em] font-mono text-[0.84em] text-foreground shadow-[inset_0_0_0_1px_var(--border)]",
   );
 
-  const content = span.text.split("\n").map((line, i, arr) => (
-    <span key={i}>
-      {line}
-      {i < arr.length - 1 && <br />}
-    </span>
-  ));
+  const content = span.math ? (
+    <InlineMath tex={span.text} />
+  ) : (
+    span.text.split("\n").map((line, i, arr) => (
+      <span key={i}>
+        {line}
+        {i < arr.length - 1 && <br />}
+      </span>
+    ))
+  );
 
   if (span.href) {
     return (

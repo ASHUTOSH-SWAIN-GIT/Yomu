@@ -52,4 +52,23 @@ describe("toMarkdown", () => {
       "Explanations",
     );
   });
+
+  it("writes inline formulas as $TeX$ and display formulas as $$", () => {
+    const article = makeArticle([
+      {
+        type: "paragraph",
+        spans: [
+          { text: "At " },
+          { text: String.raw`C = 8{,}192`, math: true },
+          { text: " tokens, " },
+          { text: "n", math: true, bold: true },
+          { text: "." },
+        ],
+      },
+      { type: "math", tex: String.raw`T = 0.7 \times C` },
+    ]);
+    const md = toMarkdown(article, [], []);
+    expect(md).toContain("At $C = 8{,}192$ tokens, **$n$**.");
+    expect(md).toContain("$$\nT = 0.7 \\times C\n$$");
+  });
 });

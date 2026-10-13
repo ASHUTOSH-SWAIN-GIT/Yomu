@@ -3,6 +3,7 @@ use serde::Serialize;
 
 use super::images::{is_decorative_image, pick_image_url, pick_picture_url};
 use super::lang_detect::detect_language;
+use super::math;
 
 /// A single formatted run of text inside a paragraph or heading.
 /// Kept as structured data (never raw HTML) so the frontend can render
@@ -19,6 +20,13 @@ pub struct Span {
     pub code: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub href: Option<String>,
+    /// `text` is TeX to typeset inline, not prose.
+    #[serde(skip_serializing_if = "is_false")]
+    pub math: bool,
+    /// Display math (`\[ ... \]`): only used while building blocks, to lift
+    /// it out of its paragraph into a `Block::Math`.
+    #[serde(skip)]
+    pub display: bool,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -33,6 +41,8 @@ impl Span {
             italic: false,
             code: false,
             href: None,
+            math: false,
+            display: false,
         }
     }
 }
@@ -109,7 +119,15 @@ fn walk_children(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block
 
 fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>) {
     let tag = el.value().name();
-    if is_wiki_furniture(el) {
+    if is_wiki_furniture(el) || math::is_rendered_mathjax(el) {
+        return;
+    }
+    if let Some(formula) = math::formula(el) {
+        // Display math on its own; inline math only means something inside
+        // a paragraph, where `collect_spans` picks it up.
+        if formula.display {
+            blocks.push(Block::Math { tex: formula.tex });
+        }
         return;
     }
 
@@ -152,12 +170,7 @@ fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>
                 blocks.push(Block::Paragraph { spans });
             }
         }
-        "p" => {
-            let spans = collect_spans(el);
-            if spans.iter().any(|s| !s.text.trim().is_empty()) {
-                blocks.push(Block::Paragraph { spans });
-            }
-        }
+        "p" => push_paragraph(collect_spans(el), blocks),
         "blockquote" => {
             let spans = trim_trailing_newlines(collect_spans(el));
             if spans.iter().any(|s| !s.text.trim().is_empty()) {
@@ -248,6 +261,29 @@ fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>
             walk_children(el, base, blocks);
         }
     }
+}
+
+/// Adds a paragraph. Display math inside it (Pandoc wraps `\[ ... \]` in the
+/// `<p>`) is lifted out as a block of its own, splitting the text around it.
+pub(super) fn push_paragraph(spans: Vec<Span>, blocks: &mut Vec<Block>) {
+    fn flush(run: &mut Vec<Span>, blocks: &mut Vec<Block>) {
+        if run.iter().any(|s| !s.text.trim().is_empty()) {
+            blocks.push(Block::Paragraph {
+                spans: std::mem::take(run),
+            });
+        }
+        run.clear();
+    }
+    let mut run = Vec::new();
+    for span in spans {
+        if span.math && span.display {
+            flush(&mut run, blocks);
+            blocks.push(Block::Math { tex: span.text });
+        } else {
+            run.push(span);
+        }
+    }
+    flush(&mut run, blocks);
 }
 
 /// Collapses whitespace and drops the permalink glyphs docs frameworks
@@ -484,7 +520,7 @@ fn admonition(el: ElementRef, blocks: &mut Vec<Block>) -> bool {
 
 /// Collects the visible text of an element, ignoring child element structure.
 /// Wikipedia puts `<style>` blocks inside table cells; their CSS is not text.
-fn collect_text(el: ElementRef) -> String {
+pub(super) fn collect_text(el: ElementRef) -> String {
     el.descendants()
         .filter_map(|n| match n.value() {
             Node::Text(t)
@@ -529,6 +565,8 @@ fn collect_spans_inner(
                         italic,
                         code,
                         href: href.clone(),
+                        math: false,
+                        display: false,
                     });
                 }
             }
@@ -536,7 +574,19 @@ fn collect_spans_inner(
                 let Some(child_el) = ElementRef::wrap(child) else {
                     continue;
                 };
-                if is_wiki_furniture(child_el) {
+                if is_wiki_furniture(child_el) || math::is_rendered_mathjax(child_el) {
+                    continue;
+                }
+                if let Some(formula) = math::formula(child_el) {
+                    out.push(Span {
+                        text: formula.tex,
+                        bold,
+                        italic,
+                        code: false,
+                        href: href.clone(),
+                        math: true,
+                        display: formula.display,
+                    });
                     continue;
                 }
                 match elem.name() {
@@ -584,6 +634,8 @@ pub(super) fn merge_adjacent(spans: Vec<Span>) -> Vec<Span> {
                 && last.italic == span.italic
                 && last.code == span.code
                 && last.href == span.href
+                && !last.math
+                && !span.math
             {
                 last.text.push_str(&span.text);
                 continue;
@@ -992,5 +1044,144 @@ kind: Pod</code></pre>"#;
         let blocks = html_to_blocks(html);
         assert_eq!(blocks.len(), 1);
         assert!(matches!(blocks[0], Block::Paragraph { .. }));
+    }
+
+    /// Pandoc (`--mathjax`) marks math with spans and leaves typesetting to
+    /// the browser; the scraper must not leave `\( ... \)` in the prose.
+    #[test]
+    fn pandoc_math_does_not_leak_raw_tex_delimiters() {
+        let blocks = html_to_blocks(
+            r#"<p>The capacity <span class="math inline">\(C\)</span> is typically
+            <span class="math inline">\(0.7 \times C\)</span>.</p>"#,
+        );
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        assert!(!text.contains("\\("), "raw delimiters leaked: {text}");
+        assert!(!text.contains("\\)"), "raw delimiters leaked: {text}");
+    }
+
+    fn math_spans(spans: &[Span]) -> Vec<&str> {
+        spans
+            .iter()
+            .filter(|s| s.math)
+            .map(|s| s.text.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn pandoc_inline_math_becomes_math_spans() {
+        let blocks = html_to_blocks(
+            r#"<p>The capacity <span class="math inline">\(C\)</span> is typically
+            <span class="math inline">\(0.7 \times C\)</span>, or <span class="math inline">\(5{,}734\)</span> tokens.</p>"#,
+        );
+        let [Block::Paragraph { spans }] = &blocks[..] else {
+            panic!("expected one paragraph, got {blocks:?}");
+        };
+        assert_eq!(math_spans(spans), ["C", r"0.7 \times C", r"5{,}734"]);
+        let prose: String = spans
+            .iter()
+            .filter(|s| !s.math)
+            .map(|s| s.text.as_str())
+            .collect();
+        assert!(prose.starts_with("The capacity "), "{prose}");
+        assert!(prose.contains(" is typically"), "{prose}");
+        assert!(prose.ends_with(" tokens."), "{prose}");
+    }
+
+    #[test]
+    fn math_keeps_bold_and_is_never_merged_into_prose() {
+        let blocks = html_to_blocks(
+            r#"<p>a <strong><span class="math inline">\(x\)</span></strong><span class="math inline">\(y\)</span> b</p>"#,
+        );
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        assert_eq!(math_spans(spans), ["x", "y"]);
+        assert!(spans[1].bold && spans[1].math);
+        assert!(!spans[2].bold && spans[2].math);
+    }
+
+    #[test]
+    fn pandoc_display_math_is_a_math_block() {
+        let blocks = html_to_blocks(
+            r#"<p>Before.</p><p><span class="math display">\[ \frac{a}{b} = 0.7 \times C \]</span></p><p>After.</p>"#,
+        );
+        assert!(matches!(blocks[0], Block::Paragraph { .. }));
+        assert!(matches!(&blocks[1], Block::Math { tex } if tex == r"\frac{a}{b} = 0.7 \times C"));
+        assert!(matches!(blocks[2], Block::Paragraph { .. }));
+        assert_eq!(blocks.len(), 3);
+    }
+
+    #[test]
+    fn display_math_inside_a_paragraph_splits_it() {
+        let blocks = html_to_blocks(
+            r#"<p>We have <span class="math inline">\(a\)</span> and
+            <span class="math display">\[ a^2 + b^2 = c^2 \]</span> so it holds.</p>"#,
+        );
+        let [Block::Paragraph { spans: before }, Block::Math { tex }, Block::Paragraph { spans: after }] =
+            &blocks[..]
+        else {
+            panic!("expected paragraph, math, paragraph; got {blocks:?}");
+        };
+        assert_eq!(math_spans(before), ["a"]);
+        assert_eq!(tex, "a^2 + b^2 = c^2");
+        assert!(after.iter().any(|s| s.text.contains("so it holds")));
+    }
+
+    #[test]
+    fn dollar_delimiters_are_stripped_too() {
+        let blocks = html_to_blocks(
+            r#"<p><span class="math inline">$x$</span></p><div class="math display">$$y = 1$$</div>"#,
+        );
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        assert_eq!(math_spans(spans), ["x"]);
+        assert!(matches!(&blocks[1], Block::Math { tex } if tex == "y = 1"));
+    }
+
+    #[test]
+    fn math_works_inside_lists_and_quotes() {
+        let blocks = html_to_blocks(
+            r#"<ul><li>cap <span class="math inline">\(C\)</span></li></ul>
+               <blockquote>so <span class="math inline">\(k\)</span></blockquote>"#,
+        );
+        let Block::List { items, .. } = &blocks[0] else {
+            panic!("expected a list");
+        };
+        assert_eq!(math_spans(&items[0].spans), ["C"]);
+        let Block::Quote { spans } = &blocks[1] else {
+            panic!("expected a quote");
+        };
+        assert_eq!(math_spans(spans), ["k"]);
+    }
+
+    #[test]
+    fn rendered_mathjax_is_not_repeated_as_prose() {
+        // A MathJax v2 page after it ran: preview, glyphs, and the source.
+        let html = r#"<p>cap <span class="MathJax_Preview">C</span><span class="MathJax" id="MathJax-Element-1-Frame"><span class="math">C</span></span><span class="math inline">\(C\)</span> end</p>"#;
+        let blocks = html_to_blocks(html);
+        let Block::Paragraph { spans } = &blocks[0] else {
+            panic!("expected a paragraph");
+        };
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        assert_eq!(text, "cap C end", "{spans:?}");
+        assert_eq!(math_spans(spans), ["C"]);
+    }
+
+    #[test]
+    fn math_flag_serialises_only_when_set() {
+        let plain = serde_json::to_value(Span::plain("a".into())).unwrap();
+        assert!(plain.get("math").is_none() && plain.get("display").is_none());
+        let math = serde_json::to_value(Span {
+            math: true,
+            display: true,
+            ..Span::plain("x".into())
+        })
+        .unwrap();
+        assert_eq!(math["math"], true);
+        assert!(math.get("display").is_none(), "display is internal");
     }
 }

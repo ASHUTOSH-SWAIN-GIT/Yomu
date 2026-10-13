@@ -4,6 +4,7 @@ mod images;
 mod jsonld;
 mod lang_detect;
 mod markdown_source;
+mod math;
 mod merge;
 mod meta;
 mod normalize;
@@ -194,6 +195,9 @@ fn extract(
     final_url: &str,
     canonical: &url::Url,
 ) -> Result<ScrapedArticle, ScrapeError> {
+    // MathJax v2 keeps its TeX in scripts, which Readability deletes.
+    let html = math::scripts_to_spans(html);
+    let html = html.as_ref();
     let original_document = Html::parse_document(html);
     let final_parsed = url::Url::parse(final_url).unwrap_or(canonical.clone());
     let host = final_parsed.host_str().unwrap_or("unknown").to_string();
@@ -217,6 +221,8 @@ fn extract(
         // Readability discards image-only containers, <picture>, and lazy
         // images, so swap them for text placeholders first (see images.rs).
         let (tokenized, found_images) = images::tokenize_images(html, &final_parsed);
+        // ...and so are formulas, which Readability would flatten into prose.
+        let tokenized = math::tokenize(&tokenized);
         let tokenized = protect_whitespace(&strip_utility_classes(&tokenized));
         let mut html_bytes = tokenized.as_bytes();
         let product = readability::extractor::extract(&mut html_bytes, &final_parsed)
@@ -228,6 +234,7 @@ fn extract(
         let content = product.content.replace(KEEP_MARK, "");
         let blocks = blocks::html_to_blocks_with_base(&content, Some(&final_parsed));
         let blocks = images::restore_image_tokens(blocks, &found_images);
+        let blocks = math::restore(blocks);
         (
             widen_to_siblings(blocks, &original_document, &final_parsed),
             title,
@@ -323,9 +330,17 @@ fn plain_text(el: scraper::ElementRef) -> String {
 
 fn block_text(block: &Block) -> Option<String> {
     match block {
-        Block::Paragraph { spans } => {
-            Some(spans.iter().map(|s| s.text.as_str()).collect::<String>())
-        }
+        // Math in the delimiters the page wrote it with, so the text can be
+        // found in the page again (see `widen_to_siblings`).
+        Block::Paragraph { spans } => Some(
+            spans
+                .iter()
+                .map(|s| match s.math {
+                    true => format!("\\({}\\)", s.text),
+                    false => s.text.clone(),
+                })
+                .collect::<String>(),
+        ),
         _ => None,
     }
 }
@@ -424,6 +439,61 @@ mod extract_tests {
 
     fn long(word: &str) -> String {
         format!("{word} is a sentence long enough to look like real article prose. ").repeat(6)
+    }
+
+    /// The page from the bug report: Pandoc output with MathJax left to the
+    /// browser. Goes through Readability, like a real fetch.
+    #[test]
+    fn pandoc_math_survives_extraction_as_math() {
+        let (a, b) = (long("Alpha"), long("Beta"));
+        let html = format!(
+            r#"<html><head><title>MemGPT</title></head><body><article><h2>Context</h2>
+            <p>{a} The context window capacity <span class="math inline">\(C\)</span> is the maximum
+            number of tokens. GPT-4 has <span class="math inline">\(C = 8{{,}}192\)</span>.</p>
+            <p>The warning threshold is typically <span class="math inline">\(0.7 \times C\)</span>.</p>
+            <p><span class="math display">\[ T = 0.7 \times C \]</span></p><p>{b}</p></article></body></html>"#
+        );
+        let base = url::Url::parse("https://papers.example/memgpt/").unwrap();
+        let article = extract(&html, "https://papers.example/memgpt/", &base).expect("extracts");
+
+        let mut inline = Vec::new();
+        let mut display = Vec::new();
+        let mut prose = String::new();
+        for block in &article.blocks {
+            match block {
+                Block::Paragraph { spans } => {
+                    for s in spans {
+                        if s.math {
+                            inline.push(s.text.clone());
+                        } else {
+                            prose.push_str(&s.text);
+                        }
+                    }
+                }
+                Block::Math { tex } => display.push(tex.clone()),
+                _ => {}
+            }
+        }
+        assert_eq!(inline, ["C", "C = 8{,}192", r"0.7 \times C"]);
+        assert_eq!(display, [r"T = 0.7 \times C"]);
+        assert!(!prose.contains(r"\(") && !prose.contains(r"\["), "{prose}");
+    }
+
+    #[test]
+    fn mathjax_v2_script_source_survives_extraction() {
+        let (a, b) = (long("Alpha"), long("Beta"));
+        let html = format!(
+            r#"<html><head><title>T</title></head><body><article><h2>Intro</h2>
+            <p>{a} Then <span class="MathJax_Preview">k</span><script type="math/tex">k = 3</script> holds.</p>
+            <p>{b}</p></article></body></html>"#
+        );
+        let base = url::Url::parse("https://old.example/p").unwrap();
+        let article = extract(&html, "https://old.example/p", &base).expect("extracts");
+        let found = article.blocks.iter().any(|b| match b {
+            Block::Paragraph { spans } => spans.iter().any(|s| s.math && s.text == "k = 3"),
+            _ => false,
+        });
+        assert!(found, "{:?}", article.blocks);
     }
 
     #[test]

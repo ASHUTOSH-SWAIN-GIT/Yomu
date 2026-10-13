@@ -5,7 +5,7 @@ import type { ChatMessage } from "@/stores/chat-store";
 import type { StoredArticle } from "@/types/library";
 
 function spanMd(span: Span): string {
-  let text = span.text.replace(/\n/g, " ");
+  let text = span.math ? `$${span.text}$` : span.text.replace(/\n/g, " ");
   if (!text.trim()) return text;
   if (span.code) text = `\`${text}\``;
   if (span.bold) text = `**${text}**`;
