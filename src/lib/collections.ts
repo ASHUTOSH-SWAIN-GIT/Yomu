@@ -13,6 +13,21 @@ export async function removeCollection(id: string) {
   useSpacesStore.getState().deleteSpace(id);
 }
 
+/** Moves a blog from one collection to another (a drag in the sidebar). It
+ * joins the new one before leaving the old, so it is never left out of
+ * both. Returns false, changing nothing, when there is nowhere to move. */
+export async function moveToCollection(
+  articleId: string,
+  from: string,
+  to: string,
+): Promise<boolean> {
+  if (from === to || to === INBOX) return false;
+  const { addTag, removeTag } = useLibraryStore.getState();
+  await addTag(articleId, to);
+  if (from !== INBOX) await removeTag(articleId, from);
+  return true;
+}
+
 /** Renames a collection: its articles move to the new name, and it keeps
  * its colour. Returns the new id, or null when the name is empty or
  * unchanged. Renaming onto an existing collection merges the two. */
