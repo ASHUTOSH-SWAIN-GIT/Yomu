@@ -3,6 +3,7 @@ import type { Block } from "@/types/article";
 import { articleText } from "@/lib/article-text";
 import type { GlossaryRow } from "@/lib/glossary";
 import { resolveScope, type MessageScope } from "@/lib/scope";
+import type { Feed, FeedEntry } from "@/lib/feeds";
 import { normalizeTag } from "@/lib/tags";
 import type {
   ArticleSummary,
@@ -881,5 +882,101 @@ export async function setInbox(
   await db.execute("UPDATE articles SET inbox = $2 WHERE id = $1", [
     articleId,
     inbox ? 1 : 0,
+  ]);
+}
+
+// ---- Subscribed blogs (migration 10) ----
+
+interface FeedRow {
+  id: string;
+  feed_url: string;
+  site_url: string | null;
+  title: string;
+  added_at: number;
+  last_checked: number | null;
+}
+
+function rowToFeed(r: FeedRow): Feed {
+  return {
+    id: r.id,
+    feedUrl: r.feed_url,
+    siteUrl: r.site_url,
+    title: r.title,
+    addedAt: r.added_at,
+    lastChecked: r.last_checked,
+  };
+}
+
+export async function listFeeds(): Promise<Feed[]> {
+  const db = await getDb();
+  const rows = await db.select<FeedRow[]>(
+    "SELECT * FROM feeds ORDER BY title COLLATE NOCASE",
+  );
+  return rows.map(rowToFeed);
+}
+
+/** Subscribes to a blog; one already subscribed to (by its feed address) is returned as
+ * it is. */
+export async function addFeed(feed: {
+  feedUrl: string;
+  siteUrl: string | null;
+  title: string;
+}): Promise<Feed> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO feeds (id, feed_url, site_url, title, added_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT(feed_url) DO NOTHING`,
+    [crypto.randomUUID(), feed.feedUrl, feed.siteUrl, feed.title, Date.now()],
+  );
+  const rows = await db.select<FeedRow[]>(
+    "SELECT * FROM feeds WHERE feed_url = $1",
+    [feed.feedUrl],
+  );
+  return rowToFeed(rows[0]);
+}
+
+/** Unsubscribes from a blog. Foreign keys are not enforced, so its posts are
+ * removed here. The articles already saved stay. */
+export async function removeFeed(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM feed_items WHERE feed_id = $1", [id]);
+  await db.execute("DELETE FROM feeds WHERE id = $1", [id]);
+}
+
+/** Every post of a blog that has been seen, saved or not. */
+export async function listFeedItemUrls(feedId: string): Promise<Set<string>> {
+  const db = await getDb();
+  const rows = await db.select<{ url: string }[]>(
+    "SELECT url FROM feed_items WHERE feed_id = $1",
+    [feedId],
+  );
+  return new Set(rows.map((r) => r.url));
+}
+
+/** Notes posts as seen, so they are never offered again. `dismissed` marks
+ * the ones that were not saved. */
+export async function recordFeedItems(
+  feedId: string,
+  entries: FeedEntry[],
+  dismissed: boolean,
+): Promise<void> {
+  const db = await getDb();
+  const now = Date.now();
+  for (const e of entries) {
+    await db.execute(
+      `INSERT OR IGNORE INTO feed_items
+         (feed_id, url, title, published_at, found_at, dismissed)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [feedId, e.url, e.title, e.publishedAt, now, dismissed ? 1 : 0],
+    );
+  }
+}
+
+export async function markFeedChecked(id: string, at: number): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE feeds SET last_checked = $2 WHERE id = $1", [
+    id,
+    at,
   ]);
 }

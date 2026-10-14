@@ -85,8 +85,8 @@ export function Home() {
         </h1>
         {showInbox && (
           <p className="text-muted-foreground text-ui mt-2">
-            Pages you bookmarked into a folder named Yomu. Add one to a
-            collection and it leaves the Inbox.
+            Pages from your Yomu bookmarks folder and blogs you subscribe to.
+            File one into a collection and it leaves the Inbox.
           </p>
         )}
         {showArchive && list.length > 0 && (

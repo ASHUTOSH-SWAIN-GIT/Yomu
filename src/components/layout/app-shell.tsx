@@ -9,6 +9,7 @@ import { ShortcutsDialog } from "@/components/layout/shortcuts-dialog";
 import { WelcomeTour } from "@/components/layout/welcome-tour";
 import { AgentConsentDialog } from "@/components/layout/agent-consent-dialog";
 import { SetupDialog } from "@/components/layout/setup-dialog";
+import { SubscribeDialog } from "@/components/layout/subscribe-dialog";
 import { TopBar } from "@/components/layout/top-bar";
 import { useSpaceAccent } from "@/hooks/use-space-accent";
 import { useThemeEffect } from "@/hooks/use-theme";
@@ -19,6 +20,7 @@ import { openLinkFromClipboard } from "@/lib/open-link";
 import { openPdfs, pickAndOpenPdf } from "@/lib/pdf/pick";
 import { shortcutFor } from "@/lib/shortcuts";
 import { watchBookmarks } from "@/stores/bookmarks-store";
+import { watchFeeds } from "@/stores/feeds-store";
 import { applyZoom, stepZoom } from "@/lib/zoom";
 import { toast } from "@/stores/toast-store";
 import { useAgentStore } from "@/stores/agent-store";
@@ -116,6 +118,7 @@ export function AppShell() {
   // Pages bookmarked into a browser folder named Yomu are saved on their own,
   // including ones bookmarked while the app was closed.
   useEffect(() => watchBookmarks(), []);
+  useEffect(() => watchFeeds(), []);
 
   // A PDF dropped on the window opens like one chosen from the dialog.
   useEffect(() => {
@@ -181,6 +184,7 @@ export function AppShell() {
       <SetupDialog />
       <AgentConsentDialog />
       <ShortcutsDialog />
+      <SubscribeDialog />
       <WelcomeTour />
       <Toaster />
 

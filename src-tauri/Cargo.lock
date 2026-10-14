@@ -1291,6 +1291,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "feed-rs"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1b8e25998007f8af0befc64e16ac2dd23cc0d5b76052d52d0b15d5acd7ed908"
+dependencies = [
+ "chrono",
+ "mediatype",
+ "quick-xml",
+ "regex",
+ "serde",
+ "serde_json",
+ "siphasher 1.0.4",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "fern"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2687,6 +2704,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mediatype"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0695a693e38d35838dd34bc3ab19911395f6837ccf55c7271189cfb12cb8b57f"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3354,7 +3380,7 @@ version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
 dependencies = [
- "siphasher 1.0.3",
+ "siphasher 1.0.4",
 ]
 
 [[package]]
@@ -3363,7 +3389,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
 dependencies = [
- "siphasher 1.0.3",
+ "siphasher 1.0.4",
 ]
 
 [[package]]
@@ -3613,6 +3639,7 @@ version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41b1177fdf999d2321d3fb46ff47159d9c1fb9ad66a4879f8c50a0b504615e9b"
 dependencies = [
+ "encoding_rs",
  "memchr",
 ]
 
@@ -4560,9 +4587,9 @@ checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "siphasher"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
+checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "slab"
@@ -7020,6 +7047,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "encoding_rs",
+ "feed-rs",
  "image",
  "landlock",
  "log",

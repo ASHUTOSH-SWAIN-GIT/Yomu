@@ -21,7 +21,6 @@ import { applyZoom, savedZoom } from "@/lib/zoom";
 
 export type { Theme } from "@/lib/appearance";
 
-const SIDEBAR_KEY = "yomu-sidebar";
 const CHAT_MODEL_KEY = "yomu-chat-model";
 const CHAT_WIDTH_KEY = "yomu-chat-width";
 const WELCOMED_KEY = "yomu-welcomed";
@@ -106,11 +105,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   focusMode: false,
   setFocusMode: (focusMode) => set({ focusMode }),
-  sidebarOpen: read(SIDEBAR_KEY) !== "0",
-  setSidebarOpen: (sidebarOpen) => {
-    write(SIDEBAR_KEY, sidebarOpen ? "1" : "0");
-    set({ sidebarOpen, sidebarPeek: false });
-  },
+  // Yomu always opens with the sidebar closed; it can still be shown or
+  // peeked at for the session.
+  sidebarOpen: false,
+  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen, sidebarPeek: false }),
   sidebarPeek: false,
   peekSidebar: (on) => {
     // A short delay on leaving lets the pointer travel from the toggle to

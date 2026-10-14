@@ -491,6 +491,27 @@ html.dark {
   animation: yomu-fade var(--dur) var(--ease);
 }
 
+/* The subscribe dialog's art: the blog signalling while its feed is looked
+   for, then the saved posts dropping into the Inbox tray. */
+@keyframes yomu-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes yomu-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+.feed-pulse {
+  animation: yomu-pulse 1.6s var(--ease) infinite;
+}
+.drop-in {
+  animation: yomu-drop var(--dur-slow) var(--ease) backwards;
+  transform-box: fill-box;
+}
+
 /* Motion is opt-out for people who ask for less of it. */
 @media (prefers-reduced-motion: reduce) {
   :root {

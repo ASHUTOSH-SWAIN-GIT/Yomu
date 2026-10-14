@@ -255,7 +255,9 @@ pub const MIGRATION_9: &str = "ALTER TABLE articles ADD COLUMN inbox INTEGER NOT
 
 /// Blogs the reader follows, and the posts found in their feeds. A post
 /// stays in `feed_items` (so it is never offered twice) until the reader
-/// opens or dismisses it; the article itself is only fetched on opening.
+/// opens or dismisses it. New posts are fetched into the Inbox as they are
+/// found; `feed_items` is the ledger of what has been seen, and a row with
+/// `dismissed = 1` is one that was seen but deliberately not saved.
 pub const MIGRATION_10: &str = r#"
     CREATE TABLE feeds (
         id TEXT PRIMARY KEY,

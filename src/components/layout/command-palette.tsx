@@ -18,6 +18,7 @@ import {
   PanelsTopLeft,
   Plus,
   RefreshCw,
+  Rss,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -25,11 +26,14 @@ import {
 } from "lucide-react";
 import {
   exportArticleAsMarkdown,
+  subscribeSite,
   isArchived,
   refetchArticle,
   toggleArchived,
+  unsubscribeSite,
 } from "@/lib/article-actions";
 import { searchLibrary } from "@/lib/db";
+import { feedForHost } from "@/lib/feeds";
 import { isPdfUrl } from "@/lib/pdf/identity";
 import { logError } from "@/lib/log";
 import { openLinkFromClipboard } from "@/lib/open-link";
@@ -50,6 +54,7 @@ import { THEMES } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { SUMMARY_LABEL } from "@/lib/scope";
 import { useChatStore } from "@/stores/chat-store";
+import { useFeedsStore } from "@/stores/feeds-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { useReaderStore } from "@/stores/reader-store";
 import { openSavedArticle, showParagraph } from "@/lib/navigate";
@@ -154,6 +159,9 @@ function PaletteBody({ close }: { close: () => void }) {
   }
 
   const openArticle_ = reader.status === "ready" ? reader.article : null;
+  const subscribed = useFeedsStore((s) =>
+    openArticle_ ? feedForHost(s.feeds, openArticle_.url) : null,
+  );
   const ui = useUiStore.getState;
   const dark =
     resolveTheme(
@@ -264,6 +272,23 @@ function PaletteBody({ close }: { close: () => void }) {
             icon: <RefreshCw />,
             run: () => void refetchArticle(openArticle_),
           },
+          ...(isPdfUrl(openArticle_.canonicalUrl)
+            ? []
+            : [
+                subscribed
+                  ? {
+                      id: "unsubscribe",
+                      label: `Unsubscribe from ${subscribed.title}`,
+                      icon: <Rss />,
+                      run: () => void unsubscribeSite(subscribed),
+                    }
+                  : {
+                      id: "subscribe",
+                      label: "Subscribe for more blogs",
+                      icon: <Rss />,
+                      run: () => void subscribeSite(openArticle_),
+                    },
+              ]),
           {
             id: "export",
             label: "Export this article as Markdown",

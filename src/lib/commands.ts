@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { BookmarkScan } from "@/lib/bookmarks";
+import type { FoundFeed } from "@/lib/feeds";
 import type { ScrapedArticle } from "@/types/article";
 import type {
   AgentConfig,
@@ -165,6 +166,17 @@ export async function agentPrompt(
  * (see src-tauri/src/bookmarks.rs). */
 export async function scanBookmarks(folder: string): Promise<BookmarkScan> {
   return invoke<BookmarkScan>("scan_bookmarks", { folder });
+}
+
+/** The RSS/Atom feed of the site a page is on, with its latest posts (see
+ * src-tauri/src/scraper/feed.rs). Rejects when the site has none. */
+export async function discoverFeed(url: string): Promise<FoundFeed> {
+  return invoke<FoundFeed>("discover_feed", { url });
+}
+
+/** The latest posts of a feed whose address is known. */
+export async function readFeed(feedUrl: string): Promise<FoundFeed> {
+  return invoke<FoundFeed>("read_feed", { feedUrl });
 }
 
 /** Anonymous usage counts (src-tauri/src/telemetry.rs). */

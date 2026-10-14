@@ -33,9 +33,19 @@ pub fn build_client() -> Result<reqwest::Client, ScrapeError> {
 /// final URL after redirects (used as the canonical source) along with the
 /// HTML body, decoded with the page's declared character encoding.
 pub async fn fetch_html(client: &reqwest::Client, url: &str) -> Result<Fetched, ScrapeError> {
+    fetch_text(client, url, "text/html,application/xhtml+xml").await
+}
+
+/// Like `fetch_html`, for any text body (a feed, say): `accept` is what the
+/// request asks for.
+pub async fn fetch_text(
+    client: &reqwest::Client,
+    url: &str,
+    accept: &str,
+) -> Result<Fetched, ScrapeError> {
     let mut attempt = 0;
     loop {
-        match fetch_once(client, url).await {
+        match fetch_once(client, url, accept).await {
             Ok(fetched) => return Ok(fetched),
             Err(err) if attempt < RETRY_DELAYS.len() && is_retryable(&err) => {
                 tokio::time::sleep(RETRY_DELAYS[attempt]).await;
@@ -54,10 +64,14 @@ fn is_retryable(err: &ScrapeError) -> bool {
     }
 }
 
-async fn fetch_once(client: &reqwest::Client, url: &str) -> Result<Fetched, ScrapeError> {
+async fn fetch_once(
+    client: &reqwest::Client,
+    url: &str,
+    accept: &str,
+) -> Result<Fetched, ScrapeError> {
     let response = client
         .get(url)
-        .header("Accept", "text/html,application/xhtml+xml")
+        .header("Accept", accept)
         .header("Accept-Language", "en-US,en;q=0.9")
         .send()
         .await?;

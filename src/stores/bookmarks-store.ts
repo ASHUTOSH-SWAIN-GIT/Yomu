@@ -4,14 +4,9 @@ import {
   pendingLinks,
   type BrowserStatus,
 } from "@/lib/bookmarks";
-import { canonicalizeUrl, scanBookmarks, scrapeUrl } from "@/lib/commands";
-import {
-  getArticleByCanonicalUrl,
-  listBookmarkImports,
-  recordBookmarkImport,
-  setInbox,
-  upsertArticle,
-} from "@/lib/db";
+import { scanBookmarks } from "@/lib/commands";
+import { listBookmarkImports, recordBookmarkImport } from "@/lib/db";
+import { saveToInbox } from "@/lib/inbox";
 import { logError } from "@/lib/log";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { useLibraryStore } from "@/stores/library-store";
@@ -36,19 +31,6 @@ interface BookmarksStore {
   waiting: number;
   /** Looks at the browsers and saves what is new. */
   check: () => Promise<void>;
-}
-
-/** Saves one bookmarked page into the Inbox, in no collection: the reader
- * files it, and that is what takes it out of the Inbox. A page already in the
- * library is left where it is: it is not new to the reader. Returns the saved
- * article's id. */
-async function saveBookmarked(url: string): Promise<string> {
-  const canonical = await canonicalizeUrl(url);
-  const existing = await getArticleByCanonicalUrl(canonical);
-  if (existing) return existing.id;
-  const saved = await upsertArticle(await scrapeUrl(url));
-  await setInbox(saved.id, true);
-  return saved.id;
 }
 
 let running = false;
@@ -78,7 +60,7 @@ export const useBookmarksStore = create<BookmarksStore>((set, get) => ({
       let saved = 0;
       for (const link of todo.slice(0, PER_PASS)) {
         try {
-          const id = await saveBookmarked(link.url);
+          const { id } = await saveToInbox(link.url);
           await recordBookmarkImport(link.url, "saved", id);
           saved += 1;
         } catch (err) {

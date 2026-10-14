@@ -160,8 +160,6 @@ async fn prune_images(app: tauri::AppHandle, keep: Vec<String>) -> Result<usize,
     Ok(imgcache::prune(&imgcache::images_dir(&app)?, &keep))
 }
 
-/// Normalizes a URL without a network round trip, so the frontend can
-/// check the local cache before deciding whether to call `scrape_url`.
 /// Pages bookmarked into the browsers' "Yomu" folder (see bookmarks.rs).
 #[tauri::command]
 async fn scan_bookmarks(folder: String) -> Result<bookmarks::Scan, String> {
@@ -170,6 +168,26 @@ async fn scan_bookmarks(folder: String) -> Result<bookmarks::Scan, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Finds the RSS/Atom feed of the site a page is on, with its latest posts.
+#[tauri::command]
+async fn discover_feed(url: String) -> Result<scraper::feed::FoundFeed, String> {
+    scraper::feed::discover(&url).await.map_err(|e| {
+        log::error!("finding a feed for {url} failed: {e}");
+        e.to_string()
+    })
+}
+
+/// The latest posts of a feed already followed.
+#[tauri::command]
+async fn read_feed(feed_url: String) -> Result<scraper::feed::FoundFeed, String> {
+    scraper::feed::read(&feed_url).await.map_err(|e| {
+        log::error!("reading the feed {feed_url} failed: {e}");
+        e.to_string()
+    })
+}
+
+/// Normalizes a URL without a network round trip, so the frontend can
+/// check the local cache before deciding whether to call `scrape_url`.
 #[tauri::command]
 fn canonicalize_url(url: String) -> Result<String, String> {
     scraper::canonical_url(&url).map_err(|e| e.to_string())
@@ -406,6 +424,8 @@ pub fn run() {
             agent_warm,
             agent_sandboxed,
             scan_bookmarks,
+            discover_feed,
+            read_feed,
             agent_use,
             agent_find_command,
             agent_list_models,

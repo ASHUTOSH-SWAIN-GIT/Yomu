@@ -1,4 +1,5 @@
 mod blocks;
+pub mod feed;
 mod fetch;
 mod images;
 mod jsonld;
@@ -36,6 +37,8 @@ pub enum ScrapeError {
     Blocked,
     #[error("this article is behind a paywall; only the preview is available")]
     Paywalled,
+    #[error("couldn't find an RSS or Atom feed for this site")]
+    NoFeed,
     #[error("could not render this page: {0}")]
     Render(String),
 }

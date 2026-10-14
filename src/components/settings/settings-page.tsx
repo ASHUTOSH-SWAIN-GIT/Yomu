@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AgentSection } from "@/components/settings/agent-section";
 import { AnswersSection } from "@/components/settings/answers-section";
 import { BookmarksSection } from "@/components/settings/bookmarks-section";
+import { FeedsSection } from "@/components/settings/feeds-section";
 import { DataSection } from "@/components/settings/data-section";
 import { ReadingSection } from "@/components/settings/reading-section";
 import { Section } from "@/components/settings/controls";
@@ -12,6 +13,7 @@ const SECTIONS = [
   { id: "answers", label: "AI answers" },
   { id: "agent", label: "Agent" },
   { id: "bookmarks", label: "Bookmarks" },
+  { id: "feeds", label: "Subscriptions" },
   { id: "data", label: "Data" },
 ];
 
@@ -58,6 +60,7 @@ export function SettingsPage() {
           <AgentSection />
         </Section>
         <BookmarksSection />
+        <FeedsSection />
         <DataSection />
       </div>
     </div>
