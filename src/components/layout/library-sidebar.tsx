@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Archive,
   ChevronRight,
@@ -24,7 +25,12 @@ import { WithContextMenu } from "@/components/ui/context-menu";
 import { Confirm } from "@/components/ui/confirm";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
-import { removeCollection, renameCollection } from "@/lib/collections";
+import {
+  moveToCollection,
+  removeCollection,
+  renameCollection,
+} from "@/lib/collections";
+import type { ArticleSummary } from "@/types/library";
 import {
   goHome,
   openArticleInNewTab,
@@ -43,6 +49,16 @@ const FOLDED_KEY = "yomu-sidebar-folded";
 const CHATS_FOLDED_KEY = "yomu-sidebar-chats-folded";
 /** Previous chats shown before "View all". */
 const RECENT_CHATS = 5;
+/** How far (px) a press has to move before it is a drag, not a click. */
+const DRAG_START = 5;
+
+/** A blog being dragged from one collection to another. */
+interface Drag {
+  article: ArticleSummary;
+  from: string;
+  x: number;
+  y: number;
+}
 
 /** The library's navigation, on the window frame beside the page: Home,
  * Papers, chats, your collections and the archive, with Settings at the
@@ -97,6 +113,60 @@ export function LibrarySidebar() {
   const [selected, setSelected] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  // The collection under the pointer while dragging.
+  const [over, setOver] = useState<string | null>(null);
+  // Set when a drag ends on its own row, so the click that follows doesn't
+  // open the blog.
+  const dragged = useRef(false);
+
+  // Drag a blog onto another collection to move it there; Escape cancels.
+  // Pointer events rather than HTML drag and drop: Tauri's own file drop
+  // (PDFs onto the window) keeps the webview's drag and drop from working
+  // on Windows.
+  function startDrag(
+    e: React.PointerEvent,
+    article: ArticleSummary,
+    from: string,
+  ) {
+    if (e.button !== 0) return;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let moving = false;
+    let target: string | null = null;
+    const move = (ev: PointerEvent) => {
+      if (!moving && Math.hypot(ev.clientX - x0, ev.clientY - y0) < DRAG_START)
+        return;
+      moving = true;
+      document.body.style.cursor = "grabbing";
+      const zone = document
+        .elementFromPoint(ev.clientX, ev.clientY)
+        ?.closest<HTMLElement>("[data-drop]");
+      target = zone?.dataset.drop ?? null;
+      setOver(target);
+      setDrag({ article, from, x: ev.clientX, y: ev.clientY });
+    };
+    const end = (drop: boolean) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", escape);
+      document.body.style.cursor = "";
+      setDrag(null);
+      setOver(null);
+      if (!moving) return;
+      dragged.current = true;
+      setTimeout(() => (dragged.current = false));
+      if (drop && target) void moveToCollection(article.id, from, target);
+    };
+    const up = () => end(true);
+    const cancel = () => end(false);
+    const escape = (ev: KeyboardEvent) => ev.key === "Escape" && end(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", escape);
+  }
   const agentStatus = useAgentStore((s) => s.status);
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
   const settingsPage = useViewStore((s) => s.settingsPage);
@@ -248,6 +318,9 @@ export function LibrarySidebar() {
         {named.map((space) => {
           const blogs = articlesInSpace(articles, space.id);
           const open = !folded.includes(space.id);
+          // Lit up as the place a dragged blog would go.
+          const dropHere =
+            drag !== null && over === space.id && drag.from !== space.id;
           if (renaming === space.id) {
             return (
               <FolderName
@@ -265,7 +338,14 @@ export function LibrarySidebar() {
             );
           }
           return (
-            <div key={space.id} className="group relative flex flex-col">
+            <div
+              key={space.id}
+              data-drop={space.id}
+              className={cn(
+                "group relative flex flex-col rounded-md",
+                dropHere && "bg-accent/60 ring-ring/60 ring-1",
+              )}
+            >
               {blogs.length > 0 && (
                 <button
                   type="button"
@@ -309,7 +389,7 @@ export function LibrarySidebar() {
                     if (blogs.length > 0) toggleFolded(space.id);
                   }}
                   onDoubleClick={() => setRenaming(space.id)}
-                  icon={open ? <FolderOpen /> : <Folder />}
+                  icon={open || dropHere ? <FolderOpen /> : <Folder />}
                   count={selected === space.id ? undefined : space.count}
                 >
                   {space.name}
@@ -363,14 +443,21 @@ export function LibrarySidebar() {
                       >
                         <button
                           type="button"
-                          onClick={() => void openSavedArticle(a.id)}
+                          onPointerDown={(e) => startDrag(e, a, space.id)}
+                          onClick={() => {
+                            if (dragged.current) return;
+                            void openSavedArticle(a.id);
+                          }}
                           title={a.title}
                           aria-current={readingId === a.id ? "page" : undefined}
                           className={cn(
-                            "focus-visible:ring-ring/60 text-meta flex h-7 w-full items-center gap-2 rounded-md pr-2 pl-7 text-left outline-none focus-visible:ring-2",
+                            "focus-visible:ring-ring/60 text-meta flex h-7 w-full items-center gap-2 rounded-md pr-2 pl-7 text-left outline-none select-none focus-visible:ring-2",
                             readingId === a.id
                               ? "bg-accent text-foreground font-medium"
                               : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                            drag?.article.id === a.id &&
+                              drag.from === space.id &&
+                              "opacity-40",
                           )}
                         >
                           <SiteFavicon
@@ -438,6 +525,24 @@ export function LibrarySidebar() {
           </Item>
         </div>
       </nav>
+      {drag &&
+        // On the body: the panel's slide transform would pin a fixed child
+        // to the panel instead of the window.
+        createPortal(
+          <div
+            aria-hidden
+            style={{ left: drag.x + 12, top: drag.y + 8 }}
+            className="bg-popover text-foreground text-meta pointer-events-none fixed z-50 flex max-w-56 items-center gap-2 rounded-md border px-2 py-1 shadow-[var(--shadow-float)]"
+          >
+            <SiteFavicon
+              url={drag.article.canonicalUrl}
+              icon={drag.article.icon}
+              site={drag.article.site}
+            />
+            <span className="min-w-0 truncate">{drag.article.title}</span>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
