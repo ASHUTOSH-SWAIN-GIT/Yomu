@@ -354,6 +354,17 @@ impl AgentHarness {
     /// empty temp directory (ROADMAP.md M4 Safety) — the harness doesn't
     /// create it so the caller stays in control of cleanup.
     pub async fn new_session(&self, cwd: &Path) -> Result<String, String> {
+        self.new_session_on(cwd, None).await
+    }
+
+    /// [`new_session`](Self::new_session) that starts on the model the reader
+    /// picked, so the session is switched once, not to a fallback and then
+    /// again to the pick.
+    pub async fn new_session_on(
+        &self,
+        cwd: &Path,
+        preferred: Option<&str>,
+    ) -> Result<String, String> {
         let conn = self.connection().await?;
         let result = conn
             .client
@@ -369,7 +380,7 @@ impl AgentHarness {
             .ok_or_else(|| "agent did not return a sessionId".to_string())?;
 
         lock_down(&conn.client, &session_id, self.is_codex()).await?;
-        self.use_supported_model(&conn.client, &session_id, &result)
+        self.use_supported_model(&conn.client, &session_id, &result, preferred)
             .await;
         Ok(session_id)
     }
@@ -377,7 +388,19 @@ impl AgentHarness {
     /// Re-attaches to a session from a previous app run so a follow up
     /// keeps its context. Fails if the agent no longer has it; callers
     /// then fall back to `new_session`.
+    #[cfg(test)]
     pub async fn resume_session(&self, session_id: &str, cwd: &Path) -> Result<(), String> {
+        self.resume_session_on(session_id, cwd, None).await
+    }
+
+    /// [`resume_session`](Self::resume_session) that moves to the reader's
+    /// picked model in the same step.
+    pub async fn resume_session_on(
+        &self,
+        session_id: &str,
+        cwd: &Path,
+        preferred: Option<&str>,
+    ) -> Result<(), String> {
         let conn = self.connection().await?;
         let result = conn
             .client
@@ -391,7 +414,7 @@ impl AgentHarness {
             )
             .await?;
         lock_down(&conn.client, session_id, self.is_codex()).await?;
-        self.use_supported_model(&conn.client, session_id, &result)
+        self.use_supported_model(&conn.client, session_id, &result, preferred)
             .await;
         Ok(())
     }
@@ -582,6 +605,16 @@ impl AgentHarness {
     /// Moves a session to a model the user picked.
     pub async fn select_model(&self, session_id: &str, model_id: &str) -> Result<(), String> {
         let conn = self.connection().await?;
+        self.select_model_on(&conn.client, session_id, model_id)
+            .await
+    }
+
+    async fn select_model_on(
+        &self,
+        client: &RpcClient,
+        session_id: &str,
+        model_id: &str,
+    ) -> Result<(), String> {
         // Codex takes `session/set_model`; other agents (OpenCode, ...) list
         // their models as a config option and change it that way.
         let (method, params) = if self.is_codex() {
@@ -595,7 +628,7 @@ impl AgentHarness {
                 json!({ "sessionId": session_id, "configId": "model", "value": model_id }),
             )
         };
-        conn.client.request(method, params).await.map(|_| ())
+        client.request(method, params).await.map(|_| ())
     }
 
     /// The offered models minus any the account rejected this run.
@@ -631,13 +664,33 @@ impl AgentHarness {
     /// is on and the models the account offers; when the first isn't among the
     /// second, switch to one that is. A failed switch is only logged: the
     /// prompt then reports the real error.
-    async fn use_supported_model(&self, client: &RpcClient, session_id: &str, session: &Value) {
+    async fn use_supported_model(
+        &self,
+        client: &RpcClient,
+        session_id: &str,
+        session: &Value,
+        preferred: Option<&str>,
+    ) {
         self.record_models(session);
-        let Some(models) = session.get("models") else {
-            return;
-        };
-        let current = models.get("currentModelId").and_then(Value::as_str);
+        let current = session
+            .pointer("/models/currentModelId")
+            .and_then(Value::as_str);
         let usable = self.usable_models();
+        // The reader's pick, when the account offers it, goes first and in
+        // one step; the fallback below would only be switched away again.
+        if let Some(pick) = preferred.filter(|p| usable.is_empty() || usable.iter().any(|m| m == p))
+        {
+            if current == Some(pick) {
+                return;
+            }
+            match self.select_model_on(client, session_id, pick).await {
+                Ok(()) => return,
+                Err(e) => log::warn!("could not use the chosen model {pick}: {e}"),
+            }
+        }
+        if session.get("models").is_none() {
+            return;
+        }
         let usable: Vec<&str> = usable.iter().map(String::as_str).collect();
         let Some(pick) = pick_model(current, &usable) else {
             return;

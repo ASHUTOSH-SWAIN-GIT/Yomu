@@ -292,6 +292,29 @@ async fn switches_again_when_a_prompt_is_turned_down() {
 }
 
 #[tokio::test]
+async fn a_session_starts_on_the_model_the_reader_picked() {
+    let mut f = fixture("model-picked").await;
+    let session = f
+        .harness
+        .new_session_on(&f.cwd, Some("backup[low]"))
+        .await
+        .unwrap();
+    f.harness.prompt(&session, "SHOW_MODEL").await.unwrap();
+    let events = until_done(&mut f.events).await;
+    assert_eq!(joined_tokens(&events).trim(), "model backup[low]");
+
+    // A pick the account does not offer is ignored: the usual fallback runs.
+    let next = f
+        .harness
+        .new_session_on(&f.cwd, Some("gone[low]"))
+        .await
+        .unwrap();
+    f.harness.prompt(&next, "SHOW_MODEL").await.unwrap();
+    let events = until_done(&mut f.events).await;
+    assert_eq!(joined_tokens(&events).trim(), "model current[low]");
+}
+
+#[tokio::test]
 async fn reports_the_error_when_every_model_is_turned_down() {
     let f = fixture("model-none").await;
     let session = f.harness.new_session(&f.cwd).await.unwrap();

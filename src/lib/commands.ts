@@ -98,14 +98,17 @@ export async function agentLogin(): Promise<void> {
 }
 
 /** Opens a new ACP session in a fresh, empty temp directory. */
-export async function agentNewSession(): Promise<string> {
-  return invoke<string>("agent_new_session");
+export async function agentNewSession(model?: string | null): Promise<string> {
+  return invoke<string>("agent_new_session", { model });
 }
 
 /** Re-attaches to a session from an earlier app run; rejects if the agent
  * no longer has it, in which case the caller opens a new one. */
-export async function agentResumeSession(sessionId: string): Promise<void> {
-  return invoke("agent_resume_session", { sessionId });
+export async function agentResumeSession(
+  sessionId: string,
+  model?: string | null,
+): Promise<void> {
+  return invoke("agent_resume_session", { sessionId, model });
 }
 
 /** Switches to the chosen agent and starts it; rejects if it cannot start. */

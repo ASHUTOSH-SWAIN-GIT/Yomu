@@ -631,7 +631,10 @@ describe("restoring a saved chat", () => {
     agentReplies("answer");
     await useChatStore.getState().send(article, "why?");
 
-    expect(commands.agentResumeSession).toHaveBeenCalledWith("old-session");
+    expect(commands.agentResumeSession).toHaveBeenCalledWith(
+      "old-session",
+      null,
+    );
     expect(commands.agentNewSession).not.toHaveBeenCalled();
     expect(m(commands.agentPrompt).mock.calls[0]).toEqual([
       "old-session",

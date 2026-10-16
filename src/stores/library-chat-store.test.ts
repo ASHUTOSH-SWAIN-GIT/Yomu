@@ -17,7 +17,7 @@ vi.mock("@/lib/agent-events", () => ({
   },
 }));
 vi.mock("@/lib/log", () => ({ logError: vi.fn() }));
-vi.mock("@/lib/models", () => ({ applyChosenModel: vi.fn() }));
+vi.mock("@/lib/models", () => ({ chosenModel: () => null }));
 vi.mock("@/lib/commands", () => ({
   agentNewSession: async () => `s${++h.sessions}`,
   agentCancel: async () => {},

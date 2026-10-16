@@ -229,11 +229,12 @@ async fn fresh_temp_dir() -> Result<std::path::PathBuf, String> {
 
 #[tauri::command]
 async fn agent_new_session(
+    model: Option<String>,
     harness: tauri::State<'_, Arc<AgentHarness>>,
 ) -> Result<String, agent::AgentError> {
     let cwd = fresh_temp_dir().await.map_err(agent::AgentError::from)?;
     harness
-        .new_session(&cwd)
+        .new_session_on(&cwd, model.as_deref())
         .await
         .map_err(|e| harness.explain_error(e))
 }
@@ -251,11 +252,12 @@ fn agent_sandboxed() -> bool {
 #[tauri::command]
 async fn agent_resume_session(
     session_id: String,
+    model: Option<String>,
     harness: tauri::State<'_, Arc<AgentHarness>>,
 ) -> Result<(), agent::AgentError> {
     let cwd = fresh_temp_dir().await.map_err(agent::AgentError::from)?;
     harness
-        .resume_session(&session_id, &cwd)
+        .resume_session_on(&session_id, &cwd, model.as_deref())
         .await
         .map_err(|e| harness.explain_error(e))
 }

@@ -9,7 +9,7 @@ import {
   type ContextUsage,
   type Progress,
 } from "@/lib/agent-progress";
-import { applyChosenModel } from "@/lib/models";
+import { chosenModel } from "@/lib/models";
 import { classifyError, type ChatError } from "@/lib/chat-errors";
 import {
   addLibraryMessage,
@@ -144,8 +144,7 @@ registerPart("libraryChat", (bundle) => {
         // said so far (a reopened chat, or one that had to be restarted).
         const history = sessionId ? [] : get().messages.slice(0, -1);
         if (!sessionId) {
-          sessionId = await agentNewSession();
-          await applyChosenModel(sessionId);
+          sessionId = await agentNewSession(chosenModel());
         }
         if (mine !== epoch) return;
         set({ sessionId });
