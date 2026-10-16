@@ -418,6 +418,11 @@ html.dark {
 
 /* The commented words you are pointing at (or whose comment you are
    pointing at): a stronger wash. */
+/* Words the reader highlighted without a note: the wash alone. */
+::highlight(yomu-mark) {
+  background-color: var(--comment-mark);
+}
+
 ::highlight(yomu-comment-active) {
   background-color: var(--comment-mark-active);
   text-decoration: underline;

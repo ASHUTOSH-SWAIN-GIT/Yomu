@@ -1,13 +1,15 @@
 import { createStore } from "zustand";
 import {
   addComment,
+  addMark,
   deleteComment,
   listComments,
+  listMarks,
   updateComment,
 } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { registerPart, tabStore } from "@/stores/tabs";
-import type { Comment } from "@/types/library";
+import type { Comment, Mark } from "@/types/library";
 
 /** Where a comment being written will go: the words it is about. */
 export interface Draft {
@@ -20,6 +22,8 @@ export interface Draft {
 export interface CommentsStore {
   articleId: string | null;
   items: Comment[];
+  /** Words the reader highlighted, with no note. */
+  marks: Mark[];
   draft: Draft | null;
   editingId: string | null;
   /** The comment being pointed at: its words and its card react together. */
@@ -32,6 +36,9 @@ export interface CommentsStore {
   setEditing: (id: string | null) => void;
   update: (id: string, note: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  highlight: (words: Draft) => Promise<void>;
+  /** Takes the highlighter off these marks; Undo puts them back. */
+  unhighlight: (ids: string[]) => Promise<void>;
   /** Puts a deleted comment back (Undo), as a new comment on the same
    * words. */
   restore: (comment: Comment) => Promise<void>;
@@ -41,6 +48,7 @@ registerPart("comments", () =>
   createStore<CommentsStore>((set, get) => ({
     articleId: null,
     items: [],
+    marks: [],
     draft: null,
     editingId: null,
     activeId: null,
@@ -53,13 +61,17 @@ registerPart("comments", () =>
       set({
         articleId,
         items: [],
+        marks: [],
         draft: null,
         editingId: null,
         activeId: null,
       });
       try {
-        const items = await listComments(articleId);
-        if (get().articleId === articleId) set({ items });
+        const [items, marks] = await Promise.all([
+          listComments(articleId),
+          listMarks(articleId),
+        ]);
+        if (get().articleId === articleId) set({ items, marks });
       } catch (err) {
         logError("loading comments failed", err);
       }
@@ -102,6 +114,27 @@ registerPart("comments", () =>
         }));
       } catch (err) {
         logError("saving the comment failed", err);
+      }
+    },
+
+    async highlight(words) {
+      const { articleId } = get();
+      if (!articleId) return;
+      try {
+        const mark = await addMark({ ...words, articleId });
+        if (get().articleId === articleId)
+          set((s) => ({ marks: [...s.marks, mark] }));
+      } catch (err) {
+        logError("saving the highlight failed", err);
+      }
+    },
+
+    async unhighlight(ids) {
+      try {
+        await Promise.all(ids.map(deleteComment));
+        set((s) => ({ marks: s.marks.filter((m) => !ids.includes(m.id)) }));
+      } catch (err) {
+        logError("removing the highlight failed", err);
       }
     },
 

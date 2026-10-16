@@ -8,6 +8,7 @@ import { normalizeTag } from "@/lib/tags";
 import type {
   ArticleSummary,
   Comment,
+  Mark,
   Chat,
   Highlight,
   RelatedArticle,
@@ -271,6 +272,54 @@ export async function deleteComment(id: string): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM annotations WHERE id = $1", [id]);
 }
+
+// ---- Highlights: the same table, rows with no note ----
+
+export async function listMarks(articleId: string): Promise<Mark[]> {
+  const db = await getDb();
+  const rows = await db.select<
+    {
+      id: string;
+      article_id: string;
+      block_index: number;
+      start_offset: number;
+      end_offset: number;
+      quote: string;
+      created_at: number;
+    }[]
+  >(
+    `SELECT id, article_id, block_index, start_offset, end_offset, quote, created_at
+     FROM annotations
+     WHERE article_id = $1 AND note IS NULL AND start_offset IS NOT NULL
+     ORDER BY block_index, start_offset, created_at`,
+    [articleId],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    articleId: r.article_id,
+    blockIndex: r.block_index,
+    start: r.start_offset,
+    end: r.end_offset,
+    quote: r.quote,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function addMark(
+  m: Omit<Mark, "id" | "createdAt">,
+): Promise<Mark> {
+  const db = await getDb();
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  await db.execute(
+    `INSERT INTO annotations (id, article_id, block_index, start_offset, end_offset, quote, note, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $7)`,
+    [id, m.articleId, m.blockIndex, m.start, m.end, m.quote, now],
+  );
+  return { ...m, id, createdAt: now };
+}
+
+// Deleting uses `deleteComment`: same table, same id.
 
 // ---- Chats about the whole library (migration 7) ----
 

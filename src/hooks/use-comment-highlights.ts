@@ -34,6 +34,7 @@ export function useCommentHighlights(
   page?: number,
 ) {
   const items = useCommentsStore((s) => s.items);
+  const marks = useCommentsStore((s) => s.marks);
   const draft = useCommentsStore((s) => s.draft);
   const activeId = useCommentsStore((s) => s.activeId);
   const setActive = useCommentsStore((s) => s.setActive);
@@ -69,6 +70,13 @@ export function useCommentHighlights(
       if (range) ranges.push(range);
     }
     CSS.highlights.set("yomu-comment", new Highlight(...ranges));
+    // Plain highlights: a wash only, so a comment (which also has an
+    // underline) still reads differently.
+    const wash = marks.flatMap((m) => {
+      const range = rangeOfWords(article, m);
+      return range ? [range] : [];
+    });
+    CSS.highlights.set("yomu-mark", new Highlight(...wash));
     // Painted over the rest, so the pointed-at words stand out.
     const glow = new Highlight(...active);
     glow.priority = 1;
@@ -76,8 +84,9 @@ export function useCommentHighlights(
     return () => {
       CSS.highlights.delete("yomu-comment");
       CSS.highlights.delete("yomu-comment-active");
+      CSS.highlights.delete("yomu-mark");
     };
-  }, [articleRef, items, draft, activeId, tabActive, page]);
+  }, [articleRef, items, marks, draft, activeId, tabActive, page]);
 
   // Words that were asked about get a thin underline, so the answer card
   // beside them is easy to tie to its words.

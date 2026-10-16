@@ -1,7 +1,15 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
-import { ArrowUp, Copy, MessageSquareText, Pencil, Trash2 } from "lucide-react";
+import {
+  ArrowUp,
+  Copy,
+  Highlighter,
+  MessageSquareText,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { marksHit } from "@/lib/text-ranges";
 import { AnswerCard } from "@/components/reader/answer-card";
 import { passageAnswers } from "@/lib/exchanges";
 import { useChatStore } from "@/stores/chat-store";
@@ -17,7 +25,8 @@ import type { Comment } from "@/types/library";
 const buttonClass =
   "hover:bg-accent focus-visible:ring-ring/60 flex h-8 items-center gap-1.5 rounded-lg px-2.5 font-sans text-ui outline-none focus-visible:ring-2 [&>svg]:size-3.5";
 
-/** What is offered over selected text: comment on it, or copy it. */
+/** What is offered over selected text: comment on it, highlight it, or copy
+ * it. Over highlighted words the highlight can be taken off instead. */
 export function AddCommentButton({
   selection,
   onDone,
@@ -26,7 +35,13 @@ export function AddCommentButton({
   onDone: () => void;
 }) {
   const startDraft = useCommentsStore((s) => s.startDraft);
+  const highlight = useCommentsStore((s) => s.highlight);
+  const unhighlight = useCommentsStore((s) => s.unhighlight);
+  const marks = useCommentsStore((s) => s.marks);
   const { rect, anchor } = selection;
+  const hit = marksHit(marks, anchor);
+  // A click on highlighted words, not a selection: only "Remove" applies.
+  const clickOnly = anchor.start === anchor.end;
   // Above the selection, or under it when there is no room above.
   const above = rect.top > 56;
   return createPortal(
@@ -38,33 +53,58 @@ export function AddCommentButton({
       style={{
         left: Math.max(8, rect.left + rect.width / 2),
         top: above ? rect.top - 8 : rect.bottom + 8,
-        transform: `translate(-50%, ${above ? "-100%" : "0"})`,
+        // `translate`, not `transform`: the pop-in animation owns `transform`,
+        // and would otherwise drop this offset until it ends, making the bar jump.
+        translate: `-50% ${above ? "-100%" : "0"}`,
+        // Grow out of the selection it points at.
+        transformOrigin: above ? "bottom center" : "top center",
       }}
     >
+      {!clickOnly && (
+        <button
+          type="button"
+          onClick={() => {
+            startDraft(anchor);
+            window.getSelection()?.removeAllRanges();
+            onDone();
+          }}
+          className={buttonClass}
+        >
+          <MessageSquareText aria-hidden />
+          Add comment
+        </button>
+      )}
       <button
         type="button"
         onClick={() => {
-          startDraft(anchor);
+          if (hit.length > 0) {
+            const ids = hit.map((m) => m.id);
+            void unhighlight(ids);
+          } else {
+            void highlight(anchor);
+          }
           window.getSelection()?.removeAllRanges();
           onDone();
         }}
         className={buttonClass}
       >
-        <MessageSquareText aria-hidden />
-        Add comment
+        <Highlighter aria-hidden />
+        {hit.length > 0 ? "Remove highlight" : "Highlight"}
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          void navigator.clipboard.writeText(anchor.quote);
-          window.getSelection()?.removeAllRanges();
-          onDone();
-        }}
-        className={buttonClass}
-      >
-        <Copy aria-hidden />
-        Copy
-      </button>
+      {!clickOnly && (
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText(anchor.quote);
+            window.getSelection()?.removeAllRanges();
+            onDone();
+          }}
+          className={buttonClass}
+        >
+          <Copy aria-hidden />
+          Copy
+        </button>
+      )}
     </div>,
     document.body,
   );

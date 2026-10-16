@@ -1,12 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Comment } from "@/types/library";
+import type { Comment, Mark } from "@/types/library";
 
-const h = vi.hoisted(() => ({ rows: [] as Comment[], n: 0 }));
+const h = vi.hoisted(() => ({
+  rows: [] as Comment[],
+  marks: [] as Mark[],
+  n: 0,
+}));
 
 vi.mock("@/lib/log", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   listComments: async (articleId: string) =>
     h.rows.filter((r) => r.articleId === articleId),
+  listMarks: async (articleId: string) =>
+    h.marks.filter((r) => r.articleId === articleId),
+  addMark: async (m: Omit<Mark, "id" | "createdAt">) => {
+    const row = { ...m, id: `m${++h.n}`, createdAt: h.n };
+    h.marks.push(row);
+    return row;
+  },
   addComment: async (c: Omit<Comment, "id">) => {
     const row = { ...c, id: `c${++h.n}`, createdAt: h.n };
     h.rows.push(row);
@@ -17,6 +28,7 @@ vi.mock("@/lib/db", () => ({
   },
   deleteComment: async (id: string) => {
     h.rows = h.rows.filter((r) => r.id !== id);
+    h.marks = h.marks.filter((r) => r.id !== id);
   },
 }));
 
@@ -27,8 +39,25 @@ const draft = { blockIndex: 3, start: 4, end: 22, quote: "the selected words" };
 
 beforeEach(async () => {
   h.rows = [];
+  h.marks = [];
   h.n = 0;
   await store().load("a1");
+});
+
+describe("highlights", () => {
+  it("saves a highlight, keeps it on reload, and takes it off", async () => {
+    await store().highlight(draft);
+    expect(store().marks).toMatchObject([{ ...draft, articleId: "a1" }]);
+    expect(store().items).toEqual([]);
+
+    await store().load("a1");
+    expect(store().marks).toHaveLength(1);
+
+    await store().unhighlight([store().marks[0].id]);
+    expect(store().marks).toEqual([]);
+    await store().load("a1");
+    expect(store().marks).toEqual([]);
+  });
 });
 
 describe("comments", () => {

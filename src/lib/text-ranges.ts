@@ -66,3 +66,33 @@ export function anchorOfRange(
   if (!quote.trim() || end <= start) return null;
   return { blockIndex: Number(block.dataset.blockIndex), start, end, quote };
 }
+
+/** The highlights a selection touches. A click (empty selection) counts as
+ * one character, so clicking inside highlighted words finds them. */
+export function marksHit<
+  M extends { blockIndex: number; start: number; end: number },
+>(marks: M[], at: { blockIndex: number; start: number; end: number }): M[] {
+  const end = Math.max(at.end, at.start + 1);
+  return marks.filter(
+    (m) => m.blockIndex === at.blockIndex && m.start < end && m.end > at.start,
+  );
+}
+
+/** Where a click landed: its block and the character offset in it. */
+export function caretAnchor(
+  range: Range,
+  container: HTMLElement,
+): TextAnchor | null {
+  const block = blockOf(range.startContainer);
+  if (!block || !container.contains(block)) return null;
+  const before = document.createRange();
+  before.selectNodeContents(block);
+  before.setEnd(range.startContainer, range.startOffset);
+  const at = before.toString().length;
+  return {
+    blockIndex: Number(block.dataset.blockIndex),
+    start: at,
+    end: at,
+    quote: "",
+  };
+}

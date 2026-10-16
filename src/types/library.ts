@@ -52,6 +52,9 @@ export interface Comment {
   createdAt: number;
 }
 
+/** Words the reader marked with the highlighter: a comment with no note. */
+export type Mark = Omit<Comment, "note">;
+
 /** One full-text search match. `kind` says where it matched. */
 export interface SearchHit {
   articleId: string;
