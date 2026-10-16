@@ -14,7 +14,7 @@ A desktop reader for technical blogs, docs and research papers, with an AI agent
 </p>
 
 <p align="center">
-  <a href="docs/media/yomu-demo.mp4"><img src="docs/media/demo-poster.jpg" alt="Yomu demo (1 minute)" width="760" /></a>
+  <a href="docs/media/yomu-demo.mp4"><img src="docs/media/yomu-demo.gif" alt="Yomu demo (1 minute)" width="760" /></a>
 </p>
 
 You open a blog post or a PDF, Yomu turns it into a clean, distraction-free page, and you can ask an agent (Codex, Claude Code, OpenCode, or any ACP agent you already have installed) about what you are reading. Everything is stored locally; there is no Yomu account and no API key.
