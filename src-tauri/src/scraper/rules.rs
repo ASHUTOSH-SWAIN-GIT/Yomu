@@ -34,6 +34,9 @@ const RULES: &[(&str, TitleSource)] = &[
     ("#article-body", TitleSource::PageH1),          // dev.to
     ("#mw-content-text .mw-parser-output", TitleSource::PageH1), // Wikipedia / MediaWiki
     ("#mdbook-content main, #content main", TitleSource::TitleTag), // mdBook
+    // Quarto splits the article into sibling <section>s, so Readability
+    // keeps only the largest one (hamel.dev).
+    ("main#quarto-document-content", TitleSource::ContentH1),
 ];
 
 /// Below this the match is probably a stub (e.g. an empty container), so
@@ -80,6 +83,20 @@ mod tests {
     fn picks_docsy_content() {
         let html = format!(r#"<div class="td-content"><p>{}</p></div>"#, long());
         assert!(extract_content(&Html::parse_document(&html)).is_some());
+    }
+
+    #[test]
+    fn picks_every_quarto_section() {
+        let html = format!(
+            r#"<main id="quarto-document-content"><header><h1 class="title">Post</h1></header>
+            <section class="level2"><h2>Intro</h2><p>{0}</p></section>
+            <section class="level1"><h1>Body</h1><p>{0}</p></section></main>"#,
+            long()
+        );
+        let content = extract_content(&Html::parse_document(&html))
+            .expect("quarto rule should match")
+            .html;
+        assert!(content.contains("Intro") && content.contains("Body"));
     }
 
     #[test]

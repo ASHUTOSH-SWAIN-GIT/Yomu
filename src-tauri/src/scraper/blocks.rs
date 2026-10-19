@@ -170,6 +170,8 @@ fn walk_element(el: ElementRef, base: Option<&url::Url>, blocks: &mut Vec<Block>
                 blocks.push(Block::Paragraph { spans });
             }
         }
+        // Markdown wraps a lone image in `<p>`; spans would drop it.
+        "p" if collect_text(el).trim().is_empty() => walk_children(el, base, blocks),
         "p" => push_paragraph(collect_spans(el), blocks),
         "blockquote" => {
             let spans = trim_trailing_newlines(collect_spans(el));
@@ -723,6 +725,16 @@ mod tests {
             panic!("expected code, got {blocks:?}");
         };
         assert_eq!(content.trim_end(), "let a = 1;\nlet b = 2;");
+    }
+
+    #[test]
+    fn an_image_alone_in_a_paragraph_is_kept() {
+        let base = url::Url::parse("https://hamel.dev/blog/posts/evals/").unwrap();
+        let blocks = html_to_blocks_with_base(r#"<p><img src="images/a.png"></p>"#, Some(&base));
+        let [Block::Image { src, .. }] = blocks.as_slice() else {
+            panic!("expected one image, got {blocks:?}");
+        };
+        assert_eq!(src, "https://hamel.dev/blog/posts/evals/images/a.png");
     }
 
     #[test]
