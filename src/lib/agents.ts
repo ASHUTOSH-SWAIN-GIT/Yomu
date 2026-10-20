@@ -67,7 +67,28 @@ export const CLAUDE_CODE: AgentPreset = {
   },
 };
 
-export const PRESETS: AgentPreset[] = [CLAUDE_CODE, OPENCODE];
+/** Google Antigravity. The `agy` CLI has no ACP mode; Google ships a separate
+ * ACP server (from the ACP registry) that is unzipped into
+ * `~/.antigravity-acp`. It does not reuse the `agy` or Gemini CLI sign-in:
+ * it needs `auth.type` set in `~/.gemini/antigravity-acp/settings.json`,
+ * and keeps its state under `~/.gemini`. */
+const AGY_SERVER = "~/.antigravity-acp/agy_acp_server.par";
+export const ANTIGRAVITY: AgentPreset = {
+  id: "antigravity",
+  label: "Antigravity",
+  detect: AGY_SERVER,
+  note: "Google Antigravity, signed in with your Google account.",
+  missing:
+    "Not found on this computer. Unzip Google's Antigravity ACP server into `~/.antigravity-acp`, then set `auth.type` to `oauth-personal` in `~/.gemini/antigravity-acp/settings.json`.",
+  config: {
+    kind: "custom",
+    command: AGY_SERVER,
+    args: [],
+    dataDirs: ["~/.gemini"],
+  },
+};
+
+export const PRESETS: AgentPreset[] = [CLAUDE_CODE, OPENCODE, ANTIGRAVITY];
 
 /** A saved choice made before a preset changed, brought up to date: Claude
  * Code was first saved without its own npm cache. Anything else is returned
