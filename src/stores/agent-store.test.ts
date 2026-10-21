@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentConfig } from "@/types/agent";
 
-const h = vi.hoisted(() => ({ used: [] as AgentConfig[] }));
+const h = vi.hoisted(() => ({
+  used: [] as AgentConfig[],
+  /** What listing the agent's models should do: nothing, or the refusal an
+   * agent gives once a session is opened. */
+  turnsDownSessions: null as string | null,
+}));
 
 vi.mock("@/lib/log", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/commands", () => ({
   agentUse: async (config: AgentConfig) => void h.used.push(config),
   agentWarm: async () => {},
   agentLogin: async () => {},
+  agentListModels: async () => {
+    if (h.turnsDownSessions) throw new Error(h.turnsDownSessions);
+    return [];
+  },
   agentDiagnose: async () => ({ node: "v24", codex: "0.1", loggedIn: true }),
 }));
 const disk = vi.hoisted(() => new Map<string, string>());
@@ -29,6 +38,7 @@ const OPENCODE: AgentConfig = {
 
 beforeEach(() => {
   h.used = [];
+  h.turnsDownSessions = null;
   disk.clear();
   useAgentStore.setState({ enabled: [], status: "off", asking: null });
 });
@@ -89,5 +99,19 @@ describe("switching agents", () => {
     await useAgentStore.getState().setConfig({ kind: "codex" });
     expect(useModelsStore.getState().models).toBeNull();
     expect(useUiStore.getState().chatModel).toBeNull();
+  });
+
+  it("says it needs setting up when the agent turns every session down", async () => {
+    // An agent can answer `initialize` happily and only refuse once a
+    // session is opened — which is what asking for its models does. Left
+    // unnoticed, the app called it "ready" and the model picker came up
+    // empty with no reason given.
+    h.turnsDownSessions = "Authentication required";
+    useAgentStore.setState({ enabled: ["opencode"] });
+    await useAgentStore.getState().setConfig(OPENCODE);
+    expect(useAgentStore.getState().status).toBe("setup");
+    expect(useAgentStore.getState().customError).toBe(
+      "Authentication required",
+    );
   });
 });

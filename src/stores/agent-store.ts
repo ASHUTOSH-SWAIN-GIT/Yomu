@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { agentDiagnose, agentLogin, agentUse, agentWarm } from "@/lib/commands";
+import {
+  agentDiagnose,
+  agentListModels,
+  agentLogin,
+  agentUse,
+  agentWarm,
+} from "@/lib/commands";
 import { logError } from "@/lib/log";
 import { agentId, readEnabled, upgradeSaved, writeEnabled } from "@/lib/agents";
 import { isReady } from "@/lib/setup";
@@ -103,6 +109,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       set({ status: "checking", customError: null });
       try {
         await agentUse(config);
+        // Starting only proves the process speaks ACP: an agent can answer
+        // `initialize` and still turn down every session (one that wants a
+        // sign-in first, say). Listing its models opens one, so a refusal
+        // lands here, as "needs setup", rather than as a model picker that
+        // quietly comes up empty.
+        await agentListModels();
         started = key;
         set({ status: "ready" });
       } catch (err) {
