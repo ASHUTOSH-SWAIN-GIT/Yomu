@@ -8,6 +8,7 @@ vi.mock("@/lib/storage", () => ({
 
 import {
   CLAUDE_CODE,
+  COMMAND_CODE,
   OPENCODE,
   CUSTOM_ID,
   agentId,
@@ -31,6 +32,19 @@ describe("agent presets", () => {
   it("recognises a preset from the configuration saved for it", () => {
     expect(presetOf(OPENCODE.config)).toBe(OPENCODE);
     expect(presetOf(CLAUDE_CODE.config)).toBe(CLAUDE_CODE);
+    expect(presetOf(COMMAND_CODE.config)).toBe(COMMAND_CODE);
+  });
+
+  it("starts Command Code as its own ACP agent, with the sign-in it has", () => {
+    // It speaks ACP itself, so there is no adapter to fetch.
+    expect(COMMAND_CODE.config.command).toBe("commandcode");
+    expect(COMMAND_CODE.config.args).toEqual(["acp"]);
+    expect(COMMAND_CODE.detect).toBe("commandcode");
+    // `cmd login` keeps the account in ~/.commandcode, and sessions and
+    // history live there too, so the sandbox has to allow the folder.
+    expect(COMMAND_CODE.config.dataDirs).toEqual(
+      expect.arrayContaining(["~/.commandcode"]),
+    );
   });
 
   it("treats Codex and a hand-made agent as no preset", () => {

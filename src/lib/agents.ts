@@ -67,7 +67,28 @@ export const CLAUDE_CODE: AgentPreset = {
   },
 };
 
-export const PRESETS: AgentPreset[] = [CLAUDE_CODE, OPENCODE];
+/** Command Code, which speaks ACP itself (`commandcode acp`), so no adapter
+ * is needed. Its sign-in is `cmd login`, kept in `~/.commandcode/auth.json`
+ * — a file, not the Keychain — and the sandbox has to let it read and write
+ * that folder: sessions and history live there too. Tried for real: it
+ * introduces itself, opens a session and lists its models with only
+ * `~/.commandcode` allowed. */
+export const COMMAND_CODE: AgentPreset = {
+  id: "command-code",
+  label: "Command Code",
+  detect: "commandcode",
+  note: "Command Code, signed in with your own account, with every model your plan offers.",
+  missing:
+    "Not found on this computer. Install it with `npm i -g command-code`, then sign in by running `cmd login` once.",
+  config: {
+    kind: "custom",
+    command: "commandcode",
+    args: ["acp"],
+    dataDirs: ["~/.commandcode"],
+  },
+};
+
+export const PRESETS: AgentPreset[] = [COMMAND_CODE, CLAUDE_CODE, OPENCODE];
 
 /** A saved choice made before a preset changed, brought up to date: Claude
  * Code was first saved without its own npm cache. Anything else is returned
