@@ -228,22 +228,36 @@ fn sessions_root() -> std::path::PathBuf {
     agent::scratch_dir()
 }
 
-/// Creates a new, empty temp directory to use as an agent's working
-/// directory — never a user project (ROADMAP.md M4 Safety).
-async fn fresh_temp_dir() -> Result<std::path::PathBuf, String> {
-    let dir_name = format!(
-        "yomu-explain-{}-{}",
-        std::process::id(),
-        SystemTime::now()
+/// The agent's working directory: one empty scratch folder for the whole app
+/// run, shared by every session.
+///
+/// It has to be the *same* folder for every `session/new` and
+/// `session/resume`. Some agents bind their process to the first workspace
+/// they are handed and refuse a session anywhere else — `cmd acp` answers
+/// "This cmd acp process serves …; start another for …" — and Yomu reuses
+/// one agent process for the whole app, so a folder per session broke the
+/// second chat. It stays inside the agent's scratch and is never a user
+/// project (ROADMAP.md M4 Safety), and one folder also stops every chat
+/// leaving a cast-off directory behind.
+fn workspace_dir() -> std::path::PathBuf {
+    static DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    );
-    let cwd = sessions_root().join(dir_name);
-    tokio::fs::create_dir_all(&cwd)
+            .unwrap_or(0);
+        sessions_root().join(format!("yomu-explain-{}-{nanos}", std::process::id()))
+    })
+    .clone()
+}
+
+/// [`workspace_dir`], created and ready to use.
+async fn workspace() -> Result<std::path::PathBuf, String> {
+    let dir = workspace_dir();
+    tokio::fs::create_dir_all(&dir)
         .await
-        .map_err(|e| format!("could not create a temp working directory: {e}"))?;
-    Ok(cwd)
+        .map_err(|e| format!("could not create a working directory: {e}"))?;
+    Ok(dir)
 }
 
 #[tauri::command]
@@ -251,7 +265,7 @@ async fn agent_new_session(
     model: Option<String>,
     harness: tauri::State<'_, Arc<AgentHarness>>,
 ) -> Result<String, agent::AgentError> {
-    let cwd = fresh_temp_dir().await.map_err(agent::AgentError::from)?;
+    let cwd = workspace().await.map_err(agent::AgentError::from)?;
     harness
         .new_session_on(&cwd, model.as_deref())
         .await
@@ -274,7 +288,7 @@ async fn agent_resume_session(
     model: Option<String>,
     harness: tauri::State<'_, Arc<AgentHarness>>,
 ) -> Result<(), agent::AgentError> {
-    let cwd = fresh_temp_dir().await.map_err(agent::AgentError::from)?;
+    let cwd = workspace().await.map_err(agent::AgentError::from)?;
     harness
         .resume_session_on(&session_id, &cwd, model.as_deref())
         .await
@@ -302,7 +316,7 @@ fn agent_find_command(command: String) -> Option<String> {
 async fn agent_list_models(
     harness: tauri::State<'_, Arc<AgentHarness>>,
 ) -> Result<Vec<agent::ModelInfo>, String> {
-    harness.list_models(&fresh_temp_dir().await?).await
+    harness.list_models(&workspace().await?).await
 }
 
 /// Moves a session to a model the user picked in the chat.
@@ -466,4 +480,20 @@ pub fn run() {
                 tauri::async_runtime::block_on(harness_for_exit.shutdown());
             }
         });
+}
+
+#[cfg(test)]
+mod workspace_tests {
+    use super::*;
+
+    /// An agent such as `cmd acp` binds its process to the first workspace it
+    /// is given and refuses a session in another ("This cmd acp process
+    /// serves …; start another for …"). Yomu reuses one agent process for the
+    /// whole app, so every session must be handed the same folder — a fresh
+    /// one per session broke the second chat.
+    #[test]
+    fn every_session_shares_one_working_directory() {
+        assert_eq!(workspace_dir(), workspace_dir());
+        assert!(workspace_dir().starts_with(agent::scratch_dir()));
+    }
 }
