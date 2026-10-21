@@ -127,6 +127,22 @@ struct StorageInfo {
     images_count: usize,
 }
 
+/// The folder holding the SQLite database, `yomu.db`.
+///
+/// `tauri-plugin-sql` resolves the relative `sqlite:yomu.db` against the
+/// app's **config** directory (its `DbPool::connect`), and on Linux that is
+/// not the data directory: `~/.config/<id>` rather than
+/// `~/.local/share/<id>`. macOS and Windows use one folder for both, so
+/// reading the data directory looked right there — until Linux, where the
+/// library server opened a database that did not exist and every one of its
+/// tools answered "the library could not be read".
+fn database_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    app.path()
+        .app_config_dir()
+        .map_err(|e| format!("could not find the app config directory: {e}"))
+}
+
 #[tauri::command]
 fn storage_info(app: tauri::AppHandle) -> Result<StorageInfo, String> {
     use tauri::Manager;
@@ -134,8 +150,9 @@ fn storage_info(app: tauri::AppHandle) -> Result<StorageInfo, String> {
         .path()
         .app_data_dir()
         .map_err(|e| format!("could not find the app data directory: {e}"))?;
-    // The database is one file plus SQLite's `-wal` and `-shm` companions.
-    let database_bytes = std::fs::read_dir(&data_dir)
+    // The database is one file plus SQLite's `-wal` and `-shm` companions,
+    // in the folder `tauri-plugin-sql` chose for it (see `database_dir`).
+    let database_bytes = std::fs::read_dir(database_dir(&app)?)
         .map(|entries| {
             entries
                 .flatten()
@@ -369,8 +386,9 @@ pub fn run() {
             // mcp.rs). If it cannot start the agent still works, with the
             // passages Yomu puts in each question.
             {
-                use tauri::Manager;
-                let db_path = app.path().app_data_dir()?.join("yomu.db");
+                // Where `tauri-plugin-sql` put it, not where the app keeps
+                // its other files: they differ on Linux (see `database_dir`).
+                let db_path = database_dir(app.handle())?.join("yomu.db");
                 let harness = Arc::clone(&harness);
                 tauri::async_runtime::spawn(async move {
                     match mcp::start(db_path).await {
