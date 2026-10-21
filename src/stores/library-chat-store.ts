@@ -9,7 +9,7 @@ import {
   type ContextUsage,
   type Progress,
 } from "@/lib/agent-progress";
-import { chosenModel } from "@/lib/models";
+import { chosenModel, forgetRefusedModel } from "@/lib/models";
 import { classifyError, type ChatError } from "@/lib/chat-errors";
 import {
   addLibraryMessage,
@@ -171,6 +171,7 @@ registerPart("libraryChat", (bundle) => {
         if (mine !== epoch) return;
         logError("library chat turn failed", err);
         const error = classifyError(err);
+        if (error.kind === "model_unavailable") forgetRefusedModel();
         // Drop a half streamed answer so Retry doesn't stack on top of it.
         set((s) => ({
           streaming: false,

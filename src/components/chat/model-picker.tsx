@@ -6,6 +6,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { agentSetModel } from "@/lib/commands";
+import { presetOf } from "@/lib/agents";
+import { modelsInPlan } from "@/lib/command-code-plan";
 import { logError } from "@/lib/log";
 import {
   defaultVariant,
@@ -13,6 +15,7 @@ import {
   type ModelEntry,
 } from "@/lib/model-groups";
 import { cn } from "@/lib/utils";
+import { useAgentStore } from "@/stores/agent-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useLibraryChatStore } from "@/stores/library-chat-store";
 import { useModelsStore } from "@/stores/models-store";
@@ -34,6 +37,12 @@ export function ModelPicker() {
   const models = useModelsStore((s) => s.models);
   const failed = useModelsStore((s) => s.failed);
   const load = useModelsStore((s) => s.load);
+  // Command Code reports its whole catalog, not what the account's plan
+  // includes, so the reader's plan (Settings) decides what is offered here.
+  // Every other agent reports exactly what it can use, and is left alone.
+  const config = useAgentStore((s) => s.config);
+  const plan = useUiStore((s) => s.commandCodePlan);
+  const commandCode = presetOf(config)?.id === "command-code";
   const [query, setQuery] = useState("");
   // Providers the user opened or folded by hand; the rest follow the default.
   const [toggled, setToggled] = useState<Set<string>>(new Set());
@@ -41,16 +50,20 @@ export function ModelPicker() {
   // A model picked earlier shows by its name, so the list is asked for once
   // on screen, not only when the menu is opened.
   useEffect(() => {
-    if (chosen) void load();
-  }, [chosen, load]);
+    if (chosen) void load(config);
+  }, [chosen, load, config]);
 
-  const sections = useMemo(() => groupModels(models ?? []), [models]);
+  const visible = useMemo(
+    () => modelsInPlan(models ?? [], commandCode ? plan : null),
+    [models, commandCode, plan],
+  );
+  const sections = useMemo(() => groupModels(visible), [visible]);
   const total = sections.reduce((n, s) => n + s.entries.length, 0);
 
   function onOpenChange(next: boolean) {
     setOpen(next);
     setQuery("");
-    if (next) void load();
+    if (next) void load(config);
   }
 
   function pick(id: string | null) {

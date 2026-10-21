@@ -6,7 +6,7 @@ import {
   agentResumeSession,
 } from "@/lib/commands";
 import { onAgentEvent } from "@/lib/agent-events";
-import { chosenModel } from "@/lib/models";
+import { chosenModel, forgetRefusedModel } from "@/lib/models";
 import { classifyError, type ChatError } from "@/lib/chat-errors";
 import {
   addHighlight,
@@ -302,6 +302,7 @@ registerPart(
         } catch (err) {
           logError("explain turn failed", err);
           const error = classifyError(err);
+          if (error.kind === "model_unavailable") forgetRefusedModel();
           // Drop a half streamed answer so Retry doesn't stack on top of it.
           set((s) => ({
             streaming: false,

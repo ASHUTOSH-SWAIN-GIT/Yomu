@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import type { AgentConfig } from "@/types/agent";
 import { Button } from "@/components/ui/button";
+import { Setting } from "@/components/settings/controls";
+import { Segmented } from "@/components/ui/segmented";
+import { type CommandCodePlan } from "@/lib/command-code-plan";
 import { agentFindCommand, agentSandboxed } from "@/lib/commands";
 import {
   CODEX_DETECT,
@@ -20,6 +23,8 @@ import { useUiStore } from "@/stores/ui-store";
  * OpenCode), or any program that speaks ACP over stdio. */
 export function AgentSection() {
   const setSetupOpen = useUiStore((s) => s.setSetupOpen);
+  const commandCodePlan = useUiStore((s) => s.commandCodePlan);
+  const setCommandCodePlan = useUiStore((s) => s.setCommandCodePlan);
   const setSettingsPage = useViewStore((s) => s.setSettingsPage);
   const config = useAgentStore((s) => s.config);
   const status = useAgentStore((s) => s.status);
@@ -253,6 +258,28 @@ export function AgentSection() {
           </div>
         </Card>
       </div>
+      {usingPreset?.id === "command-code" && (
+        <Setting
+          stacked
+          label="Command Code plan"
+          hint="Yomu can't read which plan your account is on, so pick it here: the model picker hides the models it doesn't include."
+        >
+          <Segmented<CommandCodePlan | "all">
+            label="Command Code plan"
+            value={commandCodePlan ?? "all"}
+            onChange={(plan) =>
+              setCommandCodePlan(plan === "all" ? null : plan)
+            }
+            options={[
+              { value: "all", label: "Show all" },
+              { value: "go", label: "Go" },
+              { value: "goat", label: "GOAT" },
+              { value: "pro", label: "Pro" },
+              { value: "max", label: "Max" },
+            ]}
+          />
+        </Setting>
+      )}
       {sandboxed === false && (
         <p role="note" className="text-muted-foreground text-ui mt-4">
           This computer can't fence the agent in, so it runs with your own

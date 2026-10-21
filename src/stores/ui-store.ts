@@ -17,6 +17,11 @@ import {
   type ExplainPrefs,
 } from "@/lib/explain-prefs";
 import { readStorage as read, writeStorage as write } from "@/lib/storage";
+import {
+  parseCommandCodePlan,
+  PLAN_KEY as COMMAND_CODE_PLAN_KEY,
+  type CommandCodePlan,
+} from "@/lib/command-code-plan";
 import { applyZoom, savedZoom } from "@/lib/zoom";
 
 export type { Theme } from "@/lib/appearance";
@@ -78,6 +83,12 @@ interface UiState {
    * prompt (see lib/explain-prefs.ts). */
   explainPrefs: ExplainPrefs;
   setExplainPrefs: (patch: Partial<ExplainPrefs>) => void;
+  /** The reader's Command Code plan, which decides which of its models the
+   * picker offers; null offers every model the agent reports. Command Code
+   * does not say which plan the account is on, so it is chosen in Settings
+   * (see lib/command-code-plan.ts). */
+  commandCodePlan: CommandCodePlan | null;
+  setCommandCodePlan: (plan: CommandCodePlan | null) => void;
 }
 
 const BLOCK_IMAGES_KEY = "yomu-block-images";
@@ -157,5 +168,10 @@ export const useUiStore = create<UiState>((set, get) => ({
     };
     write(EXPLAIN_PREFS_KEY, JSON.stringify(explainPrefs));
     set({ explainPrefs });
+  },
+  commandCodePlan: parseCommandCodePlan(read(COMMAND_CODE_PLAN_KEY)),
+  setCommandCodePlan: (commandCodePlan) => {
+    write(COMMAND_CODE_PLAN_KEY, commandCodePlan ?? "");
+    set({ commandCodePlan });
   },
 }));
