@@ -3,7 +3,13 @@ import { Check, Loader2 } from "lucide-react";
 import type { AgentConfig } from "@/types/agent";
 import { Button } from "@/components/ui/button";
 import { agentFindCommand, agentSandboxed } from "@/lib/commands";
-import { PRESETS, agentId, presetOf } from "@/lib/agents";
+import {
+  CODEX_DETECT,
+  CODEX_ID,
+  PRESETS,
+  agentId,
+  presetOf,
+} from "@/lib/agents";
 import { joinWords, splitWords } from "@/lib/shell-words";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/stores/agent-store";
@@ -27,7 +33,8 @@ export function AgentSection() {
   const [command, setCommand] = useState(custom?.command ?? "");
   const [args, setArgs] = useState(custom ? joinWords(custom.args) : "");
   const [dataDirs, setDataDirs] = useState(custom?.dataDirs.join(", ") ?? "");
-  // Where each preset's program was found (by preset id); null if missing.
+  // Where each agent's program was found (by preset id, and Codex under
+  // `CODEX_ID`); null if missing. Only installed agents are offered.
   const [installed, setInstalled] = useState<Record<string, string | null>>({});
   const [found, setFound] = useState<string | null | undefined>(undefined);
   const [testing, setTesting] = useState(false);
@@ -56,11 +63,17 @@ export function AgentSection() {
 
   useEffect(() => {
     void refresh();
-    for (const preset of PRESETS) {
-      agentFindCommand(preset.detect)
-        .catch(() => null)
-        .then((path) => setInstalled((s) => ({ ...s, [preset.id]: path })));
-    }
+    const probes = [
+      { id: CODEX_ID, command: CODEX_DETECT },
+      ...PRESETS.map((p) => ({ id: p.id, command: p.detect })),
+    ];
+    void Promise.all(
+      probes.map((p) =>
+        agentFindCommand(p.command)
+          .catch(() => null)
+          .then((path) => [p.id, path] as const),
+      ),
+    ).then((entries) => setInstalled(Object.fromEntries(entries)));
   }, [refresh]);
 
   const customConfig = (): AgentConfig => ({
@@ -99,39 +112,49 @@ export function AgentSection() {
         ? "Starting…"
         : "Could not start";
 
+  // Only agents whose program is on this computer are shown. The one in use
+  // stays even if its program has since gone or moved, so the reader can
+  // still see which agent they are on and switch away from it.
+  const showsCodex = Boolean(installed[CODEX_ID]) || usingCodex;
+  const showsPresets = PRESETS.filter(
+    (preset) => installed[preset.id] || usingPreset === preset,
+  );
+
   return (
     <>
       <div className="flex flex-col gap-2">
-        <Card
-          on={usingCodex}
-          title="Codex"
-          badge={
-            usingCodex
-              ? status === "ready"
-                ? "Ready"
-                : status === "checking"
-                  ? "Checking…"
-                  : "Needs setup"
-              : undefined
-          }
-          onSelect={() => choose({ kind: "codex" })}
-        >
-          {usingCodex && status === "setup" && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="mt-2 rounded-lg"
-              onClick={() => {
-                setSettingsPage(false);
-                setSetupOpen(true);
-              }}
-            >
-              Set up Codex
-            </Button>
-          )}
-        </Card>
+        {showsCodex && (
+          <Card
+            on={usingCodex}
+            title="Codex"
+            badge={
+              usingCodex
+                ? status === "ready"
+                  ? "Ready"
+                  : status === "checking"
+                    ? "Checking…"
+                    : "Needs setup"
+                : undefined
+            }
+            onSelect={() => choose({ kind: "codex" })}
+          >
+            {usingCodex && status === "setup" && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-2 rounded-lg"
+                onClick={() => {
+                  setSettingsPage(false);
+                  setSetupOpen(true);
+                }}
+              >
+                Set up Codex
+              </Button>
+            )}
+          </Card>
+        )}
 
-        {PRESETS.map((preset) => {
+        {showsPresets.map((preset) => {
           const on = usingPreset === preset;
           const found = installed[preset.id];
           return (

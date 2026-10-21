@@ -7,7 +7,6 @@ vi.mock("@/lib/storage", () => ({
 }));
 
 import {
-  ANTIGRAVITY,
   CLAUDE_CODE,
   OPENCODE,
   CUSTOM_ID,
@@ -32,7 +31,6 @@ describe("agent presets", () => {
   it("recognises a preset from the configuration saved for it", () => {
     expect(presetOf(OPENCODE.config)).toBe(OPENCODE);
     expect(presetOf(CLAUDE_CODE.config)).toBe(CLAUDE_CODE);
-    expect(presetOf(ANTIGRAVITY.config)).toBe(ANTIGRAVITY);
   });
 
   it("treats Codex and a hand-made agent as no preset", () => {
