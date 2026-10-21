@@ -18,6 +18,15 @@ pub use events::AgentEvent;
 pub use harness::{AgentHarness, ModelInfo};
 pub use status::{diagnose, login, resolve_command, Diagnosis};
 
+/// The one folder outside home that an agent may write in: its own private
+/// scratch (also the parent of every session's working directory). Agents
+/// such as OpenCode create files here as they start — OpenCode's Bun runtime
+/// makes `$TMPDIR/opencode` — so without it they refuse to boot at all. The
+/// agent is pointed at it with `TMPDIR`, keeping the system temp folder shut.
+pub fn scratch_dir() -> std::path::PathBuf {
+    std::env::temp_dir().join("yomu-agent-sessions")
+}
+
 /// Whether the agent runs inside an operating-system sandbox on this
 /// computer (see `sandbox.rs` for macOS, `confine.rs` for Linux). Where it
 /// does not, the agent has the user's own permissions.

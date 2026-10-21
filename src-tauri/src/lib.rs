@@ -204,9 +204,11 @@ async fn agent_login() -> Result<(), String> {
     agent::login().await
 }
 
-/// Shared parent of every agent session's temp working directory.
+/// Shared parent of every agent session's temp working directory. It is the
+/// agent's scratch folder (see `agent::scratch_dir`), the one place outside
+/// home the sandbox leaves writable.
 fn sessions_root() -> std::path::PathBuf {
-    std::env::temp_dir().join("yomu-agent-sessions")
+    agent::scratch_dir()
 }
 
 /// Creates a new, empty temp directory to use as an agent's working

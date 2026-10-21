@@ -8,8 +8,9 @@
 //!   folders). Without this, a prompt-injected article could make the agent
 //!   read personal files and send them out over the (necessarily open)
 //!   network.
-//! - Writes: denied everywhere except the npm cache, `~/.codex`, a custom
-//!   agent's own data folders, and `/dev/null` and `/dev/tty`.
+//! - Writes: denied everywhere except the npm cache, `~/.codex`, the agent's
+//!   own folders (a custom agent's state, plus the private scratch it boots
+//!   in), and `/dev/null` and `/dev/tty`.
 //! - Network: allowed (the agent cannot run without it).
 //!
 //! It uses Landlock, which the kernel enforces on the process and everything

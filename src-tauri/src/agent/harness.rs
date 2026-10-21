@@ -24,14 +24,15 @@ const AGENT_LABEL: &str = "@agentclientprotocol/codex-acp";
 /// regardless of what Codex's own
 /// (unenforced -- see `sandbox.rs`'s doc comment) sandbox policy claims.
 fn default_command() -> Option<Command> {
+    let scratch = super::scratch_dir();
+    let _ = std::fs::create_dir_all(&scratch);
     #[cfg(target_os = "macos")]
     {
-        let profile = super::sandbox::profile();
+        let profile = super::sandbox::profile_with(&[], std::slice::from_ref(&scratch));
         let mut command = Command::new("sandbox-exec");
-        // Node fails outright if its own working directory is unreadable, and
-        // the read lock covers home, so never inherit the app's cwd.
         command
-            .current_dir(std::env::temp_dir())
+            .current_dir(&scratch)
+            .env("TMPDIR", &scratch)
             .arg("-p")
             .arg(profile)
             .arg("--")
@@ -42,8 +43,11 @@ fn default_command() -> Option<Command> {
     #[cfg(not(target_os = "macos"))]
     {
         let mut command = Command::new("npx");
-        command.args(["-y", "@agentclientprotocol/codex-acp@1.13.1"]);
-        Some(confined(command, &[], &[]))
+        command
+            .args(["-y", "@agentclientprotocol/codex-acp@1.13.1"])
+            .current_dir(&scratch)
+            .env("TMPDIR", &scratch);
+        Some(confined(command, &[], std::slice::from_ref(&scratch)))
     }
 }
 
@@ -51,7 +55,9 @@ fn default_command() -> Option<Command> {
 /// enforce them: Landlock on Linux (see `confine.rs`). Windows has no
 /// equivalent built yet (see docs/windows-sandbox.md), and an older Linux
 /// kernel has no Landlock; there the agent runs as it is, and says so in
-/// the log. `read` and `write` are a custom agent's own folders.
+/// the log. `read` and `write` are a custom agent's own folders; the caller
+/// sets the working directory, which must stay outside home (Node fails if
+/// its working directory is unreadable, and home is locked).
 #[cfg(not(target_os = "macos"))]
 #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
 fn confined(
@@ -66,9 +72,6 @@ fn confined(
             if let Err(e) = super::confine::confine(command.as_std_mut(), &policy) {
                 log::warn!("{e}; the agent runs without the sandbox");
             }
-            // Node fails if its working directory is unreadable, and home
-            // is locked, so never inherit the app's.
-            command.current_dir(std::env::temp_dir());
         } else {
             log::warn!("this kernel has no Landlock; the agent runs without the sandbox");
         }
@@ -93,7 +96,9 @@ fn custom_command(command: &str, args: &[String], data_dirs: &[String]) -> Optio
         (Some(rest), Some(h)) => h.join(rest),
         _ => std::path::PathBuf::from(p),
     };
-    let program_dir = super::status::resolve_command(command)
+    let program = super::status::resolve_command(command);
+    let program_dir = program
+        .as_ref()
         .and_then(|p| p.parent().map(std::path::Path::to_path_buf));
     // An argument that is itself a file (`node ~/agents/my-agent.js`) is
     // part of the program, so its folder is readable too -- unless that
@@ -105,27 +110,41 @@ fn custom_command(command: &str, args: &[String], data_dirs: &[String]) -> Optio
         .filter_map(|p| p.parent().map(std::path::Path::to_path_buf))
         .filter(|dir| Some(dir) != home.as_ref());
     let read: Vec<_> = program_dir.into_iter().chain(script_dirs).collect();
-    let write: Vec<_> = data_dirs
+    let mut write: Vec<_> = data_dirs
         .iter()
         .map(|d| d.trim())
         .filter(|d| !d.is_empty())
         .map(expand)
         .collect();
+    // Its own data folders, plus the private scratch every agent needs to
+    // boot (agents such as OpenCode make files under `$TMPDIR` as they start).
+    let scratch = super::scratch_dir();
+    let _ = std::fs::create_dir_all(&scratch);
+    write.push(scratch.clone());
+    // Run the path that was resolved, not the typed one: `exec` expands
+    // neither `~` nor anything else, so an agent under home (the custom
+    // field takes `~/bin/my-agent`) would be looked up verbatim and fail
+    // with "no such file". When nothing was found, the expanded command is
+    // used anyway, so the error names the real path.
+    let exe = program.unwrap_or_else(|| expand(command));
     #[cfg(target_os = "macos")]
     {
         let mut cmd = Command::new("sandbox-exec");
-        cmd.current_dir(std::env::temp_dir())
+        cmd.current_dir(&scratch)
+            .env("TMPDIR", &scratch)
             .arg("-p")
             .arg(super::sandbox::profile_with(&read, &write))
             .arg("--")
-            .arg(command)
+            .arg(&exe)
             .args(args.iter().map(|a| expand(a)));
         Some(cmd)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let mut cmd = Command::new(command);
-        cmd.args(args.iter().map(|a| expand(a)));
+        let mut cmd = Command::new(&exe);
+        cmd.args(args.iter().map(|a| expand(a)))
+            .current_dir(&scratch)
+            .env("TMPDIR", &scratch);
         Some(confined(cmd, &read, &write))
     }
 }
@@ -138,6 +157,55 @@ fn command_for(config: &AgentConfig) -> Option<Command> {
             args,
             data_dirs,
         } => custom_command(command, args, data_dirs),
+    }
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::custom_command;
+
+    /// An agent named by a path under home (`~/bin/my-agent.par`, which the
+    /// custom agent field takes). `exec` expands nothing, so a literal `~`
+    /// used to be looked up verbatim and the agent died with "no such file
+    /// or directory".
+    #[test]
+    fn a_home_path_command_is_expanded_before_it_is_run() {
+        let command = custom_command("~/nowhere/agent.par", &[], &[]).unwrap();
+        let std = command.as_std();
+        let expected = std::path::PathBuf::from(std::env::var_os("HOME").unwrap())
+            .join("nowhere/agent.par")
+            .to_string_lossy()
+            .into_owned();
+        let shown: Vec<String> = std::iter::once(std.get_program().to_string_lossy().into_owned())
+            .chain(std.get_args().map(|a| a.to_string_lossy().into_owned()))
+            .collect();
+        assert!(
+            shown.contains(&expected),
+            "the command was not expanded to {expected}: {shown:?}"
+        );
+        assert!(
+            !shown.iter().any(|a| a.starts_with('~')),
+            "a literal `~` reached exec: {shown:?}"
+        );
+    }
+
+    /// A `~/` argument in a data folder is expanded too (the sandbox gets a
+    /// real path to allow).
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn home_path_data_folders_are_expanded() {
+        let command = custom_command("sh", &[], &["~/.my-agent".to_string()]).unwrap();
+        let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap())
+            .join(".my-agent")
+            .to_string_lossy()
+            .into_owned();
+        let profile = command
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .find(|a| a.contains("file-write*"))
+            .expect("the profile should be passed as an argument");
+        assert!(profile.contains(&home), "{profile}");
     }
 }
 

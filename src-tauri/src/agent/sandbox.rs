@@ -22,25 +22,22 @@
 
 use std::path::{Path, PathBuf};
 
-/// Builds a Seatbelt profile (fed to `sandbox-exec -p`) that:
+/// Builds a Seatbelt profile (fed to `sandbox-exec -p`) for an agent that:
 /// - allows the process to run at all (exec, fork, standard OS plumbing);
 /// - allows reads outside the home folder, and inside it only the places
 ///   Node/Codex need (see the module docs);
-/// - denies writes everywhere -- including the session's cwd, since Yomu
-///   only reads/explains and never needs the agent to write files -- except
-///   the user's npm cache (`npx` needs to write there to fetch/cache the
-///   adapter package) and Codex's own `~/.codex` state dir (its
-///   session/auth sqlite db -- confirmed necessary: without it Codex fails
-///   outright with "failed to initialize sqlite state runtime", not a
-///   security-relevant write target, same category as the npm cache);
+/// - denies writes everywhere -- Yomu only reads/explains, never needs the
+///   agent to write to the reader's files -- except the user's npm cache
+///   (`npx` needs to write there to fetch/cache the adapter package), Codex's
+///   own `~/.codex` state dir (its session/auth sqlite db -- confirmed
+///   necessary: without it Codex fails outright with "failed to initialize
+///   sqlite state runtime", not a security-relevant write target, same
+///   category as the npm cache), and the `extra_write` folders below;
 /// - allows outbound network (Codex can't run without it).
-pub fn profile() -> String {
-    profile_with(&[], &[])
-}
-
-/// Like [`profile`], for a custom agent: `extra_read` are folders it may
-/// read (its own program), `extra_write` folders it may read and write (its
-/// own state, such as a sign-in). Both only matter inside the home folder.
+///
+/// `extra_read` are folders the agent may read (its own program);
+/// `extra_write` folders it may also write (its own state, such as a
+/// sign-in, and the private scratch folder it is handed so it can boot).
 pub fn profile_with(extra_read: &[PathBuf], extra_write: &[PathBuf]) -> String {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let path = std::env::var("PATH").unwrap_or_default();
@@ -64,7 +61,7 @@ fn node_roots(home: Option<&Path>, path: &str) -> Vec<PathBuf> {
 fn build(home: Option<&Path>, node_roots: &[PathBuf], extra_write: &[PathBuf]) -> String {
     let mut writable = Vec::new();
     let mut read_lock = String::new();
-    if let Some(home) = home {
+    if let Some(home) = home.map(real) {
         let sub = |name: &str| escape(&home.join(name).to_string_lossy());
         writable.push(sub(".npm"));
         writable.push(sub(".codex"));
@@ -86,11 +83,11 @@ fn build(home: Option<&Path>, node_roots: &[PathBuf], extra_write: &[PathBuf]) -
         for root in node_roots.iter().chain(extra_write) {
             read_lock.push_str(&format!(
                 "(allow file-read-data (subpath \"{}\"))\n",
-                escape(&root.to_string_lossy())
+                escape(&real(root).to_string_lossy())
             ));
         }
         for dir in extra_write {
-            writable.push(escape(&dir.to_string_lossy()));
+            writable.push(escape(&real(dir).to_string_lossy()));
         }
     }
     read_lock.push_str("(deny file-read-data (subpath \"/Volumes\"))\n");
@@ -121,6 +118,15 @@ fn build(home: Option<&Path>, node_roots: &[PathBuf], extra_write: &[PathBuf]) -
 /// Escapes a path for embedding in a Seatbelt profile string literal.
 fn escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// `path` as the filesystem really sees it. Seatbelt matches its rules
+/// against real paths, so a rule written with a symlinked path — macOS's
+/// `/tmp` → `/private/tmp`, or `$TMPDIR` under `/var/folders` — never matches
+/// and every write there is denied. A path that does not exist yet is
+/// returned unchanged.
+fn real(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 #[cfg(test)]
@@ -292,6 +298,46 @@ mod tests {
             &format!("sh -c 'sh -c \"cat {}\"'", secret.display()),
         );
         assert!(!ok && !out.contains("the-secret-words"), "{out}");
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
+    #[test]
+    fn the_scratch_folder_is_writable_so_an_agent_can_boot() {
+        let f = fixture("scratch");
+        let scratch = f.dir.join("scratch");
+        std::fs::create_dir_all(&scratch).unwrap();
+        let profile = build(Some(&f.home), &[], std::slice::from_ref(&scratch));
+        // What OpenCode's Bun runtime does on start-up: make a folder under
+        // `$TMPDIR`. Denying it is what made OpenCode fail with EPERM.
+        let (ok, out) = run(
+            &profile,
+            &format!(
+                "export TMPDIR='{}'; mkdir -p \"$TMPDIR/opencode\" && echo made",
+                scratch.display()
+            ),
+        );
+        assert!(
+            ok && out.contains("made"),
+            "scratch must be writable: {out}"
+        );
+        assert!(scratch.join("opencode").is_dir());
+        std::fs::remove_dir_all(&f.dir).unwrap();
+    }
+
+    #[test]
+    fn a_symlinked_scratch_folder_is_matched_by_its_real_path() {
+        // macOS's `/tmp` is a link to `/private/tmp`, and `$TMPDIR` sits
+        // under a linked `/var`; Seatbelt only matches real paths, so
+        // `build` has to resolve a folder before writing its rule.
+        let f = fixture("symlink");
+        let real_dir = f.dir.join("real-scratch");
+        std::fs::create_dir_all(&real_dir).unwrap();
+        let link = f.dir.join("linked-scratch");
+        std::os::unix::fs::symlink(&real_dir, &link).unwrap();
+        let profile = build(Some(&f.home), &[], std::slice::from_ref(&link));
+        let (ok, out) = run(&profile, &format!("mkdir -p '{}/opencode'", link.display()));
+        assert!(ok, "a linked folder must still be writable: {out}");
+        assert!(real_dir.join("opencode").is_dir());
         std::fs::remove_dir_all(&f.dir).unwrap();
     }
 
