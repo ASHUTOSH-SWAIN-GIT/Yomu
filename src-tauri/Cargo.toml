@@ -1,6 +1,6 @@
 [package]
 name = "yomu"
-version = "1.0.8"
+version = "1.0.9"
 description = "Yomu, an agent native technical reader"
 authors = ["you"]
 edition = "2021"
